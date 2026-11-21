@@ -1339,10 +1339,12 @@ curl --fail http://<bind-address>:<port>/healthz  # {"status":"ok"}
 
 In the desktop app choose **File > Storage Mode...**, Database, and enter the base
 URL `http://<bind-address>:<port>`, without `/healthz` or `/api/nests`.
-To set or change just the saved server address without changing File/Database mode,
-use **Tools > Options > Nest server > Set / Change Server**. This saves the URL
-immediately, independently of the Options Save button; it does not migrate nests
-or enable Database mode. Canceling Options afterward does not undo that address.
+To add, rename or remove saved servers, or change the server in use without changing
+File/Database mode, use **Tools > Options > Nest Server**: a grid of saved servers (type
+in its blank last row to add one) and an **Active server** dropdown. Changes save with the
+Options Save button, which first checks every row (a valid http/https address, no repeats)
+and saves nothing if one is bad. The active server cannot be removed. It does not migrate
+nests or enable Database mode.
 
 ### Redeploying a development build
 

@@ -18,15 +18,58 @@ namespace OpenNest.Forms
             InitializeComponent();
             planningEffortBox.Minimum = (decimal)CuttingPlanBatch.MinimumBudgetMultiplier;
             planningEffortBox.Maximum = (decimal)CuttingPlanBatch.MaximumBudgetMultiplier;
-            GridStyle.Apply(strategyGrid);
+            GridStyle.Apply(strategyGrid, sizeColumns: false);
             BuildStrategyGrid();
+            GridStyle.Apply(serverGrid, sizeColumns: false);
+            BuildServerGrid();
+            navList.SelectedIndex = System.Math.Clamp(lastPageIndex, 0, pages.Length - 1);
         }
+
+        // The page shown last, so reopening Options in the same session returns to it.
+        private static int lastPageIndex;
 
         protected override void OnLoad(EventArgs e)
         {
             base.OnLoad(e);
             LoadSettings();
         }
+
+        private void NavList_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            var index = navList.SelectedIndex;
+            if (index < 0)
+                return;
+            lastPageIndex = index;
+            for (var i = 0; i < pages.Length; i++)
+                pages[i].Visible = i == index;
+            navList.Invalidate();
+        }
+
+        private void NavList_DrawItem(object sender, DrawItemEventArgs e)
+        {
+            if (e.Index < 0)
+                return;
+
+            var selected = (e.State & DrawItemState.Selected) != 0;
+            var bounds = e.Bounds;
+            using (var back = new System.Drawing.SolidBrush(selected ? NavSelectedColor : NavBackColor))
+                e.Graphics.FillRectangle(back, bounds);
+            if (selected)
+            {
+                using var accent = new System.Drawing.SolidBrush(NavAccentColor);
+                e.Graphics.FillRectangle(accent, bounds.Left, bounds.Top + 7, 3, bounds.Height - 14);
+            }
+
+            var textBounds = new System.Drawing.Rectangle(bounds.Left + 16, bounds.Top, bounds.Width - 20, bounds.Height);
+            TextRenderer.DrawText(e.Graphics, (string)navList.Items[e.Index], navList.Font, textBounds,
+                System.Drawing.Color.FromArgb(32, 32, 32),
+                TextFormatFlags.VerticalCenter | TextFormatFlags.Left | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
+            if ((e.State & DrawItemState.Focus) != 0 && (e.State & DrawItemState.NoFocusRect) == 0)
+                ControlPaint.DrawFocusRectangle(e.Graphics, System.Drawing.Rectangle.Inflate(bounds, -2, -2));
+        }
+
+        private static readonly System.Drawing.Color NavSelectedColor = System.Drawing.Color.FromArgb(220, 234, 248);
+        private static readonly System.Drawing.Color NavAccentColor = System.Drawing.Color.FromArgb(0, 103, 192);
 
         private void BuildStrategyGrid()
         {
@@ -37,7 +80,7 @@ namespace OpenNest.Forms
                 {
                     Name = "Enabled",
                     HeaderText = "",
-                    Width = 30,
+                    Width = 32,
                 }
             );
 
@@ -47,7 +90,8 @@ namespace OpenNest.Forms
                     Name = "Name",
                     HeaderText = "Strategy",
                     ReadOnly = true,
-                    Width = 220,
+                    AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill,
+                    MinimumWidth = 120,
                 }
             );
 
@@ -80,8 +124,7 @@ namespace OpenNest.Forms
         private void LoadSettings()
         {
             var options = ReadOptions();
-            serverPicker.ForgetServer = NestStorage.ForgetServer;
-            serverPicker.Bind(NestStorage.Settings);
+            LoadServers();
             updateFeedUrlBox.Text = Settings.Default.UpdateFeedUrl;
             updateChannelCombo.Items.Clear();
             foreach (var (_, text) in UpdateChannelOption.Choices)
@@ -89,8 +132,8 @@ namespace OpenNest.Forms
             updateChannelCombo.SelectedIndex = UpdateChannelOption.IndexOf(options.UpdateChannel);
             ledgerUrlBox.Text = MaterialLedgerStore.Settings.BaseUrl;
             ledgerKeyBox.Text = MaterialLedgerStore.Settings.ApiKey;
-            checkBox1.Checked = options.CreateNewNestOnOpen;
-            numericUpDown1.Value = (decimal)options.AutoSizePlateFactorForEditing;
+            createNestOnStartupCheck.Checked = options.CreateNewNestOnOpen;
+            autoSizeFactorBox.Value = (decimal)options.AutoSizePlateFactorForEditing;
             planningEffortBox.Value = (decimal)options.CuttingPlanEffortForEditing;
 
             colorSchemeCombo.Items.Clear();
@@ -122,9 +165,9 @@ namespace OpenNest.Forms
 
             var options = new DesktopOptions
             {
-                CreateNewNestOnOpen = checkBox1.Checked,
+                CreateNewNestOnOpen = createNestOnStartupCheck.Checked,
                 UpdateChannel = UpdateChannelOption.At(updateChannelCombo.SelectedIndex),
-                AutoSizePlateFactor = (double)numericUpDown1.Value,
+                AutoSizePlateFactor = (double)autoSizeFactorBox.Value,
                 CuttingPlanEffort = (double)planningEffortBox.Value,
                 ColorScheme = colorSchemeCombo.SelectedItem as string ?? ColorSchemeRegistry.DefaultSchemeName,
                 ClonePlacementOrder = ClonePlacement.At(clonePlacementCombo.SelectedIndex),
@@ -174,6 +217,13 @@ namespace OpenNest.Forms
 
         private void SaveSettings_Click(object sender, EventArgs e)
         {
+            // The server list is checked first so a bad row saves nothing and keeps the dialog open.
+            if (!SaveServers())
+            {
+                DialogResult = DialogResult.None;
+                return;
+            }
+
             SaveSettings();
         }
 
@@ -184,15 +234,6 @@ namespace OpenNest.Forms
                 OptionNoticeKind.Error => MessageBoxIcon.Error,
                 _ => MessageBoxIcon.Information,
             });
-
-        private void SetServer_Click(object sender, EventArgs e)
-        {
-            var (notice, url) = NestServerUrlOption.Save(serverPicker.ServerUrl,
-                next => NestStorage.Save(NestStorage.Settings.Mode, next, serverPicker.ServerName));
-            if (url != null)
-                serverPicker.Bind(NestStorage.Settings);
-            ShowNotice(notice);
-        }
 
         private void SaveLedger_Click(object sender, EventArgs e)
         {

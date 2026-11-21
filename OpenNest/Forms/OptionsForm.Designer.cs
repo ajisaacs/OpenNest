@@ -1,4 +1,7 @@
-﻿namespace OpenNest.Forms
+﻿using System.Drawing;
+using System.Windows.Forms;
+
+namespace OpenNest.Forms
 {
     partial class OptionsForm
     {
@@ -20,461 +23,489 @@
             base.Dispose(disposing);
         }
 
-        #region Windows Form Designer generated code
-
-        /// <summary>
-        /// Required method for Designer support - do not modify
-        /// the contents of this method with the code editor.
-        /// </summary>
+        // The window is a category list beside one page per category, built in code: each page
+        // is a heading, a sentence on what it holds and a label/field table, so rows line up and
+        // follow the font at any DPI.
         private void InitializeComponent()
         {
-            this.components = new System.ComponentModel.Container();
-            this.checkBox1 = new System.Windows.Forms.CheckBox();
-            this.label1 = new System.Windows.Forms.Label();
-            this.toolTip1 = new System.Windows.Forms.ToolTip(this.components);
-            this.numericUpDown1 = new OpenNest.Controls.NumericUpDown();
-            this.planningEffortLabel = new System.Windows.Forms.Label();
-            this.planningEffortBox = new OpenNest.Controls.NumericUpDown();
-            this.tableLayoutPanel1 = new System.Windows.Forms.TableLayoutPanel();
-            this.saveButton = new System.Windows.Forms.Button();
-            this.cancelButton = new System.Windows.Forms.Button();
-            this.bottomPanel1 = new OpenNest.Controls.BottomPanel();
-            this.strategyGrid = new System.Windows.Forms.DataGridView();
-            this.strategyGroupBox = new System.Windows.Forms.GroupBox();
-            this.colorSchemeLabel = new System.Windows.Forms.Label();
-            this.colorSchemeCombo = new System.Windows.Forms.ComboBox();
-            this.clonePlacementLabel = new System.Windows.Forms.Label();
-            this.clonePlacementCombo = new System.Windows.Forms.ComboBox();
-            this.serverGroupBox = new System.Windows.Forms.GroupBox();
-            this.serverPicker = new OpenNest.Controls.NestServerPicker();
-            this.setServerButton = new System.Windows.Forms.Button();
-            this.updateGroupBox = new System.Windows.Forms.GroupBox();
-            this.updateFeedUrlBox = new System.Windows.Forms.TextBox();
-            this.setUpdateFeedButton = new System.Windows.Forms.Button();
-            this.updateChannelLabel = new System.Windows.Forms.Label();
-            this.updateChannelCombo = new System.Windows.Forms.ComboBox();
-            this.ledgerGroupBox = new System.Windows.Forms.GroupBox();
-            this.ledgerUrlLabel = new System.Windows.Forms.Label();
-            this.ledgerUrlBox = new System.Windows.Forms.TextBox();
-            this.ledgerKeyLabel = new System.Windows.Forms.Label();
-            this.ledgerKeyBox = new System.Windows.Forms.TextBox();
-            this.testLedgerButton = new System.Windows.Forms.Button();
-            this.saveLedgerButton = new System.Windows.Forms.Button();
-            ((System.ComponentModel.ISupportInitialize)(this.numericUpDown1)).BeginInit();
-            ((System.ComponentModel.ISupportInitialize)(this.planningEffortBox)).BeginInit();
-            this.tableLayoutPanel1.SuspendLayout();
-            this.bottomPanel1.SuspendLayout();
-            this.serverGroupBox.SuspendLayout();
-            this.updateGroupBox.SuspendLayout();
-            this.ledgerGroupBox.SuspendLayout();
-            this.SuspendLayout();
-            // 
-            // checkBox1
-            // 
-            this.checkBox1.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
-            this.checkBox1.AutoSize = true;
-            this.tableLayoutPanel1.SetColumnSpan(this.checkBox1, 2);
-            this.checkBox1.Location = new System.Drawing.Point(3, 213);
-            this.checkBox1.Name = "checkBox1";
-            this.checkBox1.Size = new System.Drawing.Size(281, 20);
-            this.checkBox1.TabIndex = 7;
-            this.checkBox1.Text = "Create a new nest on startup";
-            this.checkBox1.UseVisualStyleBackColor = true;
-            // 
-            // label1
-            // 
-            this.label1.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
-            this.label1.AutoSize = true;
-            this.label1.Location = new System.Drawing.Point(3, 52);
-            this.label1.Name = "label1";
-            this.label1.Size = new System.Drawing.Size(145, 16);
-            this.label1.TabIndex = 3;
-            this.label1.Text = "Auto-size plate factor:";
-            // 
-            // numericUpDown1
-            // 
-            this.numericUpDown1.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
-            this.numericUpDown1.DecimalPlaces = 4;
-            this.numericUpDown1.Increment = new decimal(new int[] {
-            125,
-            0,
-            0,
-            196608});
-            this.numericUpDown1.Location = new System.Drawing.Point(154, 49);
-            this.numericUpDown1.Name = "numericUpDown1";
-            this.numericUpDown1.Size = new System.Drawing.Size(130, 22);
-            this.numericUpDown1.Suffix = "";
-            this.numericUpDown1.TabIndex = 4;
-            this.toolTip1.SetToolTip(this.numericUpDown1, "The amount to round the plate size up.");
-            //
-            // planningEffortLabel
-            //
-            this.planningEffortLabel.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
-            this.planningEffortLabel.AutoSize = true;
-            this.planningEffortLabel.Location = new System.Drawing.Point(3, 117);
-            this.planningEffortLabel.Name = "planningEffortLabel";
-            this.planningEffortLabel.Size = new System.Drawing.Size(145, 16);
-            this.planningEffortLabel.TabIndex = 12;
-            this.planningEffortLabel.Text = "Cut planning effort:";
-            //
-            // planningEffortBox
-            //
-            this.planningEffortBox.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
-            this.planningEffortBox.DecimalPlaces = 1;
-            this.planningEffortBox.Increment = new decimal(new int[] {
-            5,
-            0,
-            0,
-            65536});
-            this.planningEffortBox.Location = new System.Drawing.Point(154, 114);
-            this.planningEffortBox.Name = "planningEffortBox";
-            this.planningEffortBox.Size = new System.Drawing.Size(130, 22);
-            this.planningEffortBox.Suffix = "";
-            this.planningEffortBox.TabIndex = 13;
-            this.toolTip1.SetToolTip(this.planningEffortBox, "Multiplies the cut planner's search limit (1 = standard). "
-                + "Higher values search longer on hard plates; results are the same on every computer.");
-            //
-            // tableLayoutPanel1
-            //
-            this.tableLayoutPanel1.ColumnCount = 4;
-            this.tableLayoutPanel1.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle());
-            this.tableLayoutPanel1.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 100F));
-            this.tableLayoutPanel1.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Absolute, 297F));
-            this.tableLayoutPanel1.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Absolute, 100F));
-            this.tableLayoutPanel1.Controls.Add(this.label1, 0, 0);
-            this.tableLayoutPanel1.Controls.Add(this.colorSchemeLabel, 0, 1);
-            this.tableLayoutPanel1.Controls.Add(this.colorSchemeCombo, 1, 1);
-            this.tableLayoutPanel1.Controls.Add(this.planningEffortLabel, 0, 2);
-            this.tableLayoutPanel1.Controls.Add(this.planningEffortBox, 1, 2);
-            this.tableLayoutPanel1.Controls.Add(this.clonePlacementLabel, 0, 3);
-            this.tableLayoutPanel1.Controls.Add(this.clonePlacementCombo, 1, 3);
-            this.tableLayoutPanel1.Controls.Add(this.checkBox1, 0, 4);
-            this.tableLayoutPanel1.Controls.Add(this.numericUpDown1, 1, 0);
-            this.tableLayoutPanel1.Location = new System.Drawing.Point(12, 12);
-            this.tableLayoutPanel1.Name = "tableLayoutPanel1";
-            this.tableLayoutPanel1.RowCount = 5;
-            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 20F));
-            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 20F));
-            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 20F));
-            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 20F));
-            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 20F));
-            this.tableLayoutPanel1.Size = new System.Drawing.Size(684, 240);
-            this.tableLayoutPanel1.TabIndex = 0;
-            // 
-            // saveButton
-            // 
-            this.saveButton.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
-            this.saveButton.DialogResult = System.Windows.Forms.DialogResult.OK;
-            this.saveButton.Location = new System.Drawing.Point(507, 11);
-            this.saveButton.Margin = new System.Windows.Forms.Padding(4);
-            this.saveButton.Name = "saveButton";
-            this.saveButton.Size = new System.Drawing.Size(90, 28);
-            this.saveButton.TabIndex = 0;
-            this.saveButton.Text = "Save";
-            this.saveButton.UseVisualStyleBackColor = true;
-            this.saveButton.Click += new System.EventHandler(this.SaveSettings_Click);
-            // 
-            // cancelButton
-            // 
-            this.cancelButton.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
-            this.cancelButton.DialogResult = System.Windows.Forms.DialogResult.Cancel;
-            this.cancelButton.Location = new System.Drawing.Point(605, 11);
-            this.cancelButton.Margin = new System.Windows.Forms.Padding(4);
-            this.cancelButton.Name = "cancelButton";
-            this.cancelButton.Size = new System.Drawing.Size(90, 28);
-            this.cancelButton.TabIndex = 1;
-            this.cancelButton.Text = "Cancel";
-            this.cancelButton.UseVisualStyleBackColor = true;
-            // 
-            // bottomPanel1
-            // 
-            this.bottomPanel1.Controls.Add(this.cancelButton);
-            this.bottomPanel1.Controls.Add(this.saveButton);
-            this.bottomPanel1.Dock = System.Windows.Forms.DockStyle.Bottom;
-            this.bottomPanel1.Location = new System.Drawing.Point(0, 772);
-            this.bottomPanel1.Name = "bottomPanel1";
-            this.bottomPanel1.Size = new System.Drawing.Size(708, 50);
-            this.bottomPanel1.TabIndex = 1;
-            //
-            // strategyGrid
-            //
-            this.strategyGrid.AllowUserToAddRows = false;
-            this.strategyGrid.AllowUserToDeleteRows = false;
-            this.strategyGrid.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.strategyGrid.Location = new System.Drawing.Point(3, 18);
-            this.strategyGrid.Name = "strategyGrid";
-            this.strategyGrid.RowHeadersVisible = false;
-            this.strategyGrid.SelectionMode = System.Windows.Forms.DataGridViewSelectionMode.FullRowSelect;
-            this.strategyGrid.TabIndex = 0;
-            //
-            // strategyGroupBox
-            //
-            this.strategyGroupBox.Controls.Add(this.strategyGrid);
-            this.strategyGroupBox.Location = new System.Drawing.Point(12, 582);
-            this.strategyGroupBox.Name = "strategyGroupBox";
-            this.strategyGroupBox.Size = new System.Drawing.Size(684, 180);
-            this.strategyGroupBox.TabIndex = 2;
-            this.strategyGroupBox.TabStop = false;
-            this.strategyGroupBox.Text = "Fill Strategies";
-            //
-            // colorSchemeLabel
-            //
-            this.colorSchemeLabel.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
-            this.colorSchemeLabel.AutoSize = true;
-            this.colorSchemeLabel.Location = new System.Drawing.Point(3, 92);
-            this.colorSchemeLabel.Name = "colorSchemeLabel";
-            this.colorSchemeLabel.Size = new System.Drawing.Size(145, 16);
-            this.colorSchemeLabel.TabIndex = 10;
-            this.colorSchemeLabel.Text = "Color scheme:";
-            //
-            // colorSchemeCombo
-            //
-            this.colorSchemeCombo.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
-            this.colorSchemeCombo.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
-            this.colorSchemeCombo.Location = new System.Drawing.Point(154, 89);
-            this.colorSchemeCombo.Name = "colorSchemeCombo";
-            this.colorSchemeCombo.Size = new System.Drawing.Size(130, 24);
-            this.colorSchemeCombo.TabIndex = 11;
-            //
-            // clonePlacementLabel
-            //
-            this.clonePlacementLabel.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
-            this.clonePlacementLabel.AutoSize = true;
-            this.clonePlacementLabel.Location = new System.Drawing.Point(3, 172);
-            this.clonePlacementLabel.Name = "clonePlacementLabel";
-            this.clonePlacementLabel.Size = new System.Drawing.Size(145, 16);
-            this.clonePlacementLabel.TabIndex = 14;
-            this.clonePlacementLabel.Text = "Clone push placement:";
-            //
-            // clonePlacementCombo
-            //
-            this.clonePlacementCombo.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
-            this.clonePlacementCombo.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
-            this.clonePlacementCombo.Location = new System.Drawing.Point(154, 168);
-            this.clonePlacementCombo.Name = "clonePlacementCombo";
-            this.clonePlacementCombo.Size = new System.Drawing.Size(130, 24);
-            this.clonePlacementCombo.TabIndex = 15;
-            this.toolTip1.SetToolTip(this.clonePlacementCombo, "Where Clone Parts pushes the copy on Shift+click (part geometry) "
+            components = new System.ComponentModel.Container();
+            toolTip1 = new ToolTip(components);
+
+            createNestOnStartupCheck = new CheckBox
+            {
+                Name = "createNestOnStartupCheck",
+                Text = "Create a new nest on startup",
+                AutoSize = true,
+                Anchor = AnchorStyles.Left,
+                UseVisualStyleBackColor = true,
+            };
+            colorSchemeCombo = NewCombo("colorSchemeCombo", 200);
+            clonePlacementCombo = NewCombo("clonePlacementCombo", 200);
+            toolTip1.SetToolTip(clonePlacementCombo, "Where Clone Parts pushes the copy on Shift+click (part geometry) "
                 + "or Ctrl+click (bounding boxes). Every push goes toward the plate's origin corner.");
-            //
-            // serverGroupBox
-            //
-            this.serverGroupBox.Controls.Add(this.serverPicker);
-            this.serverGroupBox.Controls.Add(this.setServerButton);
-            this.serverGroupBox.Location = new System.Drawing.Point(12, 258);
-            this.serverGroupBox.Name = "serverGroupBox";
-            this.serverGroupBox.Size = new System.Drawing.Size(684, 126);
-            this.serverGroupBox.TabIndex = 1;
-            this.serverGroupBox.TabStop = false;
-            this.serverGroupBox.Text = "Nest server (File / Database mode is selected under File > Storage Mode)";
-            //
-            // serverPicker
-            //
-            this.serverPicker.Location = new System.Drawing.Point(12, 24);
-            this.serverPicker.Name = "serverPicker";
-            this.serverPicker.Size = new System.Drawing.Size(485, 90);
-            this.serverPicker.TabIndex = 0;
-            //
-            // setServerButton
-            //
-            this.setServerButton.Location = new System.Drawing.Point(504, 26);
-            this.setServerButton.Name = "setServerButton";
-            this.setServerButton.Size = new System.Drawing.Size(168, 28);
-            this.setServerButton.TabIndex = 1;
-            this.setServerButton.Text = "Set / Change Server";
-            this.setServerButton.UseVisualStyleBackColor = true;
-            this.setServerButton.Click += new System.EventHandler(this.SetServer_Click);
-            //
-            // updateGroupBox
-            //
-            this.updateGroupBox.Controls.Add(this.updateFeedUrlBox);
-            this.updateGroupBox.Controls.Add(this.setUpdateFeedButton);
-            this.updateGroupBox.Controls.Add(this.updateChannelLabel);
-            this.updateGroupBox.Controls.Add(this.updateChannelCombo);
-            this.updateGroupBox.Location = new System.Drawing.Point(12, 488);
-            this.updateGroupBox.Name = "updateGroupBox";
-            this.updateGroupBox.Size = new System.Drawing.Size(684, 88);
-            this.updateGroupBox.TabIndex = 3;
-            this.updateGroupBox.TabStop = false;
-            this.updateGroupBox.Text = "Auto-update feed URL (blank: nest server mirror in Database mode, else GitHub Releases)";
-            //
-            // updateFeedUrlBox
-            //
-            this.updateFeedUrlBox.Location = new System.Drawing.Point(12, 24);
-            this.updateFeedUrlBox.Name = "updateFeedUrlBox";
-            this.updateFeedUrlBox.PlaceholderText = "http://host:port";
-            this.updateFeedUrlBox.Size = new System.Drawing.Size(485, 22);
-            this.updateFeedUrlBox.TabIndex = 0;
-            //
-            // setUpdateFeedButton
-            //
-            this.setUpdateFeedButton.Location = new System.Drawing.Point(504, 21);
-            this.setUpdateFeedButton.Name = "setUpdateFeedButton";
-            this.setUpdateFeedButton.Size = new System.Drawing.Size(168, 28);
-            this.setUpdateFeedButton.TabIndex = 1;
-            this.setUpdateFeedButton.Text = "Save Feed URL";
-            this.setUpdateFeedButton.UseVisualStyleBackColor = true;
-            this.setUpdateFeedButton.Click += new System.EventHandler(this.SetUpdateFeed_Click);
-            //
-            // updateChannelLabel
-            //
-            this.updateChannelLabel.AutoSize = true;
-            this.updateChannelLabel.Location = new System.Drawing.Point(12, 59);
-            this.updateChannelLabel.Name = "updateChannelLabel";
-            this.updateChannelLabel.Size = new System.Drawing.Size(56, 16);
-            this.updateChannelLabel.TabIndex = 2;
-            this.updateChannelLabel.Text = "Updates:";
-            //
-            // updateChannelCombo
-            //
-            this.updateChannelCombo.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
-            this.updateChannelCombo.Location = new System.Drawing.Point(80, 55);
-            this.updateChannelCombo.Name = "updateChannelCombo";
-            this.updateChannelCombo.Size = new System.Drawing.Size(300, 24);
-            this.updateChannelCombo.TabIndex = 3;
-            this.toolTip1.SetToolTip(this.updateChannelCombo,
+
+            autoSizeFactorBox = new Controls.NumericUpDown
+            {
+                Name = "autoSizeFactorBox",
+                DecimalPlaces = 4,
+                Increment = 0.125m,
+                Width = 120,
+                Anchor = AnchorStyles.Left,
+                Suffix = "",
+            };
+            toolTip1.SetToolTip(autoSizeFactorBox, "The amount to round the plate size up.");
+            planningEffortBox = new Controls.NumericUpDown
+            {
+                Name = "planningEffortBox",
+                DecimalPlaces = 1,
+                Increment = 0.5m,
+                Width = 120,
+                Anchor = AnchorStyles.Left,
+                Suffix = "",
+            };
+            toolTip1.SetToolTip(planningEffortBox, "Multiplies the cut planner's search limit (1 = standard). "
+                + "Higher values search longer on hard plates; results are the same on every computer.");
+
+            strategyGrid = new DataGridView
+            {
+                Name = "strategyGrid",
+                Dock = DockStyle.Fill,
+                AllowUserToAddRows = false,
+                AllowUserToDeleteRows = false,
+                RowHeadersVisible = false,
+                SelectionMode = DataGridViewSelectionMode.FullRowSelect,
+                MultiSelect = false,
+            };
+
+            activeServerCombo = NewCombo("activeServerCombo", 360);
+            activeServerCombo.Anchor = AnchorStyles.Left | AnchorStyles.Right;
+            serverGrid = new DataGridView
+            {
+                Name = "serverGrid",
+                Dock = DockStyle.Fill,
+                AllowUserToAddRows = true,
+                AllowUserToDeleteRows = true,
+                RowHeadersVisible = false,
+                SelectionMode = DataGridViewSelectionMode.CellSelect,
+                MultiSelect = false,
+                EditMode = DataGridViewEditMode.EditOnKeystrokeOrF2,
+            };
+            removeServerButton = NewButton("removeServerButton", "Remove Server");
+            removeServerButton.Click += RemoveServer_Click;
+
+            ledgerUrlBox = NewTextBox("ledgerUrlBox", "http://ledger:5000");
+            ledgerKeyBox = NewTextBox("ledgerKeyBox", "");
+            ledgerKeyBox.UseSystemPasswordChar = true;
+            toolTip1.SetToolTip(ledgerKeyBox, "MaterialLedger's Api:Keys:OpenNest key. Stored encrypted for this Windows user.");
+            testLedgerButton = NewButton("testLedgerButton", "Test Connection");
+            testLedgerButton.Click += TestLedger_Click;
+            saveLedgerButton = NewButton("saveLedgerButton", "Save Ledger");
+            saveLedgerButton.Click += SaveLedger_Click;
+
+            updateChannelCombo = NewCombo("updateChannelCombo", 260);
+            toolTip1.SetToolTip(updateChannelCombo,
                 "Development builds are made from every finished change. Once a day or once "
                 + "a week waits that long after this copy last updated; Help > Check for "
                 + "Updates... always looks now. Takes effect after a restart.");
-            //
-            // ledgerGroupBox
-            //
-            this.ledgerGroupBox.Controls.Add(this.ledgerUrlLabel);
-            this.ledgerGroupBox.Controls.Add(this.ledgerUrlBox);
-            this.ledgerGroupBox.Controls.Add(this.ledgerKeyLabel);
-            this.ledgerGroupBox.Controls.Add(this.ledgerKeyBox);
-            this.ledgerGroupBox.Controls.Add(this.testLedgerButton);
-            this.ledgerGroupBox.Controls.Add(this.saveLedgerButton);
-            this.ledgerGroupBox.Location = new System.Drawing.Point(12, 390);
-            this.ledgerGroupBox.Name = "ledgerGroupBox";
-            this.ledgerGroupBox.Size = new System.Drawing.Size(684, 92);
-            this.ledgerGroupBox.TabIndex = 4;
-            this.ledgerGroupBox.TabStop = false;
-            this.ledgerGroupBox.Text = "MaterialLedger (optional; Auto Nest loads stock from it; saved for this Windows user)";
-            //
-            // ledgerUrlLabel
-            //
-            this.ledgerUrlLabel.AutoSize = true;
-            this.ledgerUrlLabel.Location = new System.Drawing.Point(12, 27);
-            this.ledgerUrlLabel.Name = "ledgerUrlLabel";
-            this.ledgerUrlLabel.Size = new System.Drawing.Size(37, 16);
-            this.ledgerUrlLabel.TabIndex = 0;
-            this.ledgerUrlLabel.Text = "URL:";
-            //
-            // ledgerUrlBox
-            //
-            this.ledgerUrlBox.Location = new System.Drawing.Point(80, 24);
-            this.ledgerUrlBox.Name = "ledgerUrlBox";
-            this.ledgerUrlBox.PlaceholderText = "http://ledger:5000";
-            this.ledgerUrlBox.Size = new System.Drawing.Size(417, 22);
-            this.ledgerUrlBox.TabIndex = 1;
-            //
-            // ledgerKeyLabel
-            //
-            this.ledgerKeyLabel.AutoSize = true;
-            this.ledgerKeyLabel.Location = new System.Drawing.Point(12, 59);
-            this.ledgerKeyLabel.Name = "ledgerKeyLabel";
-            this.ledgerKeyLabel.Size = new System.Drawing.Size(56, 16);
-            this.ledgerKeyLabel.TabIndex = 2;
-            this.ledgerKeyLabel.Text = "API key:";
-            //
-            // ledgerKeyBox
-            //
-            this.ledgerKeyBox.Location = new System.Drawing.Point(80, 56);
-            this.ledgerKeyBox.Name = "ledgerKeyBox";
-            this.ledgerKeyBox.Size = new System.Drawing.Size(417, 22);
-            this.ledgerKeyBox.TabIndex = 3;
-            this.ledgerKeyBox.UseSystemPasswordChar = true;
-            this.toolTip1.SetToolTip(this.ledgerKeyBox, "MaterialLedger's Api:Keys:OpenNest key. Stored encrypted for this Windows user.");
-            //
-            // testLedgerButton
-            //
-            this.testLedgerButton.Location = new System.Drawing.Point(504, 21);
-            this.testLedgerButton.Name = "testLedgerButton";
-            this.testLedgerButton.Size = new System.Drawing.Size(168, 28);
-            this.testLedgerButton.TabIndex = 4;
-            this.testLedgerButton.Text = "Test";
-            this.testLedgerButton.UseVisualStyleBackColor = true;
-            this.testLedgerButton.Click += new System.EventHandler(this.TestLedger_Click);
-            //
-            // saveLedgerButton
-            //
-            this.saveLedgerButton.Location = new System.Drawing.Point(504, 53);
-            this.saveLedgerButton.Name = "saveLedgerButton";
-            this.saveLedgerButton.Size = new System.Drawing.Size(168, 28);
-            this.saveLedgerButton.TabIndex = 5;
-            this.saveLedgerButton.Text = "Save Ledger";
-            this.saveLedgerButton.UseVisualStyleBackColor = true;
-            this.saveLedgerButton.Click += new System.EventHandler(this.SaveLedger_Click);
-            //
-            // OptionsForm
-            //
-            this.AcceptButton = this.saveButton;
-            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.None;
-            this.CancelButton = this.cancelButton;
-            this.ClientSize = new System.Drawing.Size(708, 822);
-            this.Controls.Add(this.strategyGroupBox);
-            this.Controls.Add(this.updateGroupBox);
-            this.Controls.Add(this.ledgerGroupBox);
-            this.Controls.Add(this.serverGroupBox);
-            this.Controls.Add(this.tableLayoutPanel1);
-            this.Controls.Add(this.bottomPanel1);
-            this.Font = new System.Drawing.Font("Microsoft Sans Serif", 9.75F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedDialog;
-            this.MaximizeBox = false;
-            this.MinimizeBox = false;
-            this.Name = "OptionsForm";
-            this.ShowIcon = false;
-            this.ShowInTaskbar = false;
-            this.StartPosition = System.Windows.Forms.FormStartPosition.CenterParent;
-            this.Text = "Options";
-            ((System.ComponentModel.ISupportInitialize)(this.numericUpDown1)).EndInit();
-            ((System.ComponentModel.ISupportInitialize)(this.planningEffortBox)).EndInit();
-            this.tableLayoutPanel1.ResumeLayout(false);
-            this.tableLayoutPanel1.PerformLayout();
-            this.bottomPanel1.ResumeLayout(false);
-            this.serverGroupBox.ResumeLayout(false);
-            this.serverGroupBox.PerformLayout();
-            this.updateGroupBox.ResumeLayout(false);
-            this.updateGroupBox.PerformLayout();
-            this.ledgerGroupBox.ResumeLayout(false);
-            this.ledgerGroupBox.PerformLayout();
-            this.ResumeLayout(false);
+            updateFeedUrlBox = NewTextBox("updateFeedUrlBox", "Blank: the default feed");
+            setUpdateFeedButton = NewButton("setUpdateFeedButton", "Save Feed URL");
+            setUpdateFeedButton.Click += SetUpdateFeed_Click;
 
+            pageHost = new Panel
+            {
+                Name = "pageHost",
+                Dock = DockStyle.Fill,
+                Padding = new Padding(24, 18, 24, 12),
+            };
+            pages = new[]
+            {
+                BuildGeneralPage(),
+                BuildNestingPage(),
+                BuildStrategyPage(),
+                serverPage = BuildServerPage(),
+                BuildLedgerPage(),
+                BuildUpdatesPage(),
+            };
+            foreach (var page in pages)
+            {
+                page.Visible = false;
+                pageHost.Controls.Add(page);
+            }
+
+            navList = new ListBox
+            {
+                Name = "navList",
+                Dock = DockStyle.Left,
+                Width = 180,
+                BorderStyle = BorderStyle.None,
+                DrawMode = DrawMode.OwnerDrawFixed,
+                ItemHeight = 34,
+                IntegralHeight = false,
+                BackColor = NavBackColor,
+                TabIndex = 0,
+            };
+            foreach (var page in pages)
+                navList.Items.Add(page.Text);
+            navList.DrawItem += NavList_DrawItem;
+            navList.SelectedIndexChanged += NavList_SelectedIndexChanged;
+
+            navDivider = new Panel
+            {
+                Dock = DockStyle.Left,
+                Width = 1,
+                BackColor = Color.FromArgb(218, 218, 218),
+            };
+
+            saveButton = new Button
+            {
+                Name = "saveButton",
+                Text = "Save",
+                DialogResult = DialogResult.OK,
+                Anchor = AnchorStyles.Bottom | AnchorStyles.Right,
+                Size = new Size(90, 28),
+                UseVisualStyleBackColor = true,
+                TabIndex = 0,
+            };
+            saveButton.Click += SaveSettings_Click;
+            cancelButton = new Button
+            {
+                Name = "cancelButton",
+                Text = "Cancel",
+                DialogResult = DialogResult.Cancel,
+                Anchor = AnchorStyles.Bottom | AnchorStyles.Right,
+                Size = new Size(90, 28),
+                UseVisualStyleBackColor = true,
+                TabIndex = 1,
+            };
+            bottomPanel1 = new Controls.BottomPanel { Name = "bottomPanel1", Height = 50 };
+            bottomPanel1.Controls.Add(saveButton);
+            bottomPanel1.Controls.Add(cancelButton);
+            bottomPanel1.Resize += (_, _) => LayoutDialogButtons();
+
+            SuspendLayout();
+            AutoScaleDimensions = new SizeF(7F, 15F);
+            AutoScaleMode = AutoScaleMode.Font;
+            Font = new Font("Segoe UI", 9F, FontStyle.Regular, GraphicsUnit.Point);
+            ClientSize = new Size(800, 540);
+            MinimumSize = new Size(700, 460);
+            Controls.Add(pageHost);
+            Controls.Add(navDivider);
+            Controls.Add(navList);
+            Controls.Add(bottomPanel1);
+            AcceptButton = saveButton;
+            CancelButton = cancelButton;
+            FormBorderStyle = FormBorderStyle.Sizable;
+            MaximizeBox = false;
+            MinimizeBox = false;
+            Name = "OptionsForm";
+            ShowIcon = false;
+            ShowInTaskbar = false;
+            StartPosition = FormStartPosition.CenterParent;
+            Text = "Options";
+            ResumeLayout(false);
+            LayoutDialogButtons();
         }
 
-        #endregion
+        private Panel BuildGeneralPage()
+        {
+            var fields = NewFieldTable();
+            AddRow(fields, createNestOnStartupCheck, "Opens an empty nest with your nest defaults each time OpenNest starts.");
+            AddField(fields, "Color scheme:", colorSchemeCombo, "Colors for plates, parts and cut paths.");
+            AddField(fields, "Clone push placement:", clonePlacementCombo,
+                "Where Clone Parts pushes each copy. Every push goes toward the plate's origin corner.");
+            return NewPage("General", "Startup and how nests look and behave while you edit them.", fields);
+        }
 
-        private System.Windows.Forms.CheckBox checkBox1;
-        private System.Windows.Forms.Button cancelButton;
-        private System.Windows.Forms.Button saveButton;
-        private System.Windows.Forms.Label label1;
-        private Controls.NumericUpDown numericUpDown1;
-        private System.Windows.Forms.Label planningEffortLabel;
-        private Controls.NumericUpDown planningEffortBox;
-        private System.Windows.Forms.ToolTip toolTip1;
+        private Panel BuildNestingPage()
+        {
+            var fields = NewFieldTable();
+            AddField(fields, "Auto-size plate factor:", autoSizeFactorBox,
+                "Auto-sized plates round their size up to a multiple of this amount.");
+            AddField(fields, "Cut planning effort:", planningEffortBox,
+                "Multiplies the cut planner's search limit (1 = standard). Higher values search longer "
+                + "on hard plates; results are the same on every computer.");
+            return NewPage("Nesting && Cutting", "How plates are sized and how hard Plan Cutting searches.", fields);
+        }
+
+        private Panel BuildStrategyPage()
+        {
+            var frame = new Panel
+            {
+                Dock = DockStyle.Fill,
+                Padding = new Padding(1),
+                BackColor = Color.FromArgb(218, 218, 218),
+            };
+            frame.Controls.Add(strategyGrid);
+            return NewPage("Fill Strategies",
+                "The strategies Fill tries, in order. Clear a strategy's box to skip it.", frame);
+        }
+
+        private Panel BuildServerPage()
+        {
+            var active = NewFieldTable();
+            active.Dock = DockStyle.Top;
+            active.AutoSize = true;
+            active.AutoSizeMode = AutoSizeMode.GrowAndShrink;
+            AddField(active, "Active server:", activeServerCombo,
+                "Database mode uses this server. Choose File or Database mode under File > Storage Mode.");
+
+            var listHeading = new Label
+            {
+                Text = "Saved servers",
+                Dock = DockStyle.Top,
+                AutoSize = false,
+                Height = 24,
+                Font = new Font("Segoe UI Semibold", 9F, FontStyle.Regular, GraphicsUnit.Point),
+            };
+            var frame = new Panel
+            {
+                Dock = DockStyle.Fill,
+                Padding = new Padding(1),
+                BackColor = Color.FromArgb(218, 218, 218),
+            };
+            frame.Controls.Add(serverGrid);
+
+            var footer = new FlowLayoutPanel
+            {
+                Dock = DockStyle.Bottom,
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                WrapContents = false,
+                Padding = new Padding(0, 8, 0, 0),
+            };
+            removeServerButton.Margin = new Padding(0, 0, 12, 0);
+            footer.Controls.Add(removeServerButton);
+            footer.Controls.Add(new Label
+            {
+                Text = "Type in the blank last row to add a server.",
+                AutoSize = true,
+                ForeColor = HintColor,
+                Margin = new Padding(0, 6, 0, 0),
+            });
+
+            var body = new Panel { Dock = DockStyle.Fill };
+            body.Controls.Add(frame);
+            body.Controls.Add(footer);
+            body.Controls.Add(listHeading);
+            body.Controls.Add(active);
+            return NewPage("Nest Server",
+                "The nest servers this PC uses. Changes here save with Save.", body);
+        }
+
+        private Panel BuildLedgerPage()
+        {
+            var fields = NewFieldTable();
+            ledgerUrlBox.Anchor = AnchorStyles.Left | AnchorStyles.Right;
+            ledgerKeyBox.Anchor = AnchorStyles.Left | AnchorStyles.Right;
+            AddField(fields, "URL:", ledgerUrlBox, "Leave blank to turn the ledger off.");
+            AddField(fields, "API key:", ledgerKeyBox, "Stored encrypted for this Windows user.");
+            AddButtons(fields, testLedgerButton, saveLedgerButton);
+            return NewPage("MaterialLedger",
+                "Optional. When set, Auto Nest loads stock from MaterialLedger. "
+                + "Save Ledger saves these right away, for this Windows user.", fields);
+        }
+
+        private Panel BuildUpdatesPage()
+        {
+            var fields = NewFieldTable();
+            updateFeedUrlBox.Anchor = AnchorStyles.Left | AnchorStyles.Right;
+            AddField(fields, "Install:", updateChannelCombo,
+                "Takes effect after a restart. Help > Check for Updates... always looks now.");
+            AddField(fields, "Feed URL:", updateFeedUrlBox,
+                "Blank uses the nest server's mirror in Database mode, otherwise GitHub Releases.");
+            AddButtons(fields, setUpdateFeedButton);
+            return NewPage("Updates", "Which builds OpenNest installs and where it looks for them.", fields);
+        }
+
+        private static Panel NewPage(string title, string description, Control body)
+        {
+            var page = new Panel { Dock = DockStyle.Fill, Text = title.Replace("&&", "&") };
+            var heading = new Label
+            {
+                Text = title,
+                Dock = DockStyle.Top,
+                AutoSize = false,
+                Height = 30,
+                Font = new Font("Segoe UI Semibold", 13F, FontStyle.Regular, GraphicsUnit.Point),
+                ForeColor = Color.FromArgb(32, 32, 32),
+            };
+            var summary = new Label
+            {
+                Text = description,
+                Dock = DockStyle.Top,
+                AutoSize = false,
+                Height = 40,
+                ForeColor = HintColor,
+                Padding = new Padding(0, 0, 0, 8),
+            };
+            summary.SizeChanged += (_, _) => FitLabelHeight(summary);
+            if (body is TableLayoutPanel fields)
+            {
+                // A last row takes the spare height, so the fields stay packed at the top.
+                fields.RowCount++;
+                fields.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+            }
+            body.Dock = DockStyle.Fill;
+            page.Controls.Add(body);
+            page.Controls.Add(summary);
+            page.Controls.Add(heading);
+            return page;
+        }
+
+        private static void FitLabelHeight(Label label)
+        {
+            if (label.Width <= 0)
+                return;
+            var size = TextRenderer.MeasureText(label.Text, label.Font, new Size(label.Width, int.MaxValue),
+                TextFormatFlags.WordBreak);
+            var height = size.Height + label.Padding.Vertical + 2;
+            if (label.Height != height)
+                label.Height = height;
+        }
+
+        private static TableLayoutPanel NewFieldTable()
+        {
+            var table = new TableLayoutPanel
+            {
+                ColumnCount = 2,
+                Padding = new Padding(0, 6, 0, 0),
+            };
+            table.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+            table.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+            return table;
+        }
+
+        private static void AddField(TableLayoutPanel table, string label, Control field, string hint)
+        {
+            var row = table.RowCount++;
+            table.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            table.Controls.Add(new Label
+            {
+                Text = label,
+                AutoSize = true,
+                Anchor = AnchorStyles.Left,
+                Margin = new Padding(0, 6, 16, 3),
+            }, 0, row);
+            field.Margin = new Padding(0, 3, 0, 3);
+            table.Controls.Add(field, 1, row);
+            AddHint(table, hint, 1);
+        }
+
+        private static void AddRow(TableLayoutPanel table, Control control, string hint)
+        {
+            var row = table.RowCount++;
+            table.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            control.Margin = new Padding(0, 6, 0, 3);
+            table.Controls.Add(control, 0, row);
+            table.SetColumnSpan(control, 2);
+            AddHint(table, hint, 0);
+        }
+
+        // Buttons sit under the fields they act on, in the field column.
+        private static void AddButtons(TableLayoutPanel table, params Button[] buttons)
+        {
+            var row = table.RowCount++;
+            table.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            var buttonRow = NewButtonRow(buttons);
+            buttonRow.Dock = DockStyle.None;
+            buttonRow.Anchor = AnchorStyles.Left;
+            buttonRow.Margin = new Padding(0, 0, 0, 3);
+            table.Controls.Add(buttonRow, 1, row);
+        }
+
+        private static void AddHint(TableLayoutPanel table, string hint, int column)
+        {
+            var row = table.RowCount++;
+            table.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            var label = new Label
+            {
+                Text = hint,
+                AutoSize = true,
+                Anchor = AnchorStyles.Left | AnchorStyles.Right,
+                ForeColor = HintColor,
+                Margin = new Padding(column == 0 ? 20 : 0, 0, 0, 12),
+            };
+            table.Controls.Add(label, column, row);
+            table.SetColumnSpan(label, 2 - column);
+        }
+
+        private static FlowLayoutPanel NewButtonRow(params Button[] buttons)
+        {
+            var row = new FlowLayoutPanel
+            {
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                Dock = DockStyle.Top,
+                WrapContents = false,
+                Padding = new Padding(0, 4, 0, 0),
+            };
+            foreach (var button in buttons)
+            {
+                button.Margin = new Padding(0, 0, 8, 0);
+                row.Controls.Add(button);
+            }
+            return row;
+        }
+
+        private static Button NewButton(string name, string text) => new()
+        {
+            Name = name,
+            Text = text,
+            AutoSize = true,
+            MinimumSize = new Size(120, 28),
+            Padding = new Padding(8, 0, 8, 0),
+            UseVisualStyleBackColor = true,
+        };
+
+        private static TextBox NewTextBox(string name, string placeholder) => new()
+        {
+            Name = name,
+            PlaceholderText = placeholder,
+            Anchor = AnchorStyles.Left | AnchorStyles.Right,
+        };
+
+        private static ComboBox NewCombo(string name, int width) => new()
+        {
+            Name = name,
+            DropDownStyle = ComboBoxStyle.DropDownList,
+            Width = width,
+            Anchor = AnchorStyles.Left,
+        };
+
+        private void LayoutDialogButtons()
+        {
+            var top = (bottomPanel1.Height - cancelButton.Height) / 2 + 1;
+            cancelButton.Location = new Point(bottomPanel1.Width - cancelButton.Width - 12, top);
+            saveButton.Location = new Point(cancelButton.Left - saveButton.Width - 8, top);
+        }
+
+        private static readonly Color NavBackColor = Color.FromArgb(243, 243, 243);
+        private static readonly Color HintColor = Color.FromArgb(100, 100, 100);
+
+        private ToolTip toolTip1;
+        private ListBox navList;
+        private Panel navDivider;
+        private Panel pageHost;
+        private Panel[] pages;
+        private Panel serverPage;
         private Controls.BottomPanel bottomPanel1;
-        private System.Windows.Forms.TableLayoutPanel tableLayoutPanel1;
-        private System.Windows.Forms.DataGridView strategyGrid;
-        private System.Windows.Forms.GroupBox strategyGroupBox;
-        private System.Windows.Forms.Label colorSchemeLabel;
-        private System.Windows.Forms.ComboBox colorSchemeCombo;
-        private System.Windows.Forms.Label clonePlacementLabel;
-        private System.Windows.Forms.ComboBox clonePlacementCombo;
-        private System.Windows.Forms.GroupBox serverGroupBox;
-        private Controls.NestServerPicker serverPicker;
-        private System.Windows.Forms.Button setServerButton;
-        private System.Windows.Forms.GroupBox updateGroupBox;
-        private System.Windows.Forms.TextBox updateFeedUrlBox;
-        private System.Windows.Forms.Button setUpdateFeedButton;
-        private System.Windows.Forms.Label updateChannelLabel;
-        private System.Windows.Forms.ComboBox updateChannelCombo;
-        private System.Windows.Forms.GroupBox ledgerGroupBox;
-        private System.Windows.Forms.Label ledgerUrlLabel;
-        private System.Windows.Forms.TextBox ledgerUrlBox;
-        private System.Windows.Forms.Label ledgerKeyLabel;
-        private System.Windows.Forms.TextBox ledgerKeyBox;
-        private System.Windows.Forms.Button testLedgerButton;
-        private System.Windows.Forms.Button saveLedgerButton;
+        private Button saveButton;
+        private Button cancelButton;
+        private CheckBox createNestOnStartupCheck;
+        private ComboBox colorSchemeCombo;
+        private ComboBox clonePlacementCombo;
+        private Controls.NumericUpDown autoSizeFactorBox;
+        private Controls.NumericUpDown planningEffortBox;
+        private DataGridView strategyGrid;
+        private ComboBox activeServerCombo;
+        private DataGridView serverGrid;
+        private Button removeServerButton;
+        private TextBox ledgerUrlBox;
+        private TextBox ledgerKeyBox;
+        private Button testLedgerButton;
+        private Button saveLedgerButton;
+        private ComboBox updateChannelCombo;
+        private TextBox updateFeedUrlBox;
+        private Button setUpdateFeedButton;
     }
 }

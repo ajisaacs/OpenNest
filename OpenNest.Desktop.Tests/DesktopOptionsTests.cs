@@ -280,6 +280,48 @@ public class DesktopOptionsTests
     }
 
     [Fact]
+    public void ServerList_NormalizesRowsDropsBlankOnesAndFindsTheActiveServer()
+    {
+        var (problem, servers, active) = NestServerListOption.Validate(new[]
+        {
+            (" Shop ", " http://shop:8090/ "),
+            ("", ""),
+            ((string)null, "https://Test.lan:8092"),
+        }, activeIndex: 2);
+
+        Assert.Null(problem);
+        Assert.Equal(new[] { new SavedNestServer("Shop", "http://shop:8090"), new SavedNestServer("", "https://Test.lan:8092") },
+            servers);
+        Assert.Equal("https://Test.lan:8092", active);
+    }
+
+    [Fact]
+    public void ServerList_NoActiveRowLeavesTheActiveAddressBlank()
+    {
+        var (problem, servers, active) = NestServerListOption.Validate(new[] { ("Shop", "http://shop:8090") }, -1);
+
+        Assert.Null(problem);
+        Assert.Single(servers);
+        Assert.Equal("", active);
+    }
+
+    [Theory]
+    [InlineData("Two", "not a url", 0, "Row 2: enter a valid http or https server URL.")]
+    [InlineData("Two", "", 0, "Row 2: enter a valid http or https server URL.")]
+    [InlineData("", "HTTP://ONE:1/", 0, "Row 2: HTTP://ONE:1 is already in the list.")]
+    [InlineData("", "", 1, "The active server has no address.")]
+    public void ServerList_WarnsOfTheFirstBadRow(string name, string url, int activeIndex, string text)
+    {
+        var (problem, servers, active) = NestServerListOption.Validate(
+            new[] { ("One", "http://one:1"), (name, url) }, activeIndex);
+
+        Assert.Null(servers);
+        Assert.Null(active);
+        Assert.Equal(OptionNoticeKind.Warning, problem.Kind);
+        Assert.Equal(text, problem.Text);
+    }
+
+    [Fact]
     public void ServerUrl_SaveToFileWithNoFileIsFileMode()
     {
         var directory = Path.Combine(Path.GetTempPath(), "opennest-options-" + Guid.NewGuid().ToString("N"));

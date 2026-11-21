@@ -232,7 +232,7 @@ public enum OptionNoticeKind
 public sealed record OptionNotice(string Title, string Text, OptionNoticeKind Kind);
 
 /// <summary>
-/// Tools &gt; Options &gt; Set / Change Server: the nest server URL in storage.json, keeping the
+/// The Avalonia Options server URL: the nest server URL in storage.json, keeping the
 /// storage mode (File / Database is chosen under File &gt; Storage Mode).
 /// </summary>
 public static class NestServerUrlOption
@@ -272,6 +272,52 @@ public static class NestServerUrlOption
         next.Save(path);
         return NestStorageSettings.Load(path);
     }
+}
+
+/// <summary>
+/// Tools &gt; Options &gt; Nest Server: the saved-server list as typed into its grid, and which row is
+/// the server in use. Checked before Options saves anything, so a bad row saves nothing.
+/// </summary>
+public static class NestServerListOption
+{
+    public const string Title = "Nest Servers";
+
+    /// <summary>
+    /// Normalizes the rows, dropping ones with neither a name nor an address, and returns the
+    /// servers in order with the active server's address ("" when <paramref name="activeIndex"/>
+    /// is negative), or a warning naming the first bad row (1-based, counting every row).
+    /// </summary>
+    public static (OptionNotice Problem, IReadOnlyList<SavedNestServer> Servers, string ActiveUrl) Validate(
+        IReadOnlyList<(string Name, string Url)> rows, int activeIndex)
+    {
+        ArgumentNullException.ThrowIfNull(rows);
+        var servers = new List<SavedNestServer>();
+        var activeUrl = "";
+        for (var i = 0; i < rows.Count; i++)
+        {
+            var name = rows[i].Name?.Trim() ?? "";
+            var text = rows[i].Url?.Trim() ?? "";
+            if (name.Length == 0 && text.Length == 0)
+            {
+                if (i == activeIndex)
+                    return (Warning("The active server has no address."), null, null);
+                continue;
+            }
+
+            if (!NestStorageSettings.TryNormalizeServerUrl(text, out var url))
+                return (Warning($"Row {i + 1}: enter a valid http or https server URL."), null, null);
+            if (servers.Exists(s => string.Equals(s.Url, url, StringComparison.OrdinalIgnoreCase)))
+                return (Warning($"Row {i + 1}: {url} is already in the list."), null, null);
+
+            servers.Add(new SavedNestServer(name, url));
+            if (i == activeIndex)
+                activeUrl = url;
+        }
+
+        return (null, servers, activeUrl);
+    }
+
+    private static OptionNotice Warning(string text) => new(Title, text, OptionNoticeKind.Warning);
 }
 
 /// <summary>

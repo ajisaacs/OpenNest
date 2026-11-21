@@ -47,6 +47,22 @@ namespace OpenNest.Forms
         }
 
         /// <summary>
+        /// Replaces the saved-server list and the server in use, keeping the storage mode.
+        /// If persistence fails the current settings remain unchanged.
+        /// </summary>
+        public static void SaveServers(IReadOnlyList<SavedNestServer> servers, string activeUrl)
+        {
+            var next = new NestStorageSettings
+            {
+                Mode = settings.Mode,
+                ServerUrl = activeUrl,
+                Servers = new List<SavedNestServer>(servers),
+            };
+            next.Save(NestStorageSettings.DefaultPath);
+            settings = NestStorageSettings.Load(NestStorageSettings.DefaultPath);
+        }
+
+        /// <summary>
         /// Removes a server from the saved list without changing the mode or the server in
         /// use. If persistence fails the list remains unchanged.
         /// </summary>

@@ -44,7 +44,7 @@ turned off, or a channel it has not mirrored yet), that check goes to GitHub ins
 package downloads from whichever source supplied the feed (`ServerFirstUpdateSource`). The
 source is chosen at startup, so changing storage mode or server takes effect after a restart.
 
-To use a self-hosted feed instead, set **Tools > Options > Auto-update feed URL**
+To use a self-hosted feed instead, set **Tools > Options > Updates > Feed URL**
 (`OpenNest.Properties.Settings.UpdateFeedUrl`, saved for the current Windows
 user) to the feed's base URL (`http://host:port`) and restart. A self-hosted
 feed URL is operator infrastructure and never belongs in source control; it takes
