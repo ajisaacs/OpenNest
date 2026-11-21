@@ -107,6 +107,18 @@ internal static class PlateFillOrchestrator
             DeductPlacedQuantities(leftovers, chosen);
         }
 
+        // Last, whatever is still unplaced is offered to every remnant of the layout. The fills
+        // see each earlier fill as one envelope, so a fill item can come up short while its box
+        // still fits between the parts, and the pack above tries one remnant only.
+        var unplaced = items.Where(item => item.Quantity > 0).ToList();
+        if (unplaced.Count > 0 && allParts.Count > 0 && !token.IsCancellationRequested)
+        {
+            var packed = LeftoverPacker.Pack(plate.WorkArea(), plate.PartSpacing, allParts, unplaced,
+                clampKeepOuts, pack, progress, token);
+            allParts.AddRange(packed);
+            DeductPlacedQuantities(unplaced, packed);
+        }
+
         Compactor.Settle(allParts, plate);
 
         return allParts;

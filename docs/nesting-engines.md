@@ -42,10 +42,13 @@ layout. The chosen pair then slides left and down against the true outlines arou
 one group. Trimming a fill to quantity keeps its interlocked pairs whole, so the spare space stays
 one usable cell rather than two half gaps.
 
-Strip, in place of the two orders above, offers its leftovers to every remnant of the finished
-layout (`LeftoverPacker`): the remnants in order, edge-touching first and then by area, the first
-that takes a part packed as boxes at 0 or 90 degrees and the remnants found again around it, until
-none takes a part. The first remnant is often a sliver along an edge that holds nothing.
+Lattice and the two Remnant strategies then offer whatever is still unplaced, fill items the fills
+left short as well as leftovers, to every remnant of the finished layout (`LeftoverPacker`): the
+remnants in order, edge-touching first and then by area, the first that takes a part packed as
+boxes at 0 or 90 degrees and the remnants found again around it, until none takes a part. The fills
+see each earlier fill as one envelope, so a part's box can still fit between the parts, and the
+largest remnant is often a sliver along an edge that holds nothing. Strip packs its leftovers the
+same way, in place of the two orders above.
 
 Neither Irregular nor Rectangles wins every job, even within its own lane, so Default runs both
 rather than choosing by part shape; Rectangles adds little time and is also the fallback when an

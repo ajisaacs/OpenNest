@@ -54,6 +54,13 @@ namespace OpenNest.Engine.Tests.Jobs;
 /// (<c>StripLeftoverPackTests</c>), so the rectangle lands right of the row and the nest still
 /// holds 35. No other pin changed, and the whole-plate nests are now checked with
 /// <c>NestLayoutCheck.Validate</c> as they are solved.
+/// Three whole-plate nests were re-captured when Lattice and the Remnant strategies began
+/// offering whatever is still unplaced to every remnant of the finished layout
+/// (<c>UnplacedSweepTests</c>). The mixed Fill nest was one L-shape short and the mixed Horizontal
+/// Remnant nest five, fill items the fills left out although their box fits between the parts:
+/// both now hold all 35. The learned-angle Horizontal Remnant nest packed none of its four
+/// notched parts, because the one remnant the pack tried could not hold them; a later remnant
+/// holds two, so it places 26 instead of 24. The sweep only adds parts: none of the three lost one.
 /// Not pinned: richer mixes that pair parallelogram, chevron or tee parts at oblique angles
 /// with other irregular items. Their Fill and Vertical Remnant nests vary between runs, most
 /// likely because best-fit pair candidates are gathered in a <c>ConcurrentBag</c> and equal
@@ -303,10 +310,10 @@ public class FillStackCharacterizationTests
     }
 
     [Theory]
-    [InlineData("Fill", 34, "D3D54E9116D96ACF")]
+    [InlineData("Fill", 35, "624F1E0BCC201345")]
     [InlineData("Strip", 35, "E8735AC098986DBF")]
     [InlineData("Vertical Remnant", 35, "285AF7AF9B9573C5")]
-    [InlineData("Horizontal Remnant", 30, "A0700052AE771E06")]
+    [InlineData("Horizontal Remnant", 35, "8AEB39CA035B8AA0")]
     public void Nest_MixedIrregularItems_PinnedLayout(
         string strategy,
         int expectedCount,
@@ -322,7 +329,7 @@ public class FillStackCharacterizationTests
     [InlineData("Fill", 28, "58E544673B69F3CB")]
     [InlineData("Strip", 28, "BB448C553CFECBD8")]
     [InlineData("Vertical Remnant", 28, "E146E6F08C26C375")]
-    [InlineData("Horizontal Remnant", 24, "5D5B0413007B0B07")]
+    [InlineData("Horizontal Remnant", 26, "DB32313039AF3A3E")]
     public void Nest_LearnedAngleItems_PinnedLayout(
         string strategy,
         int expectedCount,
