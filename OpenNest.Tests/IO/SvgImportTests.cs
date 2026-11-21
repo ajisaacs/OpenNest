@@ -51,6 +51,25 @@ namespace OpenNest.Tests.IO
         }
 
         [Fact]
+        public void ElementTitlesNameTheGeometryTheyDraw()
+        {
+            var result = Import(Svg(
+                "<title>sheet</title>"
+                + "<g transform='translate(1 1)'><title> star </title><path d='M0 0H2V2H0Z'/></g>"
+                + "<path d='M5 5H7V7H5Z'><title>tag</title></path>"
+                + "<g><title>empty</title></g>"
+                + "<path d='M8 8H9V9H8Z'/>"));
+
+            Assert.Equal(new[] { "star", "tag" }, result.Labels.Select(l => l.Name));
+            var star = result.Labels[0].Bounds;
+            // In the entities' frame: SVG's y axis points down, so y=1 to 3 lands at -3 to -1.
+            Assert.Equal(1, star.Left, 6);
+            Assert.Equal(3, star.Right, 6);
+            Assert.Equal(-3, star.Bottom, 6);
+            Assert.Equal(-1, star.Top, 6);
+        }
+
+        [Fact]
         public void ConvertsToMillimeterDrawings()
         {
             var result = Import(Svg(SquarePath), new CadImportOptions { DrawingUnits = Units.Millimeters });

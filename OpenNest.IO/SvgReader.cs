@@ -58,6 +58,7 @@ namespace OpenNest.IO
         private readonly List<Arc> arcs = new List<Arc>();
         private readonly List<Circle> circles = new List<Circle>();
         private readonly List<Bend> bends = new List<Bend>();
+        private readonly List<LabeledRegion> labels = new List<LabeledRegion>();
         private readonly HashSet<XElement> activeUses = new HashSet<XElement>();
 
         private SvgReader(XElement root, double tolerance)
@@ -244,6 +245,7 @@ namespace OpenNest.IO
                 Entities = entities,
                 RawEntities = raw,
                 Bends = bends,
+                Labels = labels,
                 Warnings = skipped
                     .OrderBy(s => s.Key, StringComparer.Ordinal)
                     .Select(s => $"Skipped {s.Value} <{s.Key}> element(s); convert them to paths to import them.")
@@ -266,6 +268,31 @@ namespace OpenNest.IO
             if (IgnoredElements.Contains(name) || IsHidden(element))
                 return;
 
+            var title = element.Element(svgNamespace + "title")?.Value;
+            if (!string.IsNullOrWhiteSpace(title))
+            {
+                var counts = (lines.Count, arcs.Count, circles.Count);
+                WalkElement(element, name, parent, parentLayer);
+                AddLabel(title, counts);
+                return;
+            }
+
+            WalkElement(element, name, parent, parentLayer);
+        }
+
+        // An element's title names the geometry it draws, as the region that geometry covers.
+        private void AddLabel(string title, (int Lines, int Arcs, int Circles) before)
+        {
+            var added = lines.Skip(before.Lines).Cast<Entity>()
+                .Concat(arcs.Skip(before.Arcs))
+                .Concat(circles.Skip(before.Circles))
+                .ToList();
+            if (added.Count > 0)
+                labels.Add(new LabeledRegion(title.Trim(), added.GetBoundingBox()));
+        }
+
+        private void WalkElement(XElement element, string name, SvgTransform parent, Layer parentLayer)
+        {
             var transform = parent.Then(SvgTransform.Parse(element.Attribute("transform")?.Value));
             switch (name)
             {

@@ -31,6 +31,12 @@ namespace OpenNest.IO
         /// </summary>
         public List<Bend> Bends { get; set; } = new List<Bend>();
 
+        /// <summary>
+        /// Names the file gives to regions of its geometry, such as SVG element titles; used to
+        /// name the parts when a file holding several is separated. Empty when the file has none.
+        /// </summary>
+        public List<LabeledRegion> Labels { get; set; } = new List<LabeledRegion>();
+
         public List<Bending.BendRepairReport> BendRepairReports { get; set; } =
             new List<Bending.BendRepairReport>();
 

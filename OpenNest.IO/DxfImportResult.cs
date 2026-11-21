@@ -21,6 +21,10 @@ namespace OpenNest.IO
         /// detected from <see cref="Document"/> instead.
         /// </summary>
         public List<Bend> Bends { get; set; }
+
+        /// <summary>Names the file gives to regions of its geometry, such as SVG titles; empty when none.</summary>
+        public List<LabeledRegion> Labels { get; set; } = new();
+
         public List<string> Warnings { get; set; } = new();
     }
 }

@@ -31,6 +31,7 @@ namespace OpenNest.Forms
             lblEntityCount = new System.Windows.Forms.Label();
             btnSplit = new System.Windows.Forms.Button();
             btnSimplify = new System.Windows.Forms.Button();
+            btnSeparate = new System.Windows.Forms.Button();
             btnExport = new System.Windows.Forms.Button();
             btnHoleTable = new System.Windows.Forms.Button();
             chkShowOriginal = new System.Windows.Forms.CheckBox();
@@ -169,6 +170,7 @@ namespace OpenNest.Forms
             detailBar.Controls.Add(txtCustomer);
             detailBar.Controls.Add(lblDimensions);
             detailBar.Controls.Add(lblEntityCount);
+            detailBar.Controls.Add(btnSeparate);
             detailBar.Controls.Add(btnSplit);
             detailBar.Controls.Add(btnSimplify);
             detailBar.Controls.Add(btnExport);
@@ -250,6 +252,21 @@ namespace OpenNest.Forms
             lblEntityCount.Name = "lblEntityCount";
             lblEntityCount.Size = new System.Drawing.Size(0, 15);
             lblEntityCount.TabIndex = 5;
+            // 
+            // btnSeparate
+            // 
+            btnSeparate.AutoSize = true;
+            btnSeparate.BackColor = System.Drawing.Color.FromArgb(60, 120, 60);
+            btnSeparate.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            btnSeparate.Font = new System.Drawing.Font("Segoe UI", 9F);
+            btnSeparate.ForeColor = System.Drawing.Color.White;
+            btnSeparate.Margin = new System.Windows.Forms.Padding(0, 0, 10, 0);
+            btnSeparate.Name = "btnSeparate";
+            btnSeparate.Size = new System.Drawing.Size(85, 27);
+            btnSeparate.TabIndex = 6;
+            btnSeparate.Text = "Separate...";
+            btnSeparate.UseVisualStyleBackColor = false;
+            btnSeparate.Visible = false;
             // 
             // btnSplit
             // 
@@ -444,6 +461,7 @@ namespace OpenNest.Forms
         private System.Windows.Forms.NumericUpDown numQuantity;
         private System.Windows.Forms.TextBox txtCustomer;
         private System.Windows.Forms.Button btnSplit;
+        private System.Windows.Forms.Button btnSeparate;
         private System.Windows.Forms.Button btnSimplify;
         private System.Windows.Forms.Button btnExport;
         private System.Windows.Forms.Button btnHoleTable;

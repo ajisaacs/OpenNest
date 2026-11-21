@@ -41,6 +41,9 @@ namespace OpenNest.Controls
         public Box Bounds { get; set; }
         public int EntityCount { get; set; }
         public List<CadText> Texts { get; set; } = new();
+
+        /// <summary>Names the source file gives to regions of its geometry; they name the parts it separates into.</summary>
+        public List<LabeledRegion> Labels { get; set; } = new();
     }
 
     public class FileListControl : Control
@@ -93,17 +96,34 @@ namespace OpenNest.Controls
         public FileListItem SelectedItem =>
             selectedIndex >= 0 && selectedIndex < items.Count ? items[selectedIndex] : null;
 
-        public void AddItem(FileListItem item)
+        private static readonly Comparer<FileListItem> ByName = Comparer<FileListItem>.Create(
+            (a, b) => string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase));
+
+        private int InsertSorted(FileListItem item)
         {
-            var index = items.BinarySearch(
-                item,
-                Comparer<FileListItem>.Create(
-                    (a, b) => string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase)
-                )
-            );
+            var index = items.BinarySearch(item, ByName);
             if (index < 0)
                 index = ~index;
             items.Insert(index, item);
+            return index;
+        }
+
+        /// <summary>Replaces the item at <paramref name="index"/> with others, selecting the first of them.</summary>
+        public void ReplaceItem(int index, IReadOnlyList<FileListItem> replacements)
+        {
+            items.RemoveAt(index);
+            foreach (var item in replacements)
+                InsertSorted(item);
+            selectedIndex = replacements.Count > 0 ? items.IndexOf(replacements[0]) : System.Math.Min(index, items.Count - 1);
+            UpdateScrollBar();
+            EnsureVisible(selectedIndex);
+            Invalidate();
+            SelectedIndexChanged?.Invoke(this, selectedIndex);
+        }
+
+        public void AddItem(FileListItem item)
+        {
+            var index = InsertSorted(item);
 
             if (items.Count == 1)
             {

@@ -74,6 +74,7 @@ namespace OpenNest.Forms
             entityView1.TextConvertRequested += OnTextConvertRequested;
             entityView1.EntityActionRequested += OnEntityActionRequested;
             btnSplit.Click += OnSplitClicked;
+            btnSeparate.Click += OnSeparateClicked;
             numQuantity.ValueChanged += OnQuantityChanged;
             txtCustomer.TextChanged += OnCustomerChanged;
             cboBendDetector.SelectedIndexChanged += OnBendDetectorChanged;
@@ -130,6 +131,7 @@ namespace OpenNest.Forms
                     Bounds = result.Bounds,
                     EntityCount = result.Entities.Count,
                     Texts = ExtractTexts(result.Document),
+                    Labels = result.Labels,
                 };
 
                 if (InvokeRequired)
@@ -262,6 +264,7 @@ namespace OpenNest.Forms
 
             entityView1.ZoomToFit();
             CheckSimplifiable(item);
+            RefreshSeparable(item);
             RefreshHoleTable();
         }
 
@@ -324,6 +327,7 @@ namespace OpenNest.Forms
             entityView1.DimensionLayouts = Array.Empty<DimensionLayout>();
             entityView1.Invalidate();
             RefreshHoleTable();
+            RefreshSeparable(null);
         }
 
         private void OnFilterChanged(object sender, EventArgs e)
@@ -339,6 +343,7 @@ namespace OpenNest.Forms
             RefreshBreakoffs(item);
             RefreshTabbedCutouts(item);
             RefreshHoleTable();
+            RefreshSeparable(item);
             staleProgram = true;
         }
 
@@ -1561,6 +1566,14 @@ namespace OpenNest.Forms
 
             switch (e.Action)
             {
+                case EntityAction.SeparatePart:
+                    SeparateSelectedParts(e.Entities);
+                    return;
+
+                case EntityAction.SeparateAllParts:
+                    SeparateParts(null);
+                    return;
+
                 case EntityAction.AddRadiusDimension:
                 case EntityAction.AddDiameterDimension:
                     AddRadialDimensions(item, e.Entities,

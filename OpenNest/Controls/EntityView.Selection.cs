@@ -18,6 +18,8 @@ namespace OpenNest.Controls
         Include,
         AddRadiusDimension,
         AddDiameterDimension,
+        SeparatePart,
+        SeparateAllParts,
     }
 
     public sealed class EntityActionEventArgs : EventArgs
@@ -53,6 +55,12 @@ namespace OpenNest.Controls
         public IReadOnlySet<Guid> ExcludedIds { get; set; }
 
         public IReadOnlyCollection<Entity> SelectedEntities => selectedEntities;
+
+        /// <summary>
+        /// How many separate parts the shown drawing holds; at two or more the entity menu offers
+        /// to separate them.
+        /// </summary>
+        public int SeparablePartCount { get; set; }
 
         public event EventHandler<EntityActionEventArgs> EntityActionRequested;
 
@@ -211,6 +219,17 @@ namespace OpenNest.Controls
                 var diameter = new ToolStripMenuItem("Add Diameter Dimension");
                 diameter.Click += (s, e) => RaiseEntityAction(EntityAction.AddDiameterDimension, curves);
                 menu.Items.Add(diameter);
+            }
+
+            if (SeparablePartCount >= 2)
+            {
+                menu.Items.Add(new ToolStripSeparator());
+                var part = new ToolStripMenuItem("Separate This Part");
+                part.Click += (s, e) => RaiseEntityAction(EntityAction.SeparatePart, selection);
+                menu.Items.Add(part);
+                var all = new ToolStripMenuItem($"Separate All {SeparablePartCount} Parts");
+                all.Click += (s, e) => RaiseEntityAction(EntityAction.SeparateAllParts, selection);
+                menu.Items.Add(all);
             }
 
             menu.Closed += (s, e) => BeginInvoke(new Action(menu.Dispose));

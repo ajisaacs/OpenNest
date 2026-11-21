@@ -26,6 +26,7 @@ Import takes path centerlines: `path`, `rect` (with rounded corners), `circle`, 
 - Text, images, nested `svg`, `use` of a `symbol`, and shapes sized in percentages are skipped and listed in `CadImportResult.Warnings`.
 - Layers come from `data-layer`, an Inkscape layer label, or the `id` of a top-level group (Illustrator). `ETCH`, `SCRIBE`, `RAPID` and `PLATE` are dropped, so an exported plate reads back as its parts.
 - The file's DTD may parse, because older Illustrator files declare namespaces in one, but external fetches are off and entity expansion is capped.
+- An element's `<title>` (not the root's) is kept in `CadImportResult.Labels` as a name for the region its geometry covers. Labels never change geometry; they name the parts when the CAD Converter [separates a file](separate-parts.md).
 - Each `line` on a `BEND` layer is a bend, as a center line on a DXF's `BEND` layer is; nothing else there is read. Its `data-bend-direction` (`up` or `down`), `data-bend-angle` (degrees), `data-bend-radius` (scaled like the line) and `data-bend-note` fill in the bend when present. `CadImportOptions.DetectBends` false ignores them; the detector choice does not apply.
 
 ## What export writes

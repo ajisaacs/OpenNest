@@ -96,6 +96,7 @@ namespace OpenNest.IO
                 Entities = dxf.Entities,
                 RawEntities = dxf.RawEntities,
                 Bends = bends,
+                Labels = dxf.Labels ?? new List<LabeledRegion>(),
                 BendRepairReports = repairReports,
                 Bounds = dxf.Entities.GetBoundingBox(),
                 SourcePath = path,
