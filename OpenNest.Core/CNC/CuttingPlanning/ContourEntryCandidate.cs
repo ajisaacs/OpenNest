@@ -64,10 +64,10 @@ internal enum AutomaticEntryKind
 /// </summary>
 internal enum SupportEntries
 {
-    /// <summary>Entries whose tab steadies the part, clear of inside corners, plus its best tab point.</summary>
-    Steadying,
-
-    /// <summary>Every entry clear of inside corners: the fallback when no steadying entry fits.</summary>
+    /// <summary>
+    /// Every entry clear of inside corners, plus the best tab point: the route decides among
+    /// them, not how well the tab steadies the part.
+    /// </summary>
     ClearOfInsideCorners,
 
     /// <summary>Every entry: the last fallback, when nothing clear of inside corners fits.</summary>

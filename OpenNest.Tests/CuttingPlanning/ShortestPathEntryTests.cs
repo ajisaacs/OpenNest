@@ -10,7 +10,7 @@ namespace OpenNest.Tests.CuttingPlanning;
 
 /// <summary>
 /// A holed part's outside entry lies where the straight line from its cutout to the next
-/// part's cutout leaves it, and a support tab that cannot hold a part level does not pull the
+/// part's cutout leaves it, and a support tab does not pull the
 /// entry elsewhere.
 /// </summary>
 public class ShortestPathEntryTests
@@ -77,12 +77,16 @@ public class ShortestPathEntryTests
         AssertEntersBesideTheHole(result, 2);
     }
 
-    [Fact]
-    public void ATabThatCannotHoldTheStripDoesNotPullItsEntryAway()
+    [Theory]
+    // Not enough: no single tab can hold the strip level.
+    [InlineData(0.25, false)]
+    // Enough: a tab on the left edge would hold it level, yet the route still decides.
+    [InlineData(0.1, true)]
+    public void ASupportTabDoesNotPullTheStripsEntryAway(double stabilityMargin, bool tabCanHold)
     {
         // Grid columns 2 apart, offset so the first strip rests on one line of contacts just right
-        // of its center of gravity: only a tab on its left edge would steady it, and not enough.
-        var bed = new SupportGrid(2, 2, offsetX: 0.7, stabilityMargin: 0.25);
+        // of its center of gravity: only a tab on its left edge would steady it.
+        var bed = new SupportGrid(2, 2, offsetX: 0.7, stabilityMargin: stabilityMargin);
         var parameters = Parameters();
         parameters.SupportTabs = true;
         parameters.TabHeldMaxLength = 0;
@@ -90,7 +94,10 @@ public class ShortestPathEntryTests
         var snapshot = CuttingPlanService.Capture(new CuttingPlanRequest(parts, Start, confirmedParameters: parameters,
             preservePartOrder: true)
         { SupportBed = bed });
-        Assert.True(snapshot.Placements[0].Prepared.HasUntenableSupportTab);
+        Assert.True(snapshot.Placements[0].Prepared.HasSupportTab);
+        var support = SupportAnalyzer.Analyze(bed, 1, parts[0]);
+        Assert.Equal(tabCanHold, support.TabCanSupport);
+        Assert.False(support.HoldsLevelWithTabAt(new Vector(1, HoleY)));
 
         var result = Plan(parts, parameters, bed);
 

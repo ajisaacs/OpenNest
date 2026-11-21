@@ -10,7 +10,8 @@ namespace OpenNest.Tests.CuttingPlanning;
 
 /// <summary>
 /// Plan Cutting with "Tab parts the support grid cannot hold level": a part the grid cannot
-/// hold is tabbed where the tab steadies it; a supported part is left untabbed.
+/// hold is tabbed where its route enters it, not where the tab steadies it most; a supported
+/// part is left untabbed.
 /// </summary>
 public class SupportTabPlanningTests
 {
@@ -42,22 +43,24 @@ public class SupportTabPlanningTests
     }
 
     [Fact]
-    public void StripOnOneRowOfContacts_IsTabbedOnTheEdgeAcrossItsCenterFromTheRow()
+    public void StripOnOneRowOfContacts_IsTabbedWhereTheRouteEntersIt()
     {
-        // One row of grid points at y = 2.25 runs under the strip (y 2..3), below its center.
+        // One row of grid points at y = 2.25 runs under the strip (y 2..3), below its center: a tab
+        // on its top edge would hold it level, but the tool comes from below, so it enters there.
         var bed = new SupportGrid(2, 4, 0, 2.25, stabilityMargin: 0.1);
         var (plate, part) = Strip(bed);
+        var support = SupportAnalyzer.Analyze(bed, plate.Quadrant, part);
+        Assert.False(support.IsSupported);
+        Assert.True(support.TabCanSupport);
 
         var result = CuttingPlanService.Plan(CuttingPlanRequest.ForPlate(plate, new Vector(0, 0),
             confirmedParameters: Parameters()));
 
         Assert.True(result.Status == CuttingPlanStatus.Ready, string.Join("\n", result.Findings.Select(f => f.Message)));
         var (entry, cutEnd) = EntryAndCutEnd(Assert.Single(result.ProposedOrder));
-        Assert.Equal(3, entry.Y, 6);
+        Assert.Equal(2, entry.Y, 6);
         Assert.Equal(TabSize, entry.DistanceTo(cutEnd), 6);
-        var support = SupportAnalyzer.Analyze(bed, plate.Quadrant, part);
-        Assert.False(support.IsSupported);
-        Assert.True(support.MarginWith(entry) >= bed.StabilityMargin);
+        Assert.DoesNotContain(result.Findings, f => f.Kind == PostVerificationKind.PartSupport);
     }
 
     // A 10 x 1 strip with a 2 x 0.2 bump on its top edge: inside corners at (4, 1) and (6, 1).
@@ -92,7 +95,7 @@ public class SupportTabPlanningTests
     }
 
     [Fact]
-    public void BlockedSteadyingSide_TabsTheSteadiestEntryThatFits()
+    public void BlockedSteadyingSide_TabsAnEntryThatFits()
     {
         // Only the middle of the top edge steadies the strip by 0.2. Parts 0.1 above it and beside
         // its upper half leave no room for a lead-in there or at its top corners.
@@ -110,11 +113,9 @@ public class SupportTabPlanningTests
         var proposal = result.ProposedOrder.Single(p => ReferenceEquals(p.SourcePart, strip));
         var (entry, cutEnd) = EntryAndCutEnd(proposal);
         Assert.Equal(TabSize, entry.DistanceTo(cutEnd), 6);
-        // The steadiest entry that fits: halfway up an end, not the bottom corner nearer the start.
+        // An entry the route reaches, on the open lower half, though its tab cannot hold the strip level.
         var support = SupportAnalyzer.Analyze(bed, plate.Quadrant, strip);
-        Assert.True(support.MarginWith(entry) > support.MarginWith(new Vector(7, 2)), $"entry {entry}");
-        Assert.True(entry.Y > 2.5 - 1e-9, $"entry {entry}");
-        Assert.True(support.MarginWith(entry) > support.MarginWith(new Vector(12, 2)), $"entry {entry}");
+        Assert.True(entry.Y < 2.5, $"entry {entry}");
         Assert.False(support.HoldsLevelWithTabAt(entry));
         Assert.DoesNotContain(result.Findings, f => f.Kind == PostVerificationKind.PartSupport);
     }
@@ -281,7 +282,8 @@ public class SupportTabPlanningTests
 
         Assert.Contains(any, NearACorner);
         Assert.DoesNotContain(clear, NearACorner);
-        Assert.Equal(any.Count(c => !NearACorner(c)), clear.Count);
+        // The catalog clear of inside corners also offers the best tab point.
+        Assert.Equal(any.Count(c => !NearACorner(c)), clear.Count(c => c.Kind != AutomaticEntryKind.SupportTab));
     }
 
     [Fact]

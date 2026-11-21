@@ -3,7 +3,7 @@
 A cut part drops onto the machine's support bed. If its center of gravity is not over the
 points it rests on, it can tip into the head's path or fall through. OpenNest models the bed,
 checks every part against it, and can tab only the parts the bed cannot hold level, at the
-perimeter point where one tab steadies the part most.
+perimeter point where the cutting route enters the part.
 
 ## The support bed
 
@@ -119,9 +119,14 @@ treated as cut free for later rapids, and the plan is UNVERIFIED, so applying it
 acceptance. A lead-out that would cut its tab is fixed in the cutting settings: shorten or turn
 it, or enlarge the tab. Programs judged as they are (locked, fixed or posted) keep the
 incomplete-check finding.
-A support-tabbed perimeter's automatic entries are therefore limited to catalog points the
-analysis accepts, plus the closest native point to its best tab point (`AutomaticEntryKind.SupportTab`,
-never on a reflex or cusp vertex). Ranking and lead checks are unchanged.
+A support-tabbed perimeter's automatic entries are every catalog point clear of inside corners,
+plus the closest native point to its best tab point (`AutomaticEntryKind.SupportTab`, never on a
+reflex or cusp vertex), ranked toward the next cut like any untabbed part's, in the search and in
+contour recovery. How well the tab would steady the part does not rank them: the route matters
+more. A tab holds most parts wherever it is, and one that does not is still tabbed and avoided
+once cut, while a detour to the steadiest point lengthens the way for every part. Led by the
+steadiest instead, a long strip resting on one line of contacts started mid-length, or on its
+side away from the next cut, so the head left it back over the strip. Lead checks are unchanged.
 
 ## Parts the tab alone holds
 
@@ -173,23 +178,11 @@ settings and the cutting panel): a plate's recorded parameters and drawing pins 
 `TabsEnabled` and replay as planned.
 
 If none of those entries has a lead-in that fits, the part is still tabbed. The search falls
-back first to every catalog entry clear of inside corners, then to every entry
-(`SupportEntries`), each ordered by how well the tab steadies the part; of the entries whose
-lead-in fits, it keeps every one that holds the part level, or else only the steadiest. The
-open-scrap pierce fallback then tries the last of those catalogs.
+back to every entry (`SupportEntries.Any`), ordered by how well the tab steadies the part; of
+the entries whose lead-in fits, it keeps every one that holds the part level, or else only the
+steadiest. The open-scrap pierce fallback then tries that catalog.
 
-When no single tab can hold the part level (it rests on no contacts, or too few, so even the best
-tab misses the stability margin; `PreparedContours.HasUntenableSupportTab`), no entry steadies it
-enough to be worth a detour: its automatic entries are every catalog point clear of inside corners,
-ranked toward the next cut like any untabbed part's, in the search and in contour recovery. Led by
-the steadiest instead, a long strip resting on one line of contacts started mid-length, or on its
-side away from the next cut, so the head left it back over the strip. A part boxed in by its
-neighbors, such as the upper of two strips nested in a cutout, is left toward the next cut too. It
-is still tabbed, and it is still avoided once cut (`tabMayNotHold`). A part a tab can hold level
-keeps to its steadying entries.
-
-A tabbed part counts as steady wherever its tab is: the steadiest entries above are preferences,
-never a warning. No message says a tab cannot steady its part, and once cut a tabbed part stays
+A tabbed part counts as steady wherever its tab is: where its tab lands is never a warning. No message says a tab cannot steady its part, and once cut a tabbed part stays
 crossable, as its retained material allows, whether or not its tab holds it level. Plan Cutting
 still routes around tabbed parts where it can and passes over only those it finds no way around
 (see [tabbed parts are avoided first](cutting-planner.md#tabbed-parts-are-avoided-first)). The pre-post
