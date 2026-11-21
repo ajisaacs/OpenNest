@@ -49,6 +49,13 @@ internal enum AutomaticEntryKind
     /// lead-in of the cutout fits.
     /// </summary>
     ErodedPierce = 9,
+
+    /// <summary>
+    /// The outside entry on the straight line from the part's cutout cut last to the next
+    /// part's first cut, where that line leaves the part (see
+    /// <see cref="PreparedContours.ShortestPathEntry"/>): the shortest way through the part.
+    /// </summary>
+    ShortestPath = 10,
 }
 
 /// <summary>

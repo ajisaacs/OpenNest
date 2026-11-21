@@ -371,7 +371,7 @@ public sealed class ReleasedContourState
         // Slug slices (docs/support-tabs.md#slug-slices) cross one another inside one of the part's
         // own holes: what they enclose is that hole's slug, scrap, so they take no part in the proof.
         var retained = !cutoff && (unfinished.Count > 1 || deferred.Count > 0)
-            && (remainders || unfinished.All(LeadsClearOpenEnds)
+            && (remainders || unfinished.All(group => LeadsClearOpenEnds(group, unfinished.Count == 1 && otherOpen.Count == 0))
                 && OpenCutsEncloseNothing(closed, unfinished
                     .Concat(otherOpen.Where(group => !CutsOnlySlug(group, closed, unfinished, token)))
                     .Append(loose).ToList(), token));
@@ -528,12 +528,23 @@ public sealed class ReleasedContourState
             && inner.MaxX <= outside.MaxX && inner.MaxY <= outside.MaxY);
     }
 
-    private static bool LeadsClearOpenEnds(CutGroup group)
+    private static bool LeadsClearOpenEnds(CutGroup group, bool onlyOpenCut)
     {
         var start = group.Curves[0].Start;
         var end = group.Curves[^1].End;
         var behindStart = group.Curves[0].Tangent(false) * -1;
         var aheadOfEnd = group.Curves[^1].Tangent(true);
+        // The only open cut of a part leaves one gap, between its own two ends. On a straight edge
+        // that lies along the tangents, but a tabbed perimeter's cut can start at a corner, with the
+        // gap along the other edge: an in-line corner lead-in runs back along its first edge's line,
+        // off the part, never toward the other end. The pieces of a cutout cut around several tabs
+        // each meet a neighbor's end across their gaps instead, so they keep the tangents.
+        var span = start.DistanceTo(end);
+        if (onlyOpenCut && span > PostVerificationGeometry.Epsilon)
+        {
+            behindStart = (end - start) * (1 / span);
+            aheadOfEnd = behindStart * -1;
+        }
         foreach (var lead in group.Leads)
         {
             if (Touches(lead, start) && lead.Reach(start, behindStart) > PostVerificationGeometry.Epsilon)

@@ -101,13 +101,17 @@ public class CutOffSegmentPlanningTests
         Assert.Equal(6, segments);
 
         // Applied and replanned with the order kept, the segments are looked through: the
-        // parts get the entries and routes the plan had, and it replays Ready again.
+        // parts keep their order and replay Ready again, on a route no longer than the plan's.
+        // A holed part after a segment may get a shorter one: the plan chose its outside entry
+        // routing its holes from before the segment, the replan from the segment's end, where
+        // the entry on the straight way from its holes to the next part's fits.
         Assert.Equal(CuttingCommitStatus.Applied, CuttingPlanService.Apply([result]).Status);
         var kept = CuttingPlanService.Plan(CuttingPlanRequest.ForPlate(plate, confirmedParameters: parameters,
             preservePartOrder: true));
         Assert.True(kept.Status == CuttingPlanStatus.Ready && kept.IndependentlyReplayed, Describe(kept));
         Assert.Equal(order, kept.ProposedOrder.Select(o => o.SourcePart));
-        Assert.Equal(result.RapidDistance, kept.RapidDistance, 6);
+        Assert.True(kept.RapidDistance <= result.RapidDistance + 1e-6,
+            $"The kept order's route ({kept.RapidDistance}) is longer than the plan's ({result.RapidDistance}).");
     }
 
     // A frame with two small holes on its left strip, one above the other, and a window,

@@ -348,8 +348,9 @@ Wherever a segment sits in an order, the search looks through it: the part befor
 faces the next part, not the segment, and the part after it ranks its outside entry
 from where the tool was before the segment, while its hole route and every rapid start
 from the segment's end. A kept order with segments where a plan put them (an applied
-plan replanned with `Keep the current part order`) therefore gets the entries and
-routes the plan had, and replays Ready again.
+plan replanned with `Keep the current part order`) therefore keeps the plan's order and
+replays Ready again, on a route no longer than the plan's: a holed part after a segment can
+take the shorter shortest-path entry (see [below](#automatic-outside-entries-and-look-ahead)).
 
 Candidates use native closest points, vertices, midpoints and circle angles in
 stable order. `maxEntries` caps the normal ranked shortlist, not the recovery
@@ -448,6 +449,23 @@ An inset near a convex corner is measured along the selected native straight edg
 that edge's own endpoint, not a neighboring entity's endpoint. This keeps the
 candidate on its selected entity when a joined contour has an accepted rounding gap;
 no entry-membership or lead-clearance tolerance is widened.
+
+A target level with the candidates' center along an axis (within 1e-8 times their span), such
+as the next part in the same row, faces neither side on that axis, so rounding cannot send the
+entry to the far end of a long part. Travel, the tie-break after facing and tier, measures a
+holed part's outside from the nearest of its cutouts, which are all cut before it, rather than
+from where the tool was before the part.
+
+A holed part's outside entry tries one point first: where the straight line from its cutouts to
+the next part's leaves the part (`AutomaticEntryKind.ShortestPath`). The line joins the closest
+pair of this part's cutout centers and the next part's, or the look-ahead point when the next
+part has none or holds this one; of several crossings it takes the one nearest the cutout. The
+tool leaves the cutout cut last and next cuts one of the next part's, so an entry on that line
+makes the way between them as short as it can be. The point keeps the perimeter's support-tab
+rules and every lead and rapid check; when it fails, the ranked catalog follows. Contour recovery
+tries it first too. A kept-order replan of a holed part after a cut-off segment routes its holes
+from the segment's end, so it can fit this entry where the plan, which chose the entry routing
+from before the segment, could not, and take a shorter route.
 
 With no lead-out the tool leaves a part from its outside entry. An entry inside a slot
 or pocket can only be left back over the part just cut, so within the ranked catalog

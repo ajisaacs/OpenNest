@@ -21,13 +21,16 @@ internal static class ContourEntryRanking
     /// facing sides of the candidate bounding rectangle descending (a corner on both facing
     /// sides is ideal), then rank tier ascending, then arrival-&gt;entry + entry-&gt;target
     /// ascending, then the stable geometric key. With no target (the last part): tier first,
-    /// then distance to <paramref name="arrival"/> — never toward the plate origin. The
+    /// then distance to <paramref name="arrival"/> — never toward the plate origin. A part's
+    /// outside is cut after its cutouts, so <paramref name="cutouts"/> (their centers, when
+    /// given) replace <paramref name="arrival"/>: the tool comes from the nearest of them. The
     /// input list is returned untouched as a new list; entity order is never meaningful.
     /// </summary>
     internal static IReadOnlyList<ContourEntryCandidate> RankTowardNextCut(
         this IReadOnlyList<ContourEntryCandidate> candidates,
         Vector? target = null,
-        Vector? arrival = null)
+        Vector? arrival = null,
+        IReadOnlyList<Vector> cutouts = null)
     {
         if (target.HasValue) PostVerificationGeometry.Validate(target.Value);
         if (arrival.HasValue) PostVerificationGeometry.Validate(arrival.Value);
@@ -62,15 +65,21 @@ internal static class ContourEntryRanking
             if (p.Y > maxY) maxY = p.Y;
         }
 
-        // Facing sides from the target relative to the center, matching the source plan:
-        // horizontal right when the target is right of center else left; vertical likewise.
+        // Facing sides from the target relative to the center: horizontal right when the target
+        // is right of center, left when left of it; vertical likewise. A target level with the
+        // center (a neighbor in the same row or column) faces neither side on that axis, so
+        // rounding cannot send the entry to the far end of a long part.
         var centerX = minX + (maxX - minX) * 0.5;
         var centerY = minY + (maxY - minY) * 0.5;
-        var facingRight = target != null && target.Value.X > centerX;
-        var facingTop = target != null && target.Value.Y > centerY;
+        var horizontal = target == null ? 0 : Side(target.Value.X, centerX, maxX - minX);
+        var vertical = target == null ? 0 : Side(target.Value.Y, centerY, maxY - minY);
+        var from = cutouts is { Count: > 0 } ? cutouts : arrival is { } a ? new[] { a } : null;
+        if (from != null)
+            foreach (var point in from)
+                PostVerificationGeometry.Validate(point);
 
         return candidates
-            .Select(c => (Candidate: c, Score: Score(c, minX, minY, maxX, maxY, facingRight, facingTop, target, arrival)))
+            .Select(c => (Candidate: c, Score: Score(c, minX, minY, maxX, maxY, horizontal, vertical, target, from)))
             .OrderByDescending(x => x.Score.Facing)
             .ThenBy(x => x.Score.Tier)
             .ThenBy(x => x.Score.Travel)
@@ -97,10 +106,10 @@ internal static class ContourEntryRanking
         double minY,
         double maxX,
         double maxY,
-        bool facingRight,
-        bool facingTop,
+        int horizontal,
+        int vertical,
         Vector? target,
-        Vector? arrival)
+        IReadOnlyList<Vector> from)
     {
         var p = candidate.Choice.Point;
         var facing = 0;
@@ -115,13 +124,22 @@ internal static class ContourEntryRanking
             var top = maxY - p.Y;
             var min = System.Math.Min(System.Math.Min(left, right), System.Math.Min(bottom, top));
             var near = min + PostVerificationGeometry.Epsilon + candidate.CornerReach;
-            if (facingRight && right <= near) facing++;
-            if (!facingRight && left <= near) facing++;
-            if (facingTop && top <= near) facing++;
-            if (!facingTop && bottom <= near) facing++;
+            if (horizontal > 0 && right <= near) facing++;
+            if (horizontal < 0 && left <= near) facing++;
+            if (vertical > 0 && top <= near) facing++;
+            if (vertical < 0 && bottom <= near) facing++;
         }
-        var travel = (arrival != null ? arrival.Value.DistanceTo(p) : 0.0)
+        var travel = (from != null ? from.Min(f => f.DistanceTo(p)) : 0.0)
             + (target != null ? p.DistanceTo(target.Value) : 0.0);
         return (facing, candidate.Kind.RankTier(), travel);
+    }
+
+    // +1 when the target lies past the center along an axis, -1 when before it, 0 when level:
+    // within the comparison tolerance, scaled to the candidates' span so rounding of placed
+    // coordinates far from the origin still counts as level.
+    private static int Side(double target, double center, double span)
+    {
+        var tolerance = PostVerificationGeometry.Epsilon * System.Math.Max(1.0, span);
+        return target > center + tolerance ? 1 : target < center - tolerance ? -1 : 0;
     }
 }

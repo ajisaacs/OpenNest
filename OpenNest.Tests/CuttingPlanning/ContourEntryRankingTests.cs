@@ -71,6 +71,22 @@ public class ContourEntryRankingTests
         Assert.True(rightMid < farCorner);
     }
 
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1e-13)]
+    [InlineData(-1e-13)]
+    public void LevelTarget_FacesNeitherVerticalSide(double noise)
+    {
+        // A neighbor in the same row sits level with the center: rounding must not pick the
+        // top or bottom corner, so the right corners tie on facing and travel from the cutout
+        // the tool leaves decides.
+        var ranked = Catalog(MakeClosedProgram(SquareVertices))
+            .RankTowardNextCut(new Vector(14, 5 + noise), cutouts: [new Vector(5, 9)]).ToList();
+
+        Assert.True(At(ranked[0], 10, 10), $"Expected the corner nearest the cutout, got {ranked[0].Choice.Point}");
+        Assert.True(ranked.FindIndex(c => At(c, 10, 0)) < ranked.FindIndex(c => At(c, 0, 0)));
+    }
+
     [Fact]
     public void SameFacingClass_CornerBeatsMidpoint()
     {

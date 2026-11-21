@@ -60,7 +60,8 @@ public class SideCoverageRegressionTests
     {
         var clean = Polygon();
         var prepared = PreparedContours.Capture(clean, Parameters());
-        var target = new Vector(100 * System.Math.Cos(System.Math.PI), 100 * System.Math.Sin(System.Math.PI));
+        var target = new Vector(-100, 0.5);
+        // Just above center, so the top faces it; level would face neither vertical side.
         var arrival = new Vector(40 * System.Math.Cos(3 * System.Math.PI / 2), 40 * System.Math.Sin(3 * System.Math.PI / 2));
         var ranked = prepared.AutomaticEntryCandidatesWithFallbacks(0, target).RankTowardNextCut(target, arrival);
         var adapter = Adapter(prepared, clean, []);

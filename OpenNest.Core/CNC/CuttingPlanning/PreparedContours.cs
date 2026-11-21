@@ -787,15 +787,47 @@ public sealed class PreparedContours
     internal bool IsClearOfInsideCorners(ContourChoice choice) =>
         support == null || support.IsClearOfInsideCorners(choice.Point + supportOrigin);
 
+    /// <summary>
+    /// The perimeter entry at <paramref name="exit"/> (local), where the straight line from the
+    /// cutout cut last to the next cut leaves the part: an entry on that line makes the way from
+    /// the cutout through the outside to the next cut as short as it can be. Null for a pinned
+    /// perimeter, a reflex or cusp vertex, or a point the perimeter's support tab may not take
+    /// (the same rule as its automatic catalog).
+    /// </summary>
+    internal ContourEntryCandidate ShortestPathEntry(Vector exit)
+    {
+        PostVerificationGeometry.Validate(exit);
+        if (!HasCutPerimeter || IsPinned(PerimeterOrdinal) || FixedCommonLineEntry(PerimeterOrdinal) != null)
+            return null;
+        var choice = ClosestEntry(PerimeterOrdinal, exit);
+        if (IsForbiddenVertex(GetShape(PerimeterOrdinal), choice.Point))
+            return null;
+        if (support != null && !(support.TabCanSupport
+                ? support.AcceptsTabAt(choice.Point + supportOrigin)
+                : IsClearOfInsideCorners(choice)))
+            return null;
+        return new ContourEntryCandidate(choice, AutomaticEntryKind.ShortestPath);
+    }
+
+    /// <summary>
+    /// Whether this perimeter is tabbed for support but no single tab can hold the part level
+    /// (see <see cref="PartSupport.TabCanSupport"/>). No entry then steadies it enough to be
+    /// worth a detour, so its steadying catalog is every entry clear of inside corners.
+    /// </summary>
+    internal bool HasUntenableSupportTab => HasSupportTab && !support.TabCanSupport;
+
     // A perimeter tabbed for support keeps the candidates whose tab steadies the part, and gains
-    // the outline's best tab point. The search's fallbacks, when none of them has a lead-in that
-    // fits, keep every candidate clear of inside corners and then every candidate, still tabbed.
+    // the outline's best tab point. When no single tab can hold it level, every candidate clear
+    // of inside corners counts as steadying: led by the steadiest instead, a long strip resting
+    // on one line of contacts starts mid-length or on its side away from the next cut. The
+    // search's fallbacks, when none of them has a lead-in that fits, keep every candidate clear
+    // of inside corners and then every candidate, still tabbed.
     private IReadOnlyList<ContourEntryCandidate> SupportFiltered(int contourOrdinal,
         List<ContourEntryCandidate> candidates, SupportEntries entries)
     {
         if (support == null || contourOrdinal != PerimeterOrdinal || entries == SupportEntries.Any)
             return MergeByGeometry(candidates);
-        if (entries == SupportEntries.ClearOfInsideCorners)
+        if (entries == SupportEntries.ClearOfInsideCorners || !support.TabCanSupport)
             return MergeByGeometry(candidates.Where(c => IsClearOfInsideCorners(c.Choice)).ToList());
         var kept = candidates.Where(c => support.AcceptsTabAt(c.Choice.Point + supportOrigin)).ToList();
         var best = ClosestEntry(PerimeterOrdinal, support.BestTabPoint!.Value - supportOrigin);

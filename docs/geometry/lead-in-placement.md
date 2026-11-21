@@ -31,7 +31,8 @@ A straight (`LineLeadIn`) lead-in at a convex corner of the outside perimeter
 that edge's line, behind the corner, and the torch travels straight into the corner
 and keeps cutting along the same line. Which of the two edges was picked (auto
 assignment or the manual cursor) does not matter; the cut direction never changes.
-The approach angle is ignored at such a corner.
+The approach angle is ignored at such a corner. On a tabbed perimeter the tab gap then lies along the other edge, which
+the lead-in never reaches, so the tab-retention check accepts it (see [support tabs](../support-tabs.md)).
 
 The straight lead is used only while its pierce stays at least
 `CuttingParameters.PierceClearance` (or the [pierce zone](pierce-zone.md) radius, when larger)
@@ -157,7 +158,7 @@ automatic assignment and the manual preview keep the configured lead.
 
 ## Regression checks
 
-Run `dotnet test OpenNest.Tests/OpenNest.Tests.csproj --filter "FullyQualifiedName~CutoutCornerLeadInTests|FullyQualifiedName~PerimeterCornerLeadInTests|FullyQualifiedName~ErodedPierceTests"`.
+Run `dotnet test OpenNest.Tests/OpenNest.Tests.csproj --filter "FullyQualifiedName~CutoutCornerLeadInTests|FullyQualifiedName~PerimeterCornerLeadInTests|FullyQualifiedName~ErodedPierceTests|FullyQualifiedName~ShortestPathEntryTests"`.
 The cutout tests exercise generated part programs, default automatic placement, every
 rectangular corner with both adjoining edges and windings, part rotation, acute
 and obtuse angles, reflex corners, line/arc corners, preview agreement, and
@@ -167,6 +168,8 @@ agreement, approach-angle handling, the flat-corner clearance fallback, reflex
 notches, and straight lead-outs. `ErodedPierceTests` covers the eroded pierces of a slot and a small round hole, leads stopped at a
 center line, a cutout that keeps its configured lead, the containment of text cutouts that sit a micro-inch apart and, with the
 optional `SmallFeatureLeadNestPath` input, a plate of stencil-text tags planned in reading order.
+`ShortestPathEntryTests` covers holed strips entered beside their hole on the line to the next strip,
+a support tab that cannot hold a strip level, and the tab-retention check of an in-line corner lead-in.
 `ArcLeadInTangentTests` checks curved-lead tangency, direction
 and sweep on perimeters and cutouts under both windings, and at every perimeter corner from
 either edge.

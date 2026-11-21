@@ -108,7 +108,11 @@ The lead-out leaves from where the cut stops, as configured; Plan Cutting never 
 it. A line lead-out angled forward runs toward the lead-in whenever its run along the edge is
 longer than the tab, as a 0.1 lead-out at 60 degrees (0.05 along the edge) beside a 0.03 tab
 does on a counterclockwise outside, and can then cut the tab free. The strict search refuses
-such an entry and looks for another. Only when that refusal is all that stops a plan does Plan
+such an entry and looks for another. The check measures each lead against the gap between the
+outside cut's two ends: at a convex corner the cut starts on one edge and the gap lies along the
+other, so a straight in-line corner lead-in, which runs back along its first edge's line off the
+part, is clear of the tab. A cutout cut in pieces around several tabs keeps measuring along each
+piece's own ends. Only when that refusal is all that stops a plan does Plan
 Cutting plan again keeping those lead-outs (`CuttingPlanSnapshot.WithTabLeadOuts`): each such
 part gets a `PostVerificationKind.TabLeadOut` warning (Plan Cutting's "Tab lead-out" issue), is
 treated as cut free for later rapids, and the plan is UNVERIFIED, so applying it needs explicit
@@ -174,13 +178,15 @@ back first to every catalog entry clear of inside corners, then to every entry
 lead-in fits, it keeps every one that holds the part level, or else only the steadiest. The
 open-scrap pierce fallback then tries the last of those catalogs.
 
-When no single tab can steady the part (it rests on no contacts, or too few), the steadiest
-entry is only a preference: its other fitting entries clear of inside corners follow it, ranked
-toward the next cut, in the search and in contour recovery (ranked steadiest first, the shortlist
-of a long strip resting on one line of contacts would all lie on its far side). A part boxed in
-by its neighbors, such as the upper of two strips nested in a cutout, can then be left toward the
-next cut instead of blocking the plan. It is still tabbed. A part a tab can hold level keeps to
-its steadying entries.
+When no single tab can hold the part level (it rests on no contacts, or too few, so even the best
+tab misses the stability margin; `PreparedContours.HasUntenableSupportTab`), no entry steadies it
+enough to be worth a detour: its automatic entries are every catalog point clear of inside corners,
+ranked toward the next cut like any untabbed part's, in the search and in contour recovery. Led by
+the steadiest instead, a long strip resting on one line of contacts started mid-length, or on its
+side away from the next cut, so the head left it back over the strip. A part boxed in by its
+neighbors, such as the upper of two strips nested in a cutout, is left toward the next cut too. It
+is still tabbed, and it is still avoided once cut (`tabMayNotHold`). A part a tab can hold level
+keeps to its steadying entries.
 
 A tabbed part counts as steady wherever its tab is: the steadiest entries above are preferences,
 never a warning. No message says a tab cannot steady its part, and once cut a tabbed part stays
