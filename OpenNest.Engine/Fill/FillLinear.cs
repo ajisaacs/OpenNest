@@ -94,6 +94,16 @@ namespace OpenNest.Engine.Fill
             return direction == NestDirection.Horizontal ? WorkArea.Right : WorkArea.Top;
         }
 
+        /// <summary>
+        /// The gap between two boxes across the given axis; negative when they overlap there.
+        /// </summary>
+        private static double SideGap(Box a, Box b, NestDirection direction)
+        {
+            return direction == NestDirection.Horizontal
+                ? System.Math.Max(a.Bottom - b.Top, b.Bottom - a.Top)
+                : System.Math.Max(a.Left - b.Right, b.Left - a.Right);
+        }
+
         private static NestDirection PerpendicularAxis(NestDirection direction)
         {
             return direction == NestDirection.Horizontal
@@ -169,7 +179,10 @@ namespace OpenNest.Engine.Fill
                 movingBoxes[i] = stationaryBoxes[i].Translate(offset);
             }
 
+            // The copy distance is the maximum over every pair. Pairs whose bboxes overlap
+            // across the push are kept apart from those only beside the copy's path: see below.
             var maxCopyDistance = 0.0;
+            var maxBesideDistance = 0.0;
 
             for (var j = 0; j < parts.Count; j++)
             {
@@ -184,8 +197,13 @@ namespace OpenNest.Engine.Fill
                     if (SpatialQuery.DirectionalGap(movingBox, stationaryBox, opposite) > 0)
                         continue;
 
-                    // Skip if bboxes can't overlap along the axis perpendicular to the push.
-                    if (!SpatialQuery.PerpendicularOverlap(movingBox, stationaryBox, dirVec))
+                    // Skip a part the copy cannot come within the spacing of: one whose bbox
+                    // lies beside the copy's path by the spacing or more. One nearer than
+                    // that is measured even though the bboxes never overlap, or the copy
+                    // would stop clear of the parts in its path and pass this one too close.
+                    var sideGap = SideGap(movingBox, stationaryBox, direction);
+                    var beside = sideGap > Tolerance.Epsilon;
+                    if (beside && sideGap >= PartSpacing - Tolerance.Epsilon)
                         continue;
 
                     if (stationaryEntities[i] == null)
@@ -214,16 +232,24 @@ namespace OpenNest.Engine.Fill
 
                     var copyDist = startOffset - slideDistance;
 
-                    if (copyDist > maxCopyDistance)
-                        maxCopyDistance = copyDist;
+                    if (beside)
+                        maxBesideDistance = System.Math.Max(maxBesideDistance, copyDist);
+                    else
+                        maxCopyDistance = System.Math.Max(maxCopyDistance, copyDist);
 
-                    // The copy distance is the maximum over every pair, so it can only grow.
-                    if (maxCopyDistance > useful)
+                    // Either maximum can only grow, and so can the distance they give.
+                    if (maxCopyDistance > useful || maxBesideDistance > useful + Tolerance.Epsilon)
                         return double.PositiveInfinity;
                 }
             }
 
-            return maxCopyDistance;
+            // A part beside the path often meets the copy corner to corner at the very
+            // distance the parts in the path set, and that contact can measure up to
+            // Epsilon longer. Only one that needs more than that moves the copy.
+            if (maxBesideDistance > maxCopyDistance + Tolerance.Epsilon)
+                maxCopyDistance = maxBesideDistance;
+
+            return maxCopyDistance > useful ? double.PositiveInfinity : maxCopyDistance;
         }
 
         /// <summary>

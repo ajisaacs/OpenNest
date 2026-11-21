@@ -45,6 +45,15 @@ namespace OpenNest.Engine.Tests.Jobs;
 /// herringbone-era pins came from Windows, whose runtime trig differs from Linux in the last
 /// bit, and the cross nested differently on each (Strip 23 there, 28 here). Both platforms
 /// now give these layouts, which pass the overlap and work-area checks.
+/// The mixed Strip nest was re-captured when the pattern copy distance began measuring parts
+/// beside the copy's path (<c>PatternCopySpacingTests</c>): its row of D-shapes used to come from
+/// an Extents column pair tiled 0.01 apart, a layout that broke the part spacing and lost to the
+/// columns on score. The row is now valid and denser than the columns, so the strip takes it.
+/// The first remnant that layout leaves is a sliver along the top edge, too narrow for the single
+/// rectangle, and the pack step used to stop there. It now goes on to the following remnants
+/// (<c>StripLeftoverPackTests</c>), so the rectangle lands right of the row and the nest still
+/// holds 35. No other pin changed, and the whole-plate nests are now checked with
+/// <c>NestLayoutCheck.Validate</c> as they are solved.
 /// Not pinned: richer mixes that pair parallelogram, chevron or tee parts at oblique angles
 /// with other irregular items. Their Fill and Vertical Remnant nests vary between runs, most
 /// likely because best-fit pair candidates are gathered in a <c>ConcurrentBag</c> and equal
@@ -282,7 +291,12 @@ public class FillStackCharacterizationTests
     {
         var plate = MakePlate();
         var items = createItems();
+        var demand = items.ToDictionary(i => i.Drawing, i => (i.Drawing.Name, i.Quantity));
         var parts = PlateFillService.Nest(strategy, plate, items, null, CancellationToken.None);
+        Assert.Empty(NestLayoutCheck.Validate(
+            new List<(Plate, List<Part>)> { (plate, parts) },
+            demand
+        ));
         // Remaining demand is part of the contract callers read back.
         var remaining = string.Join(",", items.Select(i => $"{i.Drawing.Name}={i.Quantity}"));
         return Layout(parts) + "\nremaining:" + remaining;
@@ -290,7 +304,7 @@ public class FillStackCharacterizationTests
 
     [Theory]
     [InlineData("Fill", 34, "D3D54E9116D96ACF")]
-    [InlineData("Strip", 35, "55A0EE3EDF28E68E")]
+    [InlineData("Strip", 35, "E8735AC098986DBF")]
     [InlineData("Vertical Remnant", 35, "285AF7AF9B9573C5")]
     [InlineData("Horizontal Remnant", 30, "A0700052AE771E06")]
     public void Nest_MixedIrregularItems_PinnedLayout(

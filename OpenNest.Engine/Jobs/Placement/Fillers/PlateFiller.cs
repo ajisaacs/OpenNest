@@ -21,7 +21,7 @@ internal enum PlateLayout
 
     /// <summary>
     /// Iterative shrink-fill strips (each strip ranked by a fresh remnant filler), then pack the
-    /// leftovers into the first remnant.
+    /// leftovers into the remnants, first to last, until none takes a part.
     /// </summary>
     Strips,
 }
@@ -608,26 +608,8 @@ internal class PlateFiller
         }
 
         packItems = packItems.Where(item => item.Quantity > 0).ToList();
-        if (packItems.Count > 0 && !token.IsCancellationRequested)
-        {
-            var packArea = workArea;
-            if (allParts.Count > 0 || clampKeepOuts.Count > 0)
-            {
-                var obstacles = allParts
-                    .Select(part => part.BoundingBox.Offset(Plate.PartSpacing))
-                    .ToList();
-                obstacles.AddRange(clampKeepOuts);
-                var finder = new RemnantFinder(workArea, obstacles);
-                var remnants = finder.FindRemnants();
-                packArea = remnants.Count > 0 ? remnants[0] : new Box(0, 0, 0, 0);
-            }
-
-            if (packArea.Width > 0 && packArea.Length > 0)
-            {
-                var packParts = PackArea(packArea, packItems, progress, token);
-                allParts.AddRange(packParts);
-            }
-        }
+        if (packItems.Count > 0)
+            allParts.AddRange(PackLeftovers(workArea, allParts, packItems, clampKeepOuts, progress, token));
 
         foreach (var item in items)
         {
@@ -640,6 +622,30 @@ internal class PlateFiller
 
         return allParts;
     }
+
+    /// <summary>
+    /// The Strip layout's pack step: <paramref name="packItems"/> go to the remnants
+    /// <paramref name="placed"/> and the clamp keep-outs leave, first to last, through
+    /// <see cref="LeftoverPacker"/>. Returns the packed parts; quantities are the caller's to deduct.
+    /// </summary>
+    internal List<Part> PackLeftovers(
+        Box workArea,
+        List<Part> placed,
+        List<NestItem> packItems,
+        IReadOnlyList<Box> clampKeepOuts,
+        IProgress<NestProgress> progress,
+        CancellationToken token
+    ) =>
+        LeftoverPacker.Pack(
+            workArea,
+            Plate.PartSpacing,
+            placed,
+            packItems,
+            clampKeepOuts,
+            PackArea,
+            progress,
+            token
+        );
 
     private void RunPipeline(FillContext context)
     {

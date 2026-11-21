@@ -42,6 +42,11 @@ layout. The chosen pair then slides left and down against the true outlines arou
 one group. Trimming a fill to quantity keeps its interlocked pairs whole, so the spare space stays
 one usable cell rather than two half gaps.
 
+Strip, in place of the two orders above, offers its leftovers to every remnant of the finished
+layout (`LeftoverPacker`): the remnants in order, edge-touching first and then by area, the first
+that takes a part packed as boxes at 0 or 90 degrees and the remnants found again around it, until
+none takes a part. The first remnant is often a sliver along an edge that holds nothing.
+
 Neither Irregular nor Rectangles wins every job, even within its own lane, so Default runs both
 rather than choosing by part shape; Rectangles adds little time and is also the fallback when an
 Irregular layout fails the check. Default runs Rectangles first, then Circles, then Irregular, so
