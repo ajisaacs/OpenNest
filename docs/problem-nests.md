@@ -164,7 +164,9 @@ Plates use their own cutting parameters. A plate without them uses line lead-ins
    then drag the `.nest` file onto the window. Keep the corpus server selected until the save in
    step 4 succeeds, then restore your previous storage settings.
 2. In **Nest > Edit**, name it after the problem, and in the comments describe what failed
-   and which commit fixed it, if any.
+   and which commit fixed it, if any. Keep it scannable: short `Setup:`, `Problem:` and `Fix:`
+   sections separated by blank lines, with `-` bullets rather than one long paragraph. Never
+   start a prose line with one of the machine-read prefixes below.
 3. Add a baseline line to the comments, with plate numbers counted from the first plate:
    `planning: 1=NoSolutionWithinBudget 2=BestEffort`. An Auto Nest problem takes
    `auto-nest: 2 sheets` instead, the sheet count Auto Nest reaches today (`auto-nest: 1 sheets,
