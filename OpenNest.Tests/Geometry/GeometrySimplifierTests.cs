@@ -240,8 +240,9 @@ public class GeometrySimplifierTests
         );
     }
 
-    // Frozen Analyze + Apply output from 5bf3c5f. The circles are order markers;
-    // the rotated ellipse also pins the two trailing lines left unfitted.
+    // Frozen Analyze + Apply output. The circles are order markers. The rotated
+    // ellipse takes two tangent arcs (from 5bf3c5f until arcs chained tangent, one
+    // arc left two trailing lines unfitted).
     [Theory]
     [MemberData(nameof(SignedAngleCharacterizationCases))]
     public void Apply_SignedAngleCharacterization_PreservesOrderedEntities(
@@ -256,21 +257,19 @@ public class GeometrySimplifierTests
         shape.Entities.Add(new Circle(new Vector(30, -40), 3.5));
         var simplifier = new GeometrySimplifier { Tolerance = 0.05 };
 
-        var candidate = Assert.Single(simplifier.Analyze(shape));
-        Assert.Equal(1, candidate.StartIndex);
-        Assert.Equal(expectedEndIndex, candidate.EndIndex);
-        var result = simplifier.Apply(shape, new List<ArcCandidate> { candidate });
+        var candidates = simplifier.Analyze(shape);
+        Assert.Equal(expected.Length, candidates.Count);
+        Assert.Equal(1, candidates[0].StartIndex);
+        Assert.Equal(expectedEndIndex, candidates[^1].EndIndex);
+        var result = simplifier.Apply(shape, candidates);
         var assertions = new List<Action<Entity>>
         {
             entity => AssertCharacterizedCircle(entity, -30, 40, 2.5),
-            entity => AssertCharacterizedArc(entity, expected[0], reversed[0]),
         };
-        if (scenario == "rotated-partial-ellipse")
+        for (var i = 0; i < expected.Length; i++)
         {
-            assertions.Add(entity => AssertCharacterizedLine(entity,
-                new[] { 2.644054114237731, 2.288101855169011, 2.3955895038427424, 2.1920946874414766 }));
-            assertions.Add(entity => AssertCharacterizedLine(entity,
-                new[] { 2.3955895038427424, 2.1920946874414766, 2.148394352966971, 2.087282751199381 }));
+            var arc = i;
+            assertions.Add(entity => AssertCharacterizedArc(entity, expected[arc], reversed[arc]));
         }
         assertions.Add(entity => AssertCharacterizedCircle(entity, 30, -40, 3.5));
         Assert.Collection(result.Entities, assertions.ToArray());
@@ -333,10 +332,11 @@ public class GeometrySimplifierTests
             "rotated-partial-ellipse",
             new double[][]
             {
-                new[] { 4.738877816517773, -2.224586867329932, 4.975203096337214, 1.0053406925186938, 2.0054021506562583 },
+                new[] { 4.927983487079521, -1.5611530645286615, 4.318154756605715, 0.9599821908021332, 1.8142367957441152 },
+                new[] { 7.613448117613107, -12.373669407184302, 15.459170416860491, 1.8142367957441152, 1.9321227648248305 },
             },
-            new[] { false },
-            22,
+            new[] { false, false },
+            24,
         };
     }
 
@@ -360,14 +360,6 @@ public class GeometrySimplifierTests
         Assert.Equal(radius, circle.Radius);
     }
 
-    private static void AssertCharacterizedLine(Entity entity, double[] expected)
-    {
-        var line = Assert.IsType<Line>(entity);
-        var actual = new[] { line.StartPoint.X, line.StartPoint.Y, line.EndPoint.X, line.EndPoint.Y };
-        for (var i = 0; i < expected.Length; i++)
-            Assert.InRange(actual[i], expected[i] - 1e-10, expected[i] + 1e-10);
-    }
-
     private static Vector ArcTangentAt(Arc arc, Vector pt)
     {
         var ang = System.Math.Atan2(pt.Y - arc.Center.Y, pt.X - arc.Center.X);
@@ -384,6 +376,124 @@ public class GeometrySimplifierTests
         dot = System.Math.Max(-1, System.Math.Min(1, dot));
         return System.Math.Acos(dot) * 180.0 / System.Math.PI;
     }
+
+    /// <summary>
+    /// A drawing that is symmetric only to within the fit tolerance (the snowflake
+    /// ornament's fillets are sampled differently on each side): the mirrored arc
+    /// must not replace the target's fit unless it still meets the neighbors exactly.
+    /// </summary>
+    [Fact]
+    public void Symmetrize_NearlyMirroredCorners_KeepsContourClosed()
+    {
+        // Rounded top corners: the right one has radius 1, the left one 1.003,
+        // so the mirrored right arc misses the left corner's ends by 0.003.
+        const double leftRadius = 1.003;
+        var points = new System.Collections.Generic.List<Vector>
+        {
+            new(-4 - leftRadius, 0),
+            new(5, 0),
+        };
+        points.AddRange(new Arc(new Vector(4, 4), 1, 0, System.Math.PI / 2, false).ToPoints(16));
+        points.AddRange(
+            new Arc(new Vector(-4, 4), leftRadius, System.Math.PI / 2, System.Math.PI, false).ToPoints(16)
+        );
+        var shape = new Shape();
+        for (var i = 0; i < points.Count; i++)
+            shape.Entities.Add(new Line(points[i], points[(i + 1) % points.Count]));
+
+        var simplifier = new GeometrySimplifier { Tolerance = 0.004 };
+        var candidates = simplifier.Analyze(shape);
+        Assert.Equal(2, candidates.Count);
+        var mirrored = candidates.Select(c => c.FittedArc).ToList();
+
+        simplifier.Symmetrize(candidates, new MirrorAxisResult(new Vector(0, 0), new Vector(0, 1), 1));
+        Assert.Contains(candidates, c => !mirrored.Contains(c.FittedArc));
+        var simplified = simplifier.Apply(shape, candidates);
+
+        var entities = simplified.Entities;
+        for (var i = 0; i < entities.Count; i++)
+        {
+            var end = EndOf(entities[i]);
+            var start = StartOf(entities[(i + 1) % entities.Count]);
+            Assert.True(end.DistanceTo(start) < 1e-6, $"Gap of {end.DistanceTo(start):F4} after entity {i}");
+        }
+    }
+
+    /// <summary>
+    /// The ornament snowflake's fillet where an arm meets the center (inches): it bends
+    /// one way, straightens and turns back slightly, then bends the same way again.
+    /// Two same-way arcs cannot meet across that without a corner, so wherever an arc
+    /// meets its neighbor it may turn no more sharply than the original polyline does.
+    /// </summary>
+    [Fact]
+    public void Analyze_FilletWithInflection_AddsNoCorners()
+    {
+        var inflection = new[]
+            {
+                (-12.172, 10.492), (-6.251, 7.095), (-5.870, 7.042), (-5.497, 7.138), (-4.979, 7.496),
+                (-4.264, 7.925), (-3.411, 8.350), (-3.155, 8.623), (-3.018, 8.971), (-3.000, 9.158),
+                (-3.000, 15.787),
+            }
+            .Select(p => new Vector(p.Item1 / 25.4, -p.Item2 / 25.4))
+            .ToList();
+
+        var shape = new Shape();
+        for (var i = 0; i < inflection.Count - 1; i++)
+            shape.Entities.Add(new Line(inflection[i], inflection[i + 1]));
+
+        var simplifier = new GeometrySimplifier { Tolerance = 0.004 };
+        var simplified = simplifier.Apply(shape, simplifier.Analyze(shape));
+
+        Assert.Contains(simplified.Entities, e => e is Arc);
+        var entities = simplified.Entities;
+        for (var i = 0; i < entities.Count - 1; i++)
+        {
+            if (entities[i] is not Arc && entities[i + 1] is not Arc)
+                continue;
+
+            var joint = EndOf(entities[i]);
+            var vertex = inflection.FindIndex(p => p.DistanceTo(joint) < 1e-9);
+            Assert.InRange(vertex, 1, inflection.Count - 2);
+            var original = AngleBetweenDeg(
+                new Vector(inflection[vertex].X - inflection[vertex - 1].X, inflection[vertex].Y - inflection[vertex - 1].Y),
+                new Vector(inflection[vertex + 1].X - inflection[vertex].X, inflection[vertex + 1].Y - inflection[vertex].Y)
+            );
+            var turn = AngleBetweenDeg(ExitOf(entities[i]), EntryOf(entities[i + 1]));
+            Assert.True(turn <= original + 1, $"Corner of {turn:F1} deg after entity {i}; the drawing turns {original:F1} deg there");
+        }
+    }
+
+    private static Vector ExitOf(Entity e) =>
+        e switch
+        {
+            Line l => new Vector(l.EndPoint.X - l.StartPoint.X, l.EndPoint.Y - l.StartPoint.Y),
+            Arc a => ArcTangentAt(a, a.EndPoint()),
+            _ => Vector.Invalid,
+        };
+
+    private static Vector EntryOf(Entity e) =>
+        e switch
+        {
+            Line l => new Vector(l.EndPoint.X - l.StartPoint.X, l.EndPoint.Y - l.StartPoint.Y),
+            Arc a => ArcTangentAt(a, a.StartPoint()),
+            _ => Vector.Invalid,
+        };
+
+    private static Vector StartOf(Entity e) =>
+        e switch
+        {
+            Line l => l.StartPoint,
+            Arc a => a.StartPoint(),
+            _ => Vector.Invalid,
+        };
+
+    private static Vector EndOf(Entity e) =>
+        e switch
+        {
+            Line l => l.EndPoint,
+            Arc a => a.EndPoint(),
+            _ => Vector.Invalid,
+        };
 
     /// <summary>
     /// Optional real-drawing check. The DXF stays outside the repository; set

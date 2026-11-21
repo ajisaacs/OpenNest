@@ -21,6 +21,9 @@ public class ArcCandidate
 
     /// <summary>Last point of the original line segments this candidate covers.</summary>
     public Vector LastPoint { get; set; }
+
+    /// <summary>The original polyline vertices this candidate covers, in order.</summary>
+    internal List<Vector> Points { get; set; }
 }
 
 /// <summary>
@@ -306,19 +309,74 @@ public class GeometrySimplifier
             var target = candidates[targetIdx];
             var mirrored = MirrorArc(source.FittedArc, axis);
 
-            // Only apply the mirrored arc if its endpoints are close enough to the
-            // target's actual boundary points. Otherwise the mirror introduces gaps.
-            var mirroredStart = mirrored.StartPoint();
-            var mirroredEnd = mirrored.EndPoint();
-            var startDist = mirroredStart.DistanceTo(target.FirstPoint);
-            var endDist = mirroredEnd.DistanceTo(target.LastPoint);
+            // Only consider the mirrored arc if it lands near the target's boundary
+            // points. A drawing is rarely symmetric to the last digit, so the mirror
+            // only lends its radius: the arc is refit through the target's own
+            // endpoints, or the neighbors would no longer meet it.
+            var startDist = mirrored.StartPoint().DistanceTo(target.FirstPoint);
+            var endDist = mirrored.EndPoint().DistanceTo(target.LastPoint);
+            if (startDist > Tolerance || endDist > Tolerance)
+                continue;
 
-            if (startDist <= Tolerance && endDist <= Tolerance)
+            var refit = FitWithRadius(target, mirrored);
+            if (refit.arc != null)
             {
-                target.FittedArc = mirrored;
-                target.MaxDeviation = source.MaxDeviation;
+                target.FittedArc = refit.arc;
+                target.MaxDeviation = refit.deviation;
             }
         }
+    }
+
+    /// <summary>
+    /// Fits an arc of <paramref name="mirrored"/>'s radius exactly through the
+    /// target's endpoints, on the side of its center, and accepts it only if it
+    /// stays within tolerance of the target's original segments.
+    /// </summary>
+    private (Arc arc, double deviation) FitWithRadius(ArcCandidate target, Arc mirrored)
+    {
+        var points = target.Points;
+        if (points == null || points.Count < 3)
+            return (null, 0);
+
+        var p1 = points[0];
+        var pn = points[^1];
+        var dx = pn.X - p1.X;
+        var dy = pn.Y - p1.Y;
+        var chordLen = System.Math.Sqrt(dx * dx + dy * dy);
+        var halfChord = chordLen / 2;
+        if (chordLen < 1e-10 || mirrored.Radius < halfChord)
+            return (null, 0);
+
+        var mx = (p1.X + pn.X) / 2;
+        var my = (p1.Y + pn.Y) / 2;
+        var nx = -dy / chordLen;
+        var ny = dx / chordLen;
+        var offset = System.Math.Sqrt(mirrored.Radius * mirrored.Radius - halfChord * halfChord);
+        var side = (mirrored.Center.X - mx) * nx + (mirrored.Center.Y - my) * ny >= 0 ? 1 : -1;
+        var center = new Vector(mx + side * offset * nx, my + side * offset * ny);
+
+        var isReversed = ArcFit.SumSignedAngles(center, points) < 0;
+        if (isReversed != target.FittedArc.IsReversed)
+            return (null, 0);
+
+        var deviation = System.Math.Max(
+            ArcFit.MaxRadialDeviation(points, center.X, center.Y, mirrored.Radius),
+            MaxArcToSegmentDeviation(points, center, mirrored.Radius, isReversed)
+        );
+        if (deviation > Tolerance)
+            return (null, 0);
+
+        // The target's own fit meets its neighbors smoothly; a different radius
+        // through the same endpoints turns at its ends, which would add corners.
+        var arc = CreateArc(center, mirrored.Radius, points, target.FittedArc);
+        var own = target.FittedArc;
+        if (
+            AngleBetween(ArcTangent(arc, arc.StartAngle), ArcTangent(own, own.StartAngle)) > MirrorTangentAllowance
+            || AngleBetween(ArcTangent(arc, arc.EndAngle), ArcTangent(own, own.EndAngle)) > MirrorTangentAllowance
+        )
+            return (null, 0);
+
+        return (arc, deviation);
     }
 
     private static Arc MirrorArc(Arc arc, MirrorAxisResult axis)
@@ -353,35 +411,278 @@ public class GeometrySimplifier
     )
     {
         var j = runStart;
-        var chainedTangent = Vector.Invalid;
 
-        while (j <= runEnd - MinLines + 1)
+        // The arcs fitted back to back up to j, each meeting the next. They are the
+        // tail of candidates, in order.
+        var chain = new List<ChainLink>();
+        var lastStart = runEnd - MinLines + 1;
+
+        // Trimming and dropping move j backwards; each pass still shortens or removes an
+        // arc, so this bound is never reached in practice. It only guards the UI thread.
+        var budget = 16 * (runEnd - runStart + 1) + 16;
+
+        while (budget-- > 0)
         {
-            var result = TryFitArcAt(entities, j, runEnd, chainedTangent);
-            if (result == null)
+            if (j > lastStart)
             {
-                j++;
-                chainedTangent = Vector.Invalid;
+                // The run's last arc meets whatever follows the run (or lines it left).
+                var (resume, droppedStart) = SettleChainEnd(entities, chain, candidates);
+                if (resume < 0 && droppedStart >= 0)
+                {
+                    // Dropped arcs left lines that a fresh start may still fit.
+                    resume = droppedStart + 1;
+                    chain.Clear();
+                }
+
+                if (resume < 0 || resume > lastStart)
+                    break;
+                j = resume;
                 continue;
             }
 
-            chainedTangent = ComputeEndTangent(result.Center, result.Points);
-            var arc = CreateArc(result.Center, result.Radius, result.Points, entities[j]);
-            candidates.Add(
-                new ArcCandidate
-                {
-                    StartIndex = j,
-                    EndIndex = result.EndIndex,
-                    FittedArc = arc,
-                    MaxDeviation = result.Deviation,
-                    BoundingBox = result.Points.GetBoundingBox(),
-                    FirstPoint = arc.StartPoint(),
-                    LastPoint = arc.EndPoint(),
-                }
-            );
+            var previous = chain.Count > 0 ? chain[^1] : null;
+            var chainedTangent = previous == null ? Vector.Invalid : EndTangent(previous.Candidate);
+            ArcFitResult result = null;
+            var strict = false;
 
+            if (previous != null)
+            {
+                // Leave the previous arc along its own end tangent, so the two meet
+                // smoothly. Failing that, give back the previous arc's last lines one at
+                // a time: an arc grown as far as tolerance allows often ends on a
+                // tangent no following arc can continue.
+                result = TryFitArcAt(entities, j, runEnd, chainedTangent, strictStart: true);
+                strict = result != null;
+                if (result == null && TryShortenPrevious(entities, runEnd, previous, candidates, out var shortened, out var next))
+                {
+                    chain[^1] = shortened;
+                    j = shortened.Candidate.EndIndex + 1;
+                    chainedTangent = EndTangent(shortened.Candidate);
+                    result = next;
+                    strict = true;
+                }
+            }
+
+            result ??= TryFitArcAt(entities, j, runEnd, chainedTangent);
+            var candidate = result == null ? null : ToCandidate(entities, j, result);
+
+            // A fallback fit is not tangent to what precedes it. Keep it only where the
+            // drawing itself turns at least as sharply, or it adds a corner the original
+            // does not have (two same-way arcs across an inflection, say); otherwise the
+            // original line stays and the next arc starts after it.
+            if (candidate != null && !strict && AddsCorner(entities, j, chainedTangent, candidate.FittedArc))
+                candidate = null;
+
+            if (candidate == null)
+            {
+                // The line at j stays, so the chain's last arc now meets it.
+                var (resume, droppedStart) = SettleChainEnd(entities, chain, candidates);
+                if (resume >= 0)
+                {
+                    j = resume;
+                    continue;
+                }
+
+                j = droppedStart >= 0 ? droppedStart + 1 : j + 1;
+                chain.Clear();
+                continue;
+            }
+
+            candidates.Add(candidate);
+            chain.Add(new ChainLink(candidate, chainedTangent, strict));
             j = result.EndIndex + 1;
         }
+    }
+
+    private static Vector EndTangent(ArcCandidate candidate) =>
+        ComputeEndTangent(candidate.FittedArc.Center, candidate.Points);
+
+    /// <summary>
+    /// Makes the chain's last arc meet the original line after it without a corner the
+    /// drawing does not have: trims it, or failing that drops it (keeping its lines)
+    /// and settles the arc before it. Returns where to resume chaining after a trim
+    /// (or -1), and the start of the earliest dropped arc (or -1).
+    /// </summary>
+    private (int resume, int droppedStart) SettleChainEnd(
+        List<Entity> entities,
+        List<ChainLink> chain,
+        List<ArcCandidate> candidates
+    )
+    {
+        var droppedStart = -1;
+        while (chain.Count > 0)
+        {
+            var last = chain[^1];
+            if (!EndAddsCorner(entities, last.Candidate))
+                break;
+
+            if (TryTrimEnd(entities, last, candidates, out var trimmed))
+            {
+                chain[^1] = trimmed;
+                return (trimmed.Candidate.EndIndex + 1, droppedStart);
+            }
+
+            candidates.RemoveAt(candidates.Count - 1);
+            chain.RemoveAt(chain.Count - 1);
+            droppedStart = last.Candidate.StartIndex;
+        }
+
+        return (-1, droppedStart);
+    }
+
+    /// <summary>
+    /// True when <paramref name="candidate"/>'s arc meets the original entity after it
+    /// at a sharper angle than the original polyline turns at that vertex.
+    /// </summary>
+    private static bool EndAddsCorner(List<Entity> entities, ArcCandidate candidate)
+    {
+        var last = entities[candidate.EndIndex];
+        var after = candidate.EndIndex + 1 < entities.Count ? entities[candidate.EndIndex + 1] : entities[0];
+        if (
+            ReferenceEquals(after, last)
+            || !EntityEndpoints.TryGet(last, out _, out var lastEnd)
+            || !EntityEndpoints.TryGet(after, out var afterStart, out _)
+            || lastEnd.DistanceTo(afterStart) > 1e-6
+        )
+            return false;
+
+        var arc = candidate.FittedArc;
+        var originalTurn = AngleBetween(GetExitDirection(last), GetEntryDirection(after));
+        var turn = AngleBetween(ArcTangent(arc, arc.EndAngle), GetEntryDirection(after));
+        return turn > originalTurn + CornerAllowance;
+    }
+
+    /// <summary>
+    /// Ends <paramref name="previous"/> (the last candidate) at the latest line where
+    /// it meets the next original line without an added corner, keeping its start
+    /// condition. Replaces the candidate on success.
+    /// </summary>
+    private bool TryTrimEnd(
+        List<Entity> entities,
+        ChainLink previous,
+        List<ArcCandidate> candidates,
+        out ChainLink trimmed
+    )
+    {
+        trimmed = null;
+        var prev = previous.Candidate;
+        for (var end = prev.EndIndex - 1; end >= prev.StartIndex + MinLines - 1; end--)
+        {
+            var shortened = TryFitArcAt(entities, prev.StartIndex, end, previous.ChainedIn, previous.Strict);
+            if (shortened == null || shortened.EndIndex != end)
+                continue;
+
+            var candidate = ToCandidate(entities, prev.StartIndex, shortened);
+            if (EndAddsCorner(entities, candidate))
+                continue;
+            if (!previous.Strict && AddsCorner(entities, prev.StartIndex, previous.ChainedIn, candidate.FittedArc))
+                continue;
+
+            candidates[^1] = candidate;
+            trimmed = previous with { Candidate = candidate };
+            return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>Extra corner, beyond the original polyline's turn, that a joint may have.</summary>
+    private static readonly double CornerAllowance = Angle.ToRadians(1);
+
+    /// <summary>How far a mirrored refit may turn the target arc's end tangents.</summary>
+    private static readonly double MirrorTangentAllowance = Angle.ToRadians(0.5);
+
+    /// <summary>
+    /// True when <paramref name="arc"/>, starting at entity <paramref name="start"/>,
+    /// meets the geometry before it at a sharper angle than the original polyline
+    /// turns at that vertex. <paramref name="incoming"/> is the previous arc's end
+    /// tangent, or invalid to use the original entity before <paramref name="start"/>.
+    /// </summary>
+    private static bool AddsCorner(List<Entity> entities, int start, Vector incoming, Arc arc)
+    {
+        var before = start > 0 ? entities[start - 1] : entities[^1];
+        if (
+            ReferenceEquals(before, entities[start])
+            || !EntityEndpoints.TryGet(before, out _, out var beforeEnd)
+            || !EntityEndpoints.TryGet(entities[start], out var startPoint, out _)
+            || beforeEnd.DistanceTo(startPoint) > 1e-6
+        )
+            return false;
+
+        var originalTurn = AngleBetween(GetExitDirection(before), GetEntryDirection(entities[start]));
+        var turn = AngleBetween(
+            incoming.IsValid() ? incoming : GetExitDirection(before),
+            ArcTangent(arc, arc.StartAngle)
+        );
+        return turn > originalTurn + CornerAllowance;
+    }
+
+    private static double AngleBetween(Vector a, Vector b)
+    {
+        var cross = a.X * b.Y - a.Y * b.X;
+        var dot = a.X * b.X + a.Y * b.Y;
+        if (cross == 0 && dot == 0)
+            return 0;
+        return System.Math.Abs(PortableMath.Atan2(cross, dot));
+    }
+
+    private sealed record ChainLink(ArcCandidate Candidate, Vector ChainedIn, bool Strict);
+
+    /// <summary>
+    /// Shortens <paramref name="previous"/> (the last candidate) until an arc can start
+    /// right after it along its end tangent. Replaces the candidate on success.
+    /// </summary>
+    private bool TryShortenPrevious(
+        List<Entity> entities,
+        int runEnd,
+        ChainLink previous,
+        List<ArcCandidate> candidates,
+        out ChainLink shortenedLink,
+        out ArcFitResult next
+    )
+    {
+        shortenedLink = null;
+        next = null;
+        var prev = previous.Candidate;
+        for (var end = prev.EndIndex - 1; end >= prev.StartIndex + MinLines - 1; end--)
+        {
+            var shortened = TryFitArcAt(entities, prev.StartIndex, end, previous.ChainedIn, previous.Strict);
+            if (shortened == null || shortened.EndIndex != end)
+                continue;
+
+            // Refit without an exact start tangent, the shorter arc starts differently.
+            var candidate = ToCandidate(entities, prev.StartIndex, shortened);
+            if (!previous.Strict && AddsCorner(entities, prev.StartIndex, previous.ChainedIn, candidate.FittedArc))
+                continue;
+
+            // Only worth it if the next arc then reaches past the old end; otherwise this
+            // just splits one arc in two.
+            next = TryFitArcAt(entities, end + 1, runEnd, EndTangent(candidate), strictStart: true);
+            if (next == null || next.EndIndex <= prev.EndIndex)
+                continue;
+
+            candidates[^1] = candidate;
+            shortenedLink = previous with { Candidate = candidate };
+            return true;
+        }
+
+        return false;
+    }
+
+    private static ArcCandidate ToCandidate(List<Entity> entities, int start, ArcFitResult result)
+    {
+        var arc = CreateArc(result.Center, result.Radius, result.Points, entities[start]);
+        return new ArcCandidate
+        {
+            StartIndex = start,
+            EndIndex = result.EndIndex,
+            FittedArc = arc,
+            MaxDeviation = result.Deviation,
+            BoundingBox = result.Points.GetBoundingBox(),
+            FirstPoint = arc.StartPoint(),
+            LastPoint = arc.EndPoint(),
+            Points = result.Points,
+        };
     }
 
     private record ArcFitResult(
@@ -392,11 +693,17 @@ public class GeometrySimplifier
         int EndIndex
     );
 
+    /// <summary>
+    /// Fits the longest arc starting at <paramref name="start"/> and ending no later
+    /// than <paramref name="runEnd"/>. With <paramref name="strictStart"/>, the arc must
+    /// leave exactly along <paramref name="chainedTangent"/> (no balanced fallback).
+    /// </summary>
     private ArcFitResult TryFitArcAt(
         List<Entity> entities,
         int start,
         int runEnd,
-        Vector chainedTangent
+        Vector chainedTangent,
+        bool strictStart = false
     )
     {
         var k = start + MinLines - 1;
@@ -408,6 +715,8 @@ public class GeometrySimplifier
             return null;
 
         var startTangent = EstimateStartTangent(entities, start, points, chainedTangent);
+        if (strictStart && chainedTangent.IsValid())
+            startTangent = startTangent with { Strict = true };
         var endTangent = EstimateEndTangent(entities, k, points);
         var (center, radius, dev) = TryFit(points, startTangent, endTangent);
         if (!center.IsValid())
@@ -478,6 +787,12 @@ public class GeometrySimplifier
         TangentEstimate end
     )
     {
+        if (start.Strict)
+        {
+            yield return ArcFit.FitWithStartTangent(points, start.Direction);
+            yield break;
+        }
+
         if (start.Trusted && !end.Trusted)
         {
             yield return ArcFit.FitWithStartTangent(points, start.Direction);
@@ -532,7 +847,11 @@ public class GeometrySimplifier
     /// edge) and are enforced exactly; untrusted ones are derived from the polyline
     /// vertices and only guide the fit.
     /// </summary>
-    private readonly record struct TangentEstimate(Vector Direction, bool Trusted);
+    private readonly record struct TangentEstimate(Vector Direction, bool Trusted)
+    {
+        /// <summary>Enforce this tangent exactly, with no balanced or free fallback.</summary>
+        public bool Strict { get; init; }
+    }
 
     /// <summary>Segment-length ratio above which a neighboring line counts as a true
     /// straight edge (rather than another chord of the tessellated curve).</summary>
