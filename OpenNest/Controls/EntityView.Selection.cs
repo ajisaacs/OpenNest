@@ -191,6 +191,16 @@ namespace OpenNest.Controls
 
             var menu = new ContextMenuStrip();
             menu.Items.Add(new ToolStripLabel(noun) { ForeColor = SystemColors.GrayText });
+            if (selection.Any(en => en is Line or Arc))
+            {
+                var chain = new ToolStripMenuItem("Select Chain")
+                {
+                    ToolTipText = "Select every line and arc joined end to end to the selection, the whole loop when it closes.",
+                };
+                chain.Click += (s, e) => SelectChain();
+                menu.Items.Add(chain);
+                menu.Items.Add(new ToolStripSeparator());
+            }
             AddRoleItem(menu, "Cut", EntityAction.Cut, current == EntityRole.Cut, selection);
             AddRoleItem(menu, "Etch", EntityAction.Etch, current == EntityRole.Etch, selection);
             AddRoleItem(menu, "Display Only", EntityAction.Display, current == EntityRole.Display, selection);
@@ -234,6 +244,16 @@ namespace OpenNest.Controls
 
             menu.Closed += (s, e) => BeginInvoke(new Action(menu.Dispose));
             menu.Show(this, location);
+        }
+
+        /// <summary>Adds every selectable entity joined end to end to the current selection.</summary>
+        public void SelectChain()
+        {
+            var chain = EntityChains.Connected(Entities.Where(IsSelectable), selectedEntities.ToList());
+            var before = selectedEntities.Count;
+            selectedEntities.UnionWith(chain);
+            if (selectedEntities.Count != before)
+                Invalidate();
         }
 
         private void AddRoleItem(ContextMenuStrip menu, string text, EntityAction action, bool isChecked,
