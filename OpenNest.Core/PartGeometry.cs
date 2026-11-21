@@ -69,6 +69,15 @@ namespace OpenNest
             var geoEntities = MaterialEntities(program);
             var profile = new ShapeProfile(geoEntities);
 
+            // A dense run of tiny entities is thinned to a few chords on a slightly wider offset;
+            // the chords stay outside the true one, so only clearance is added (DenseOutline).
+            if (DenseOutline.HasDenseRun(profile.Perimeter.Entities))
+            {
+                var padded = profile.Perimeter.OffsetOutward(spacing + DenseOutline.Pad);
+                if (padded != null)
+                    return DenseOutline.Thin(padded.Entities);
+            }
+
             var offsetShape = profile.Perimeter.OffsetOutward(spacing);
             if (offsetShape == null)
                 return new List<Entity>();

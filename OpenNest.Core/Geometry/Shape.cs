@@ -688,6 +688,17 @@ namespace OpenNest.Geometry
                 offsetLine.StartPoint = intersection;
                 lastOffsetLine.EndPoint = intersection;
             }
+            else if (
+                (side == OffsetSide.Left && cross >= 0) || (side == OffsetSide.Right && cross <= 0)
+            )
+            {
+                // Nearly parallel lines turning concave by less than the corner test resolves
+                // (short segments of a polyline curve): an arc between the offsets' ends would
+                // sweep the long way round the corner, a near circle per joint. A straight
+                // bridge stays inside the offset envelope, as at any concave corner.
+                if (lastOffsetLine.EndPoint.DistanceTo(offsetLine.StartPoint) > OpenNest.Math.Tolerance.Epsilon)
+                    offsetShape.Entities.Add(new Line(lastOffsetLine.EndPoint, offsetLine.StartPoint));
+            }
             else
             {
                 var arc = new Arc(
