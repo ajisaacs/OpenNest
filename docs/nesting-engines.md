@@ -12,7 +12,7 @@ in `OpenNest.Engine/NestingEngines/<Name>/`, its tests in `OpenNest.Engine.Tests
 | Engine | Best for | Method |
 |---|---|---|
 | Default | Any job; used when no engine is named | Runs Irregular, Rectangles and Circles, checks each layout with the layout check and keeps the best: valid first, then fewest unplaced parts, then lowest salvage-credited cost, then the largest compactness offcut; remaining ties keep the engine listed first here |
-| Rectangles | Plain and near-rectangular plates | Each part packed as the box of its material at its minimum-area rotation, using a maximal-rectangles free list; the sheet that finishes the job is also squeezed into a shorter or narrower bin; stock chosen sheet by sheet by salvage-credited look-ahead cost |
+| Rectangles | Plain and near-rectangular plates | Each part packed as the box of its material at its minimum-area rotation, using a maximal-rectangles free list; the sheet that finishes the job is also squeezed into a shorter or narrower bin; stock chosen sheet by sheet by salvage-credited look-ahead cost, and the whole job also run large parts first with the small parts filling their sheets' gaps |
 | Circles | Round parts: blanks, washers, flanges, gears by their tip circle | Each part packed as its minimum enclosing circle at centers tangent to two of walls, placed discs and clamp keep-outs, with hexagonal and square lattice seeds; bids only when every part is round; stock chosen as Rectangles does, plus whole-job runs preferring each stock and a tail re-plan |
 | Irregular | Irregular profiles | No-fit-polygon frontier packing with gap filling and best-fit pairs, six whole-job strategy variants (each also keeping a stock that finished the job when the per-sheet estimate passed it over for a plan that ended up dearer) and a tail re-plan, then grouped variants that pack like parts together, then a banded variant that packs each sheet in full-height strips, each group as its Lattice band or each strip from the largest parts down, then a sheet-reduction pass that packs edge parts first and turns a key part by its contacts, then a squeeze that packs the last sheet again, largest part first, in ever shorter strips; under a time limit it first reports a quick plan without Lattice blocks, and after its search keeps trying seeded variants until the limit |
 | FlatBar | Flat bar: parts about as wide as the bar | Each stock read as a bar and cut in one row: the CutList cut-list packer and a best-fill search on part lengths less their self-nesting gain, then a slide-left pass that nests shaped ends and refills freed length; stock chosen bar by bar by whole-plan cost |
@@ -63,6 +63,24 @@ other parts goes to Irregular and Rectangles.
 Rectangles places irregular parts validly, but only as their bounding boxes; it never nests into a
 notch or hole. Box sides account for how the layout check flattens arcs, so round-edged parts stay
 valid at box contact.
+
+#### Large parts first
+
+Picking each sheet by its look-ahead cost favors the densest sheet, and a sheet of small parts
+packs densest. On a job mixing large plates with small parts that spends the first sheets on the
+small parts alone and leaves each large plate a sheet with an empty strip beside it. On one real
+job (a braze casing in 3/16 steel: 35 x 57 to 65 x 89 side and cover plates, 5 x 28 angles and
+9 x 4 tabs, 219 parts on five stock sizes) sheet 1 held 109 small parts and the plates followed
+one or two to a sheet, 28 sheets and 220,032 sq in in all.
+
+So Rectangles also runs the job large parts first. The part types are split at a wide drop in box
+area (to half or less of the next larger type; the three widest drops are each tried). The large
+types nest alone, sheet by sheet as usual; then each of their sheets, in order, is packed again with
+its own large parts and every small part still waiting, keeping the packing that places the most
+material without dropping one of its large parts; whatever small parts are left get new sheets of
+their own. The cheapest whole job wins (then the larger compactness offcut); a tie keeps the
+cost-first run. The braze casing now takes 27 sheets and 203,616 sq in, every sheet but the last
+holding a plate with small parts in its gaps.
 
 #### Squeezing the last sheet
 

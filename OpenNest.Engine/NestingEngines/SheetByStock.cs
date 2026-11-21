@@ -38,6 +38,8 @@ internal static class SheetByStock
     /// packer's completed search, not budget-limited output, so a repeat is safe.</param>
     /// <param name="preferred">When set, only this stock is tried while it is available and
     /// takes a layout; the others are tried only once it cannot.</param>
+    /// <param name="prefix">Sheets already chosen, committed first in order and counted against
+    /// stock and plate limits; <paramref name="remaining"/> must already exclude their parts.</param>
     public static NestJobResult Run(
         NestJob job,
         IReadOnlyList<SheetDemand> types,
@@ -46,12 +48,18 @@ internal static class SheetByStock
         IProgress<NestJobProgress>? progress,
         CancellationToken token,
         Action<RepeatBatch>? batchSelected = null,
-        NestPlateStock? preferred = null)
+        NestPlateStock? preferred = null,
+        IReadOnlyList<SheetLayout>? prefix = null)
     {
         var used = job.Plates.ToDictionary(s => s.Id, _ => 0, StringComparer.Ordinal);
         var parts = job.Parts.ToDictionary(p => p.Id, StringComparer.Ordinal);
         var priority = types.ToDictionary(t => t.Id, t => t.Priority, StringComparer.Ordinal);
         var result = new NestJobResultBuilder(job, progress);
+        foreach (var sheet in prefix ?? Array.Empty<SheetLayout>())
+        {
+            result.AddSheet(sheet.Stock, sheet.Poses);
+            used[sheet.Stock.Id]++;
+        }
         NestJobStopReason reason;
 
         while (true)
