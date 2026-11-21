@@ -11,7 +11,9 @@ namespace OpenNest.Engine.Strategies;
 /// <summary>
 /// Staggers round parts edge to edge with <see cref="StaggeredFill"/>, whose half-pitch rows stretch
 /// their pitch to the sheet so the next row drops deeper than a fixed lattice does, and whose
-/// slack-shifted rows keep every row full; the better of the two is kept.
+/// slack-shifted rows keep every row full; the better of the two is kept. A remnant ranking also
+/// weighs each mode's stripes in both directions, since stripes spanning the side the remnant runs
+/// along can leave a deeper remnant than the direction placing the most discs.
 /// </summary>
 public class CircleFillStrategy : IFillStrategy
 {
@@ -36,10 +38,23 @@ public class CircleFillStrategy : IFillStrategy
         var area = context.WorkArea.Offset(gap * 0.5);
 
         var comparer = context.Policy?.Comparer ?? new DefaultFillComparer();
-        var halfPitch = Pack(area, spaced, StaggerMode.HalfPitch, item, context.Item.Drawing);
-        var slackShift = Pack(area, spaced, StaggerMode.SlackShift, item, context.Item.Drawing);
+        var drawing = context.Item.Drawing;
+        var halfPitch = Pack(area, spaced, StaggerMode.HalfPitch, item, drawing);
+        var slackShift = Pack(area, spaced, StaggerMode.SlackShift, item, drawing);
 
-        return comparer.IsBetter(slackShift, halfPitch, context.WorkArea) ? slackShift : halfPitch;
+        var best = comparer.IsBetter(slackShift, halfPitch, context.WorkArea) ? slackShift : halfPitch;
+        if (comparer is not RemnantComparer)
+            return best;
+
+        foreach (var mode in new[] { StaggerMode.HalfPitch, StaggerMode.SlackShift })
+            foreach (var alongX in new[] { true, false })
+            {
+                var candidate = Pack(area, spaced, mode, alongX, item, drawing);
+                if (comparer.IsBetter(candidate, best, context.WorkArea))
+                    best = candidate;
+            }
+
+        return best;
     }
 
     private static List<Part> Pack(
@@ -50,8 +65,22 @@ public class CircleFillStrategy : IFillStrategy
         Drawing drawing
     )
     {
-        var bin = new Bin { Location = area.Location, Size = area.Size };
+        var bin = NewBin(area);
         StaggeredFill.Fill(bin, spaced, mode);
-        return bin.Items.Select(i => new Part(drawing, i.Center + item.PartOffset)).ToList();
+        return ToParts(bin.Items, item, drawing);
     }
+
+    private static List<Part> Pack(
+        Box area,
+        Item spaced,
+        StaggerMode mode,
+        bool alongX,
+        Item item,
+        Drawing drawing
+    ) => ToParts(StaggeredFill.Layout(NewBin(area), spaced, mode, alongX), item, drawing);
+
+    private static Bin NewBin(Box area) => new() { Location = area.Location, Size = area.Size };
+
+    private static List<Part> ToParts(List<Item> items, Item item, Drawing drawing) =>
+        items.Select(i => new Part(drawing, i.Center + item.PartOffset)).ToList();
 }

@@ -156,6 +156,24 @@ public class ShrinkFillerTests
     }
 
     [Fact]
+    public void TrimToCount_WithoutPairs_KeepsTheNearestPartsOneByOne()
+    {
+        // The same overlapping boxes as staggered discs, which never interlock.
+        var parts = new List<Part>
+        {
+            TestHelpers.MakePartAt(0, 0, 5),
+            TestHelpers.MakePartAt(1, 0, 5),
+            TestHelpers.MakePartAt(10, 0, 5),
+            TestHelpers.MakePartAt(11, 0, 5),
+            TestHelpers.MakePartAt(30, 0, 5),
+        };
+
+        var trimmed = ShrinkFiller.TrimToCount(parts, 3, ShrinkAxis.Width, keepPairs: false);
+
+        Assert.Equal(new[] { parts[0], parts[1], parts[2] }, trimmed);
+    }
+
+    [Fact]
     public void TrimToCount_SplitsTheNearestPairOnlyWithoutAnUnpairedPart()
     {
         var parts = new List<Part>

@@ -8,6 +8,8 @@ namespace OpenNest.Engine.Fill
     /// </summary>
     public class VerticalRemnantComparer : RemnantComparer
     {
+        protected override ShrinkAxis TrimAxis => ShrinkAxis.Width;
+
         protected override double Low(Box box) => box.Left;
 
         protected override double High(Box box) => box.Right;

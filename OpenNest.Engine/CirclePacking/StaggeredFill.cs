@@ -40,7 +40,7 @@ namespace OpenNest.Engine.CirclePacking
         }
 
         /// <summary>Stripes run along X and step along Y when <paramref name="alongX"/>, and the reverse otherwise.</summary>
-        private static List<Item> Layout(Bin bin, Item item, StaggerMode mode, bool alongX)
+        internal static List<Item> Layout(Bin bin, Item item, StaggerMode mode, bool alongX)
         {
             var items = new List<Item>();
             var diameter = item.Diameter;

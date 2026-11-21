@@ -101,4 +101,46 @@ public class RemnantEngineTests
             $"Remnant X-extent ({remnantXExtent:F1}) should be <= default filler ({defaultXExtent:F1})"
         );
     }
+
+    [Fact]
+    public void VerticalRemnantPlateFiller_LaysAQuantityOfDiscsInFullHeightColumns()
+    {
+        // Eight-inch discs, 7 then 6 to a full-height column: twelve fit in two columns
+        // (about 15 in.), where three half-pitch columns of 4-disc rows take 16.25 in.
+        var plate = new Plate(60, 120) { PartSpacing = 0.25 };
+        var filler = new PlateFiller(plate, PlateFillPolicy.VerticalRemnant);
+        var item = new NestItem
+        {
+            Drawing = new Drawing("disc", TestHelpers.MakeCircleProgram(0, 0, 4)),
+            Quantity = 12,
+        };
+
+        var parts = filler.Fill(item, plate.WorkArea(), null, System.Threading.CancellationToken.None);
+
+        Assert.Equal(12, parts.Count);
+        var xExtent = parts.Max(p => p.BoundingBox.Right) - parts.Min(p => p.BoundingBox.Left);
+        var yExtent = parts.Max(p => p.BoundingBox.Top) - parts.Min(p => p.BoundingBox.Bottom);
+        Assert.True(xExtent < 15.5, $"X-extent {xExtent:F2} should hold two columns");
+        Assert.True(yExtent > 55, $"Y-extent {yExtent:F2} should span the plate's height");
+    }
+
+    [Fact]
+    public void HorizontalRemnantPlateFiller_LaysAQuantityOfDiscsInFullWidthRows()
+    {
+        var plate = new Plate(120, 60) { PartSpacing = 0.25 };
+        var filler = new PlateFiller(plate, PlateFillPolicy.HorizontalRemnant);
+        var item = new NestItem
+        {
+            Drawing = new Drawing("disc", TestHelpers.MakeCircleProgram(0, 0, 4)),
+            Quantity = 12,
+        };
+
+        var parts = filler.Fill(item, plate.WorkArea(), null, System.Threading.CancellationToken.None);
+
+        Assert.Equal(12, parts.Count);
+        var xExtent = parts.Max(p => p.BoundingBox.Right) - parts.Min(p => p.BoundingBox.Left);
+        var yExtent = parts.Max(p => p.BoundingBox.Top) - parts.Min(p => p.BoundingBox.Bottom);
+        Assert.True(yExtent < 15.5, $"Y-extent {yExtent:F2} should hold two rows");
+        Assert.True(xExtent > 55, $"X-extent {xExtent:F2} should span the plate's width");
+    }
 }

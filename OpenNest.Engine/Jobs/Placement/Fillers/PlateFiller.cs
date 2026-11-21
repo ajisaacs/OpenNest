@@ -70,8 +70,6 @@ internal class PlateFiller
 
     private IFillComparer Comparer => comparer ??= policy.CreateComparer();
 
-    private FillPolicy BuildPolicy() => new(Comparer, PreferredDirection);
-
     internal bool ForceFullAngleSweep
     {
         get => angleBuilder.ForceFullSweep;
@@ -165,10 +163,23 @@ internal class PlateFiller
             }
         }
 
+        // A remnant fill of round parts lays a quantity across the whole side the remnant runs
+        // along (a disc's stripes may run either way) and trims it disc by disc, since equal
+        // discs never interlock. Every other fill keeps its proportional shrink and pair trim.
+        var roundRemnant =
+            policy.KeepsRemnant
+            && PartClassifier.Classify(canonicalItem.Drawing).Type == PartType.Circle;
+        var keepsPairs = !roundRemnant;
+
         var effectiveWorkArea = workArea;
         if (canonicalItem.Quantity > 0)
         {
-            effectiveWorkArea = ShrinkWorkArea(canonicalItem, workArea, Plate.PartSpacing);
+            effectiveWorkArea = ShrinkWorkArea(
+                canonicalItem,
+                workArea,
+                Plate.PartSpacing,
+                roundRemnant ? TrimAxis : null
+            );
             if (effectiveWorkArea != workArea)
                 Debug.WriteLine(
                     $"[Fill] Low-qty shrink: {canonicalItem.Quantity} requested, "
@@ -177,7 +188,14 @@ internal class PlateFiller
                 );
         }
 
-        var best = RunFillPipeline(canonicalItem, originalDrawing, effectiveWorkArea, progress, token);
+        var best = RunFillPipeline(
+            canonicalItem,
+            originalDrawing,
+            effectiveWorkArea,
+            keepsPairs,
+            progress,
+            token
+        );
 
         if (
             canonicalItem.Quantity > 0
@@ -190,11 +208,18 @@ internal class PlateFiller
             );
             PhaseResults.Clear();
             AngleResults.Clear();
-            best = RunFillPipeline(canonicalItem, originalDrawing, workArea, progress, token);
+            best = RunFillPipeline(
+                canonicalItem,
+                originalDrawing,
+                workArea,
+                keepsPairs,
+                progress,
+                token
+            );
         }
 
         if (canonicalItem.Quantity > 0 && best.Count > canonicalItem.Quantity)
-            best = ShrinkFiller.TrimToCount(best, canonicalItem.Quantity, TrimAxis);
+            best = ShrinkFiller.TrimToCount(best, canonicalItem.Quantity, TrimAxis, keepsPairs);
 
         best = RebindAndUnCanonicalize(best, originalDrawing);
 
@@ -351,10 +376,16 @@ internal class PlateFiller
     }
 
     /// <summary>
-    /// Shrinks the work area in both dimensions proportionally when the
-    /// requested quantity is much less than the plate capacity.
+    /// Shrinks the work area when the requested quantity is much less than the plate capacity:
+    /// both dimensions proportionally, or only <paramref name="onlyAxis"/> when given, so the
+    /// parts can still span the whole other side.
     /// </summary>
-    private static Box ShrinkWorkArea(NestItem item, Box workArea, double spacing)
+    private static Box ShrinkWorkArea(
+        NestItem item,
+        Box workArea,
+        double spacing,
+        ShrinkAxis? onlyAxis
+    )
     {
         var bbox = item.Drawing.Program.BoundingBox();
         if (bbox.Width <= 0 || bbox.Length <= 0)
@@ -372,13 +403,21 @@ internal class PlateFiller
         if (fullCount <= 0 || fullCount <= item.Quantity)
             return workArea;
 
-        // Scale both dimensions by sqrt(ratio) so the area shrinks
-        // proportionally. 2x margin gives strategies room to optimize.
+        // Scale both dimensions by sqrt(ratio) so the area shrinks proportionally, or only
+        // onlyAxis by ratio. 2x margin gives strategies room to optimize.
         var ratio = (double)item.Quantity / fullCount;
-        var scale = System.Math.Sqrt(ratio) * 2.0;
-
-        var newWidth = workArea.Width * scale;
-        var newLength = workArea.Length * scale;
+        var newWidth = workArea.Width;
+        var newLength = workArea.Length;
+        if (onlyAxis == null)
+        {
+            var scale = System.Math.Sqrt(ratio) * 2.0;
+            newWidth *= scale;
+            newLength *= scale;
+        }
+        else if (onlyAxis == ShrinkAxis.Width)
+            newLength *= ratio * 2.0; // Width trims X, a box's Length
+        else
+            newWidth *= ratio * 2.0;
 
         // Ensure at least one part fits.
         var minWidth = bbox.Width + spacing * 2;
@@ -400,6 +439,7 @@ internal class PlateFiller
         NestItem item,
         Drawing originalDrawing,
         Box workArea,
+        bool keepsPairs,
         IProgress<NestProgress> progress,
         CancellationToken token
     )
@@ -413,7 +453,13 @@ internal class PlateFiller
             PlateNumber = PlateNumber,
             Token = token,
             Progress = progress,
-            Policy = BuildPolicy(),
+            // A remnant ranking judges round parts' layouts as they will be trimmed to the
+            // quantity. Other shapes keep the untrimmed ranking, where a quantity would favor
+            // sparse layouts (a tilted bar spans less but blocks the next item).
+            Policy = new FillPolicy(
+                policy.CreateComparer(keepsPairs ? 0 : item.Quantity, keepsPairs),
+                PreferredDirection
+            ),
             MaxQuantity = StopAtQuantity ? System.Math.Max(0, item.Quantity) : 0,
         };
         RunPipeline(context);

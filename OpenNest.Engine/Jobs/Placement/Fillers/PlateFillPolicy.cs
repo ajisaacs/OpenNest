@@ -13,25 +13,27 @@ namespace OpenNest.Engine.Jobs.Placement.Fillers;
 /// </summary>
 internal sealed class PlateFillPolicy
 {
-    private readonly Func<IFillComparer> comparerFactory;
+    private readonly Func<int, bool, IFillComparer> comparerFactory;
     private readonly Func<NestItem, double, double> angleExtent;
 
     private PlateFillPolicy(
-        Func<IFillComparer> comparerFactory,
+        Func<int, bool, IFillComparer> comparerFactory,
         NestDirection? preferredDirection,
         ShrinkAxis trimAxis,
-        Func<NestItem, double, double> angleExtent
+        Func<NestItem, double, double> angleExtent,
+        bool keepsRemnant = false
     )
     {
         this.comparerFactory = comparerFactory;
         PreferredDirection = preferredDirection;
         TrimAxis = trimAxis;
         this.angleExtent = angleExtent;
+        KeepsRemnant = keepsRemnant;
     }
 
     /// <summary>Plain fill: default ranking and the filler's learned angle candidates.</summary>
     internal static PlateFillPolicy Fill { get; } = new(
-        () => new DefaultFillComparer(),
+        (_, _) => new DefaultFillComparer(),
         null,
         ShrinkAxis.Width,
         null
@@ -39,18 +41,28 @@ internal sealed class PlateFillPolicy
 
     /// <summary>Vertical remnant: minimize X-extent, prefer horizontal placement.</summary>
     internal static PlateFillPolicy VerticalRemnant { get; } = new(
-        () => new VerticalRemnantComparer(),
+        (quantity, keepsPairs) => new VerticalRemnantComparer
+        {
+            Quantity = quantity,
+            KeepsPairs = keepsPairs,
+        },
         NestDirection.Horizontal,
         ShrinkAxis.Width,
-        RotatedWidth
+        RotatedWidth,
+        keepsRemnant: true
     );
 
     /// <summary>Horizontal remnant: minimize Y-extent, prefer vertical placement.</summary>
     internal static PlateFillPolicy HorizontalRemnant { get; } = new(
-        () => new HorizontalRemnantComparer(),
+        (quantity, keepsPairs) => new HorizontalRemnantComparer
+        {
+            Quantity = quantity,
+            KeepsPairs = keepsPairs,
+        },
         NestDirection.Vertical,
         ShrinkAxis.Length,
-        RotatedHeight
+        RotatedHeight,
+        keepsRemnant: true
     );
 
     internal NestDirection? PreferredDirection { get; }
@@ -58,12 +70,25 @@ internal sealed class PlateFillPolicy
     internal ShrinkAxis TrimAxis { get; }
 
     /// <summary>
+    /// True for the remnant fills: a quantity of round parts is laid out across the whole side
+    /// the remnant runs along, so their low-quantity fill only narrows the work area along
+    /// <see cref="TrimAxis"/>.
+    /// </summary>
+    internal bool KeepsRemnant { get; }
+
+    /// <summary>
     /// True when the filler's <see cref="AngleCandidateBuilder"/> chooses the angles; false when
     /// <see cref="BuildFixedAngles"/> replaces it entirely.
     /// </summary>
     internal bool UsesAngleBuilder => angleExtent == null;
 
-    internal IFillComparer CreateComparer() => comparerFactory();
+    /// <summary>
+    /// The ranking for a fill; a remnant fill given a positive <paramref name="quantity"/> ranks
+    /// layouts as they will be trimmed to it, keeping interlocked pairs whole when
+    /// <paramref name="keepsPairs"/>.
+    /// </summary>
+    internal IFillComparer CreateComparer(int quantity = 0, bool keepsPairs = true) =>
+        comparerFactory(System.Math.Max(0, quantity), keepsPairs);
 
     /// <summary>
     /// The remnant angles: the primary angle and its quarter turn, narrowest extent first. No

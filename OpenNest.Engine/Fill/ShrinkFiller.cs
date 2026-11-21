@@ -162,10 +162,17 @@ namespace OpenNest.Engine.Fill
         /// Keeps the <paramref name="targetCount"/> parts nearest to the origin
         /// along the given axis, discarding parts farthest from the origin.
         /// Interlocked pairs are kept or discarded whole; a pair is split only when an
-        /// odd count leaves no unpaired part to keep instead.
+        /// odd count leaves no unpaired part to keep instead. Equal discs never interlock, so a
+        /// fill of round parts passes <paramref name="keepPairs"/> false: staggered discs' bounding
+        /// boxes overlap without the parts forming pairs.
         /// Returns the input list unchanged if count is already at or below target.
         /// </summary>
-        internal static List<Part> TrimToCount(List<Part> parts, int targetCount, ShrinkAxis axis)
+        internal static List<Part> TrimToCount(
+            List<Part> parts,
+            int targetCount,
+            ShrinkAxis axis,
+            bool keepPairs = true
+        )
         {
             if (parts == null || parts.Count <= targetCount)
                 return parts;
@@ -174,7 +181,9 @@ namespace OpenNest.Engine.Fill
             (double, double) Key(int i) => axis == ShrinkAxis.Width
                 ? (boxes[i].Right, boxes[i].Top)
                 : (boxes[i].Top, boxes[i].Right);
-            var partner = InterlockedPairs.Partners(boxes);
+            var partner = keepPairs
+                ? InterlockedPairs.Partners(boxes)
+                : Enumerable.Repeat(-1, boxes.Length).ToArray();
             // A pair's later member decides when it is discarded; within a unit, the nearer first.
             var units = Enumerable.Range(0, parts.Count)
                 .Where(i => partner[i] < 0 || i < partner[i])
