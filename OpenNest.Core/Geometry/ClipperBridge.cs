@@ -24,6 +24,30 @@ namespace OpenNest.Geometry
         private const double ValidationJoinFactor = 0.1;
 
         /// <summary>
+        /// The closest point to <paramref name="target"/> on any edge of the closed
+        /// <paramref name="paths"/>; the first edge wins a tie, and an empty set gives the default vector.
+        /// </summary>
+        internal static Vector NearestBoundaryPoint(List<PathD> paths, Vector target)
+        {
+            var best = default(Vector);
+            var bestDistance = double.PositiveInfinity;
+            foreach (var path in paths)
+                for (var i = 0; i < path.Count; i++)
+                {
+                    var a = new Vector(path[i].x, path[i].y);
+                    var b = new Vector(path[(i + 1) % path.Count].x, path[(i + 1) % path.Count].y);
+                    var point = new Line(a, b).ClosestPointTo(target);
+                    var distance = point.DistanceTo(target);
+                    if (distance < bestDistance)
+                    {
+                        bestDistance = distance;
+                        best = point;
+                    }
+                }
+            return best;
+        }
+
+        /// <summary>
         /// Converts a polygon to a Clipper path, dropping the closing vertex and
         /// orienting it positive (CCW) or negative (CW).
         /// </summary>

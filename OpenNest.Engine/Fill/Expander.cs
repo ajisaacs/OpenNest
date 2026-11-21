@@ -1451,15 +1451,7 @@ namespace OpenNest.Engine.Fill
                 return clone;
             }
 
-            private static bool BoxOverlap(Box a, Box b, double slack)
-            {
-                return !(
-                    a.Right + slack < b.Left
-                    || b.Right + slack < a.Left
-                    || a.Top + slack < b.Bottom
-                    || b.Top + slack < a.Bottom
-                );
-            }
+            private static bool BoxOverlap(Box a, Box b, double slack) => Clearance.BoxesWithin(a, b, slack);
         }
     }
 }

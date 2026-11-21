@@ -1,11 +1,15 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Linq;
 
 namespace OpenNest.Geometry
 {
     public static class BoundingBox
     {
-        public static Box GetBoundingBox(this IList<Box> boxes)
+        public static Box GetBoundingBox(this IList<Box> boxes) => GetBoundingBox<Box>(boxes);
+
+        /// <summary>The box around every box in the list, or <see cref="Box.Empty"/> when it is empty.</summary>
+        public static Box GetBoundingBox<T>(this IList<T> boxes)
+            where T : Box
         {
             if (boxes.Count == 0)
                 return Box.Empty;

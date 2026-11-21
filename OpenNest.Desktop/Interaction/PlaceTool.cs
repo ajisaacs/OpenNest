@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using OpenNest.CommonLines;
 using OpenNest.Desktop.Rendering;
 using OpenNest.Engine.Fill;
 using OpenNest.Geometry;
@@ -58,23 +59,8 @@ public sealed class PlaceTool : PlateTool
     // The common-line groups among the copied parts, by index into the copy, so each placement
     // joins its copies the same way. Read now: Cut removes the sources, and their groups, next.
     private static List<(int[] Members, double Kerf)> CopiedCommonLines(
-        Plate plate, List<Part> copied)
-    {
-        var groups = new List<(int[] Members, double Kerf)>();
-        if (plate == null)
-            return groups;
-
-        foreach (var group in plate.CommonLines)
-        {
-            var members = Enumerable.Range(0, copied.Count)
-                .Where(i => group.Contains(copied[i]))
-                .ToArray();
-            if (members.Length >= 2)
-                groups.Add((members, group.Kerf));
-        }
-
-        return groups;
-    }
+        Plate plate, List<Part> copied) =>
+        CommonLineGroup.AmongParts(plate, copied);
 
     /// <summary>
     /// Moves the previews' lower-left corner to the pointer. A move to the screen point last seen

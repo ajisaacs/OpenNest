@@ -6,6 +6,7 @@ using System.Linq;
 using System.Windows.Forms;
 using OpenNest.Controls;
 using OpenNest.Converters;
+using OpenNest.Desktop.Rendering;
 using OpenNest.Geometry;
 
 namespace OpenNest
@@ -13,7 +14,6 @@ namespace OpenNest
     public class LayoutPart : IPart
     {
         private static Color selectedColor = Color.FromArgb(90, 150, 200, 255);
-        private const int LabelSearchCells = 20000;
 
         // GDI+ objects are not thread-safe, so views on different UI threads each draw
         // with their own; sharing one fails with "Object is currently in use elsewhere".
@@ -318,37 +318,8 @@ namespace OpenNest
         /// The drawing's label point in its program frame; uses no GDI+ objects. The Drawing
         /// Library grid's check passes an unlimited <paramref name="maxCells"/> to time the search.
         /// </summary>
-        internal static Vector ComputeLabelPoint(Drawing drawing, int maxCells = LabelSearchCells)
-        {
-            var entities = ConvertProgram.ToGeometry(drawing.Program);
-            var nonRapid = entities.Where(e => SpecialLayers.IsMaterial(e.Layer)).ToList();
-
-            var shapes = ShapeBuilder.GetShapes(nonRapid);
-
-            if (shapes.Count == 0)
-            {
-                var bbox = drawing.Program.BoundingBox();
-                return new Vector(
-                    bbox.Location.X + bbox.Length / 2,
-                    bbox.Location.Y + bbox.Width / 2
-                );
-            }
-
-            var profile = ShapeProfile.FromShapes(shapes);
-            var outer = profile.Perimeter.ToPolygonWithTolerance(0.1);
-
-            List<Polygon> holes = null;
-
-            if (profile.Cutouts.Count > 0)
-            {
-                holes = new List<Polygon>();
-                foreach (var cutout in profile.Cutouts)
-                    holes.Add(cutout.ToPolygonWithTolerance(0.1));
-            }
-
-            // The label is cosmetic: a budget keeps any shape from stalling the paint.
-            return PolyLabel.Find(outer, holes, PolyLabel.ThicknessPrecision(outer, holes), maxCells);
-        }
+        internal static Vector ComputeLabelPoint(Drawing drawing, int maxCells = PartLabels.SearchCells) =>
+            PartLabels.LabelPoint(drawing, maxCells);
 
         /// <summary>Rebuilds the part's paths from its program and maps them to the view.</summary>
         public void Update(DrawControl plateView)
@@ -476,36 +447,7 @@ namespace OpenNest
         // Every segment of a cut-off is a part of the one cut-off drawing with its own trimmed
         // program. Labeled from the drawing, all of them would stack on one point and the view's
         // culling would decide which number shows; label each at the middle of its own cut.
-        private Vector? CutOffSegmentLabelPoint()
-        {
-            var program = BasePart.Program;
-            if (!BasePart.BaseDrawing.IsCutOff || program?.Mode != CNC.Mode.Absolute)
-                return null;
-
-            double minX = double.MaxValue, minY = double.MaxValue;
-            double maxX = double.MinValue, maxY = double.MinValue;
-            Vector? position = null;
-            foreach (var code in program.Codes)
-            {
-                if (code is not CNC.Motion motion)
-                    continue;
-                if (motion is not CNC.RapidMove && position is { } start)
-                {
-                    foreach (var point in new[] { start, motion.EndPoint })
-                    {
-                        minX = System.Math.Min(minX, point.X);
-                        minY = System.Math.Min(minY, point.Y);
-                        maxX = System.Math.Max(maxX, point.X);
-                        maxY = System.Math.Max(maxY, point.Y);
-                    }
-                }
-                position = motion.EndPoint;
-            }
-
-            if (minX > maxX)
-                return null;
-            return new Vector((minX + maxX) / 2, (minY + maxY) / 2) + BasePart.Location;
-        }
+        private Vector? CutOffSegmentLabelPoint() => PartLabels.CutOffSegmentPoint(BasePart);
 
         public void UpdateOffset(double spacing, double tolerance, Matrix matrix)
         {

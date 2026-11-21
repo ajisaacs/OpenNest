@@ -5,7 +5,6 @@ using System.Linq;
 using Clipper2Lib;
 using OpenNest.CNC;
 using OpenNest.CommonLines;
-using OpenNest.Converters;
 using OpenNest.Engine.Jobs.Adapters;
 using OpenNest.Geometry;
 
@@ -124,14 +123,7 @@ internal sealed class CommonLinePair
         return new CommonLinePair(geometry, offset.X, offset.Y, spans.Sum(s => s.Length));
     }
 
-    private static ShapeProfile? Profile(Part part)
-    {
-        var entities = ConvertProgram.ToGeometry(part.Program).ForNesting().ToList();
-        if (entities.Count == 0)
-            return null;
-        var profile = new ShapeProfile(entities);
-        return profile.Perimeter == null ? null : profile;
-    }
+    private static ShapeProfile? Profile(Part part) => NestLayoutCheck.Profile(part);
 
     /// <summary>The union of both perimeters (arcs circumscribed) and the kerf between them, or
     /// null when it is not one outline.</summary>

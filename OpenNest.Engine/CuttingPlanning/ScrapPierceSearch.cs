@@ -140,25 +140,8 @@ internal sealed class ScrapPierceSearch
     }
 
     // The closest point of the clear region's boundary; targets lie on material, outside it.
-    private static Vector Nearest(List<PathD> paths, Vector target)
-    {
-        var best = default(Vector);
-        var bestDistance = double.PositiveInfinity;
-        foreach (var path in paths)
-            for (var i = 0; i < path.Count; i++)
-            {
-                var a = new Vector(path[i].x, path[i].y);
-                var b = new Vector(path[(i + 1) % path.Count].x, path[(i + 1) % path.Count].y);
-                var point = new Line(a, b).ClosestPointTo(target);
-                var distance = point.DistanceTo(target);
-                if (distance < bestDistance)
-                {
-                    bestDistance = distance;
-                    best = point;
-                }
-            }
-        return best;
-    }
+    private static Vector Nearest(List<PathD> paths, Vector target) =>
+        ClipperBridge.NearestBoundaryPoint(paths, target);
 
     // Outlines flattened as conservatively as ClipperBridge.ToRegion: the perimeter never inside
     // its curves, holes never outside theirs. A part's own holes are not scrap for its perimeter.

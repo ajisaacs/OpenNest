@@ -881,16 +881,8 @@ static class NestConsole
         return true;
     }
 
-    /// <summary>The plates' saved settings when every plate carries the same ones; otherwise null.</summary>
-    static CuttingParameters SavedCuttingParameters(IReadOnlyList<Plate> plates)
-    {
-        var first = plates[0].CuttingParameters;
-        if (first == null)
-            return null;
-        var json = CuttingParametersSerializer.Serialize(first);
-        return plates.All(p => p.CuttingParameters != null
-            && CuttingParametersSerializer.Serialize(p.CuttingParameters) == json) ? first : null;
-    }
+    static CuttingParameters SavedCuttingParameters(IReadOnlyList<Plate> plates) =>
+        CuttingParametersSerializer.SharedBy(plates);
 
     /// <summary>Reports synchronously, so phase lines print in order with the summary.</summary>
     sealed class PlanningProgress(int plateCount) : IProgress<CuttingPlanProgress>

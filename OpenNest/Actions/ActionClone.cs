@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
 using System.Windows.Forms;
+using OpenNest.CommonLines;
 using OpenNest.Controls;
 using OpenNest.CutOffs;
 using OpenNest.Engine.Fill;
@@ -47,21 +48,8 @@ namespace OpenNest.Actions
 
         // The common-line groups among the copied parts, by index into the copy, so each paste
         // joins its clones the same way. Read now: Cut removes the sources, and their groups, next.
-        private static List<(int[] Members, double Kerf)> CopiedCommonLines(Plate plate, List<Part> copied)
-        {
-            var groups = new List<(int[] Members, double Kerf)>();
-            if (plate == null)
-                return groups;
-
-            foreach (var group in plate.CommonLines)
-            {
-                var members = Enumerable.Range(0, copied.Count).Where(i => group.Contains(copied[i])).ToArray();
-                if (members.Length >= 2)
-                    groups.Add((members, group.Kerf));
-            }
-
-            return groups;
-        }
+        private static List<(int[] Members, double Kerf)> CopiedCommonLines(Plate plate, List<Part> copied) =>
+            CommonLineGroup.AmongParts(plate, copied);
 
         // Re-flag on every reselect: a deselect elsewhere would otherwise leave the
         // previews drawn with the solid fill of placed parts.

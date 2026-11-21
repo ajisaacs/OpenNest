@@ -45,6 +45,28 @@ namespace OpenNest.CommonLines
 
         public bool Contains(Part part) => members.Any(member => ReferenceEquals(member, part));
 
+        /// <summary>
+        /// The plate's groups that join two or more of <paramref name="parts"/>, as indexes into
+        /// <paramref name="parts"/>, so copies of those parts can be joined the same way. Empty when
+        /// <paramref name="plate"/> is null.
+        /// </summary>
+        public static List<(int[] Members, double Kerf)> AmongParts(Plate plate, IReadOnlyList<Part> parts)
+        {
+            ArgumentNullException.ThrowIfNull(parts);
+            var groups = new List<(int[] Members, double Kerf)>();
+            if (plate == null)
+                return groups;
+
+            foreach (var group in plate.CommonLines)
+            {
+                var indexes = Enumerable.Range(0, parts.Count).Where(i => group.Contains(parts[i])).ToArray();
+                if (indexes.Length >= 2)
+                    groups.Add((indexes, group.Kerf));
+            }
+
+            return groups;
+        }
+
         /// <summary>Drops a member (a part removed from the plate); true when it was one.</summary>
         internal bool Remove(Part part) => members.RemoveAll(member => ReferenceEquals(member, part)) > 0;
     }

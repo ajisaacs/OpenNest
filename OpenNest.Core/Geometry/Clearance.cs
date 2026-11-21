@@ -359,7 +359,8 @@ namespace OpenNest.Geometry
             );
         }
 
-        private static bool BoxesWithin(Box a, Box b, double distance)
+        /// <summary>Whether the boxes are no more than <paramref name="distance"/> apart on both axes.</summary>
+        internal static bool BoxesWithin(Box a, Box b, double distance)
         {
             return !(
                 a.Right + distance < b.Left

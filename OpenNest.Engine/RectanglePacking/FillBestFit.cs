@@ -1,5 +1,6 @@
-﻿using System;
+using System;
 using OpenNest.Engine.Fill;
+using OpenNest.Geometry;
 using OpenNest.Math;
 
 namespace OpenNest.Engine.RectanglePacking

@@ -156,15 +156,7 @@ namespace OpenNest.Mcp.Tools
                 + "Save with save_nest to keep it.";
         }
 
-        /// <summary>The plates' saved settings when every plate carries the same ones; otherwise null.</summary>
-        private static CuttingParameters SavedCuttingParameters(IReadOnlyList<Plate> plates)
-        {
-            var first = plates[0].CuttingParameters;
-            if (first == null)
-                return null;
-            var json = CuttingParametersSerializer.Serialize(first);
-            return plates.All(p => p.CuttingParameters != null
-                && CuttingParametersSerializer.Serialize(p.CuttingParameters) == json) ? first : null;
-        }
+        private static CuttingParameters SavedCuttingParameters(IReadOnlyList<Plate> plates) =>
+            CuttingParametersSerializer.SharedBy(plates);
     }
 }

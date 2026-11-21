@@ -1,4 +1,3 @@
-﻿using System.Collections.Generic;
 using OpenNest.Geometry;
 using OpenNest.Math;
 
@@ -25,34 +24,6 @@ namespace OpenNest.Engine.RectanglePacking
                 Size = this.Size,
                 Id = this.Id,
             };
-        }
-    }
-
-    internal static class ItemListExtensions
-    {
-        public static Box GetBoundingBox(this IList<Item> items)
-        {
-            if (items.Count == 0)
-                return Box.Empty;
-
-            double minX = items[0].X;
-            double minY = items[0].Y;
-            double maxX = items[0].Right;
-            double maxY = items[0].Top;
-
-            foreach (var box in items)
-            {
-                if (box.Left < minX)
-                    minX = box.Left;
-                if (box.Right > maxX)
-                    maxX = box.Right;
-                if (box.Bottom < minY)
-                    minY = box.Bottom;
-                if (box.Top > maxY)
-                    maxY = box.Top;
-            }
-
-            return new Box(minX, minY, maxX - minX, maxY - minY);
         }
     }
 }

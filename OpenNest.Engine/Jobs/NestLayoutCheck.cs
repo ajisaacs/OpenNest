@@ -783,7 +783,7 @@ public static class NestLayoutCheck
 
     /// <summary>A part's clean nesting material, already rotated; null when it has no closed
     /// perimeter.</summary>
-    private static ShapeProfile Profile(Part part)
+    internal static ShapeProfile Profile(Part part)
     {
         var entities = ConvertProgram
             .ToGeometry(part.Program)

@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Text.Json;
 using OpenNest.CNC.CuttingStrategy;
 using static OpenNest.IO.CuttingParametersDto;
@@ -21,6 +23,23 @@ public static class CuttingParametersSerializer
         if (parameters.TabConfig == null)
             dto.TabConfig = null;
         return JsonSerializer.Serialize(dto, JsonOptions);
+    }
+
+    /// <summary>
+    /// The plates' saved settings when every plate carries the same ones (compared as serialized
+    /// settings); otherwise null.
+    /// </summary>
+    /// <exception cref="ArgumentException">No plates.</exception>
+    public static CuttingParameters SharedBy(IReadOnlyList<Plate> plates)
+    {
+        ArgumentNullException.ThrowIfNull(plates);
+        if (plates.Count == 0)
+            throw new ArgumentException("At least one plate is needed.", nameof(plates));
+        var first = plates[0].CuttingParameters;
+        if (first == null)
+            return null;
+        var json = Serialize(first);
+        return plates.All(p => p.CuttingParameters != null && Serialize(p.CuttingParameters) == json) ? first : null;
     }
 
     /// <summary>Reads desktop settings with their historical defaults and angle fallback.</summary>
