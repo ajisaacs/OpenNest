@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using OpenNest.Engine.BestFit;
+using OpenNest.Engine.Fill;
 using OpenNest.Engine.Jobs.Adapters;
 using OpenNest.Engine.Jobs.Placement.Fillers;
 using OpenNest.Geometry;
@@ -20,8 +21,11 @@ internal static class PrivatePlateFill
     /// <param name="width">Y extent of the plate and work area.</param>
     /// <param name="quantity">Copies wanted; zero fills the whole area.</param>
     /// <param name="wholePairGrids">See <see cref="PlateFiller.WholePairGrids"/>.</param>
+    /// <param name="overlapMemo">See <see cref="PlateFiller.OverlapMemo"/>: a caller filling one
+    /// part again and again passes the same memo to each fill.</param>
     internal static List<Part> Run(Drawing drawing, RotationPolicy rotation, double spacing,
-        double length, double width, int quantity, CancellationToken token, bool wholePairGrids = true)
+        double length, double width, int quantity, CancellationToken token, bool wholePairGrids = true,
+        OutlineOverlapMemo overlapMemo = null)
     {
         var plate = new Plate(new Size(width, length)) { PartSpacing = spacing };
         // The drawing is private: stabilize this cache entry before Fill's candidate pruning.
@@ -35,7 +39,12 @@ internal static class PrivatePlateFill
         fits.AddRange(sorted);
         // A positive quantity lets supporting strategies avoid surplus rows. Zero still
         // fills the whole area (the cutout lattice caller requires an uncapped lattice).
-        var filler = new PlateFiller(plate) { StopAtQuantity = true, WholePairGrids = wholePairGrids };
+        var filler = new PlateFiller(plate)
+        {
+            StopAtQuantity = true,
+            WholePairGrids = wholePairGrids,
+            OverlapMemo = overlapMemo,
+        };
         return filler.Fill(new NestItem
         {
             Drawing = drawing,

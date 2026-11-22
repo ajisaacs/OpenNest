@@ -30,12 +30,22 @@ namespace OpenNest.Engine.Fill
         // Placed copies are tested against every layout variant; reference keys are per copy.
         private readonly Dictionary<Part, SpacingOutline> inflatedOutlines = new(ReferenceEqualityComparer.Instance);
 
+        // Each outline's entry in the overlap memo, looked up once per outline.
+        private readonly Dictionary<SpacingOutline, OutlineOverlapMemo.Shape> shapes =
+            new(ReferenceEqualityComparer.Instance);
+
         public TiltedRemnantFiller(Box workArea, double partSpacing, IFillComparer comparer)
         {
             this.workArea = workArea;
             this.partSpacing = partSpacing;
             this.comparer = comparer;
         }
+
+        /// <summary>
+        /// Overlap verdicts shared with other fills of the same part, which test the same
+        /// outlines at the same places; null tests every pair. See <see cref="OutlineOverlapMemo"/>.
+        /// </summary>
+        internal OutlineOverlapMemo OverlapMemo { get; init; }
 
         /// <summary>
         /// Returns <paramref name="layout"/> (possibly moved) plus tilted parts when that beats
@@ -325,6 +335,23 @@ namespace OpenNest.Engine.Fill
             return outline;
         }
 
+        /// <summary>Whether the outlines share material, from the memo when there is one.</summary>
+        private bool Overlap(SpacingOutline inflated, SpacingOutline raw) =>
+            OverlapMemo == null
+                ? inflated.Overlaps(raw)
+                : OverlapMemo.Overlaps(inflated, ShapeOf(inflated), raw, ShapeOf(raw));
+
+        private OutlineOverlapMemo.Shape ShapeOf(SpacingOutline outline)
+        {
+            if (!shapes.TryGetValue(outline, out var shape))
+            {
+                shape = OverlapMemo.ShapeOf(outline);
+                shapes[outline] = shape;
+            }
+
+            return shape;
+        }
+
         private static double Low(Box box, bool alongX) => alongX ? box.Left : box.Bottom;
 
         private static double High(Box box, bool alongX) => alongX ? box.Right : box.Top;
@@ -367,7 +394,7 @@ namespace OpenNest.Engine.Fill
 
                     inflated ??= owner.InflatedOutline(part);
                     outlines[i] ??= owner.Outline(Parts[i], 0);
-                    if (inflated == null || outlines[i] == null || inflated.Overlaps(outlines[i]))
+                    if (inflated == null || outlines[i] == null || owner.Overlap(inflated, outlines[i]))
                         return false;
                 }
 

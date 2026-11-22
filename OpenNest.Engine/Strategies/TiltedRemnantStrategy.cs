@@ -33,7 +33,10 @@ public class TiltedRemnantStrategy : IFillStrategy
             context.WorkArea,
             context.Plate.PartSpacing,
             context.Policy.Comparer
-        );
+        )
+        {
+            OverlapMemo = context.OverlapMemo,
+        };
         var result = filler.Fill(item.Drawing, layout, context.Token);
 
         if (result != null)

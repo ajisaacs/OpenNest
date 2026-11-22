@@ -28,6 +28,13 @@ namespace OpenNest.Engine.Strategies
         /// (<see cref="Fill.PairFiller.WholePairGrids"/>).
         /// </summary>
         public bool WholePairGrids { get; init; } = true;
+
+        /// <summary>
+        /// Outline overlap verdicts shared by a caller's fills of the same part; null keeps
+        /// each fill to itself (see <see cref="Fill.OutlineOverlapMemo"/>).
+        /// </summary>
+        internal Fill.OutlineOverlapMemo OverlapMemo { get; init; }
+
         public PartType PartType { get; set; }
 
         /// <summary>

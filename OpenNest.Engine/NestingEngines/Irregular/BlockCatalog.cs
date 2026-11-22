@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading;
 using Clipper2Lib;
 using OpenNest.Engine.BestFit;
+using OpenNest.Engine.Fill;
 using OpenNest.Engine.Jobs;
 using OpenNest.Engine.Jobs.Adapters;
 using OpenNest.Engine.Jobs.Placement;
@@ -76,6 +77,12 @@ internal sealed class BlockCatalog : IDisposable
     /// metered apart leaves the catalog, and every decision read from it later, as it found it.
     /// </summary>
     public bool Frozen { get; set; }
+
+    /// <summary>
+    /// Overlap verdicts every Fill proposal of this catalog shares: the same part is filled in
+    /// the same box for one quantity after another, testing the same outlines each time.
+    /// </summary>
+    private readonly OutlineOverlapMemo overlapMemo = new();
 
     /// <summary>Guarded by its own lock, as are its entries' members and charge.</summary>
     private readonly Dictionary<PatternKey, BandEntry> bands = new();
@@ -417,7 +424,7 @@ internal sealed class BlockCatalog : IDisposable
         try
         {
             var members = PrivatePlateFill.Run(drawing, type.Part.Rotation, fillSpacing,
-                rectangle.Length, rectangle.Width, quantity, token);
+                rectangle.Length, rectangle.Width, quantity, token, overlapMemo: overlapMemo);
             token.ThrowIfCancellationRequested();
             var kept = members.Take(quantity).ToArray();
             var poses = Certify(type, kept, spacing, token);

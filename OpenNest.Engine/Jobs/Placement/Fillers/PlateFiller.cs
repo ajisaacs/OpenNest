@@ -91,6 +91,12 @@ internal class PlateFiller
     /// </summary>
     internal bool WholePairGrids { get; init; } = true;
 
+    /// <summary>
+    /// Outline overlap verdicts this fill shares with the caller's other fills of the same part
+    /// (<see cref="OutlineOverlapMemo"/>); null, the default, keeps the fill to itself.
+    /// </summary>
+    internal OutlineOverlapMemo OverlapMemo { get; init; }
+
     public virtual List<double> BuildAngles(
         NestItem item,
         ClassificationResult classification,
@@ -470,6 +476,7 @@ internal class PlateFiller
             ),
             MaxQuantity = StopAtQuantity ? System.Math.Max(0, item.Quantity) : 0,
             WholePairGrids = WholePairGrids,
+            OverlapMemo = OverlapMemo,
         };
         RunPipeline(context);
 
