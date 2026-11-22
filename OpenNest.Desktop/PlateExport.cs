@@ -22,6 +22,12 @@ public enum PlateExportFormat
 
     /// <summary>The plate's parts as SVG in the nest's units.</summary>
     Svg,
+
+    /// <summary>
+    /// The plate's parts as SVG for laser software such as LightBurn: only what is cut or marked,
+    /// each kind in its own layer color (<see cref="SvgExportOptions.LaserSoftware"/>).
+    /// </summary>
+    SvgForLaser,
 }
 
 /// <summary>
@@ -48,6 +54,7 @@ public static class PlateExport
         PlateExportFormat.Image,
         PlateExportFormat.PlacementText,
         PlateExportFormat.Svg,
+        PlateExportFormat.SvgForLaser,
     };
 
     /// <summary>The format for the save dialog's 1-based <paramref name="filterIndex"/>.</summary>
@@ -59,7 +66,8 @@ public static class PlateExport
     /// <summary>
     /// The format a chosen file's extension asks for (.dxf, .png/.jpg/.jpeg, .txt, .svg, any
     /// case), or null for any other extension or none. Bitmap (.bmp) is not offered: no
-    /// cross-platform encoder writes it.
+    /// cross-platform encoder writes it. An extension cannot ask for
+    /// <see cref="PlateExportFormat.SvgForLaser"/>; only the save dialog's file type can.
     /// </summary>
     public static PlateExportFormat? FromPath(string path) =>
         Path.GetExtension(path ?? "").ToLowerInvariant() switch
@@ -129,6 +137,9 @@ public static class PlateExport
                 break;
             case PlateExportFormat.Svg:
                 Svg.ExportPlate(plate, destination, units);
+                break;
+            case PlateExportFormat.SvgForLaser:
+                Svg.ExportPlate(plate, destination, units, SvgExportOptions.LaserSoftware);
                 break;
             default:
                 throw new ArgumentException("Unsupported plate export format.", nameof(format));

@@ -37,12 +37,13 @@ public sealed class PlateExportTests : IDisposable
     [InlineData(2, PlateExportFormat.Image)]
     [InlineData(3, PlateExportFormat.PlacementText)]
     [InlineData(4, PlateExportFormat.Svg)]
+    [InlineData(5, PlateExportFormat.SvgForLaser)]
     public void FromFilterIndex_FollowsTheSaveDialogOrder(int index, PlateExportFormat expected) =>
         Assert.Equal(expected, PlateExport.FromFilterIndex(index));
 
     [Theory]
     [InlineData(0)]
-    [InlineData(5)]
+    [InlineData(6)]
     [InlineData(99)]
     public void FromFilterIndex_RefusesOtherIndexes(int index) =>
         Assert.Equal("filterIndex", Assert.Throws<ArgumentException>(() => PlateExport.FromFilterIndex(index)).ParamName);
@@ -148,6 +149,22 @@ public sealed class PlateExportTests : IDisposable
     }
 
     [Fact]
+    public void SvgForLaser_LeavesOutThePlateAndRapids()
+    {
+        var plate = CreateJob().Plates[0];
+        var path = Path.Combine(folder, "laser.svg");
+
+        PlateExport.Write(plate, Units.Millimeters, path, PlateExportFormat.SvgForLaser, null);
+
+        var root = XDocument.Load(path).Root!;
+        Assert.EndsWith("mm", root.Attribute("width")!.Value);
+        var layers = root.Elements().Select(g => g.Attribute("data-layer")!.Value).ToList();
+        Assert.DoesNotContain("PLATE", layers);
+        Assert.DoesNotContain("RAPID", layers);
+        Assert.Contains("CUT", layers);
+    }
+
+    [Fact]
     public void Image_IsDrawnByTheFrontEnd_AtTheChosenPath()
     {
         var path = Path.Combine(folder, "view.png");
@@ -182,6 +199,7 @@ public sealed class PlateExportTests : IDisposable
     [InlineData(PlateExportFormat.Dxf)]
     [InlineData(PlateExportFormat.PlacementText)]
     [InlineData(PlateExportFormat.Svg)]
+    [InlineData(PlateExportFormat.SvgForLaser)]
     public void Write_LeavesTheNestUntouched(PlateExportFormat format)
     {
         var nest = CreateJob();

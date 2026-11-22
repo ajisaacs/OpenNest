@@ -781,7 +781,8 @@ namespace OpenNest.Forms
                 Filter = "DXF file (*.dxf)|*.dxf|"
                     + "Image as displayed (*.jpg)|*.jpg|"
                     + "Locations and rotations (*.txt)|*.txt|"
-                    + "SVG file (*.svg)|*.svg",
+                    + "SVG file (*.svg)|*.svg|"
+                    + "SVG for laser software, e.g. LightBurn (*.svg)|*.svg",
                 FileName = suggestedFileName,
                 AddExtension = true,
                 DefaultExt = ".",

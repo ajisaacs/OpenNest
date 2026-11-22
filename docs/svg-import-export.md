@@ -33,6 +33,15 @@ Import takes path centerlines: `path`, `rect` (with rounded corners), `circle`, 
 
 `ExportProgram`, `ExportPlate` and `ExportEntities` write one `<g data-layer>` per layer; the `ExportEntities` overload that takes bends adds a `BEND` group with each bend's `line` and `data-bend-*` attributes, plus its note as text for people. `width` and `height` are in the given units and match the `viewBox`, so one user unit is one drawing unit and the file needs no scale prompt. Arcs stay `A` commands. The plate outline and edge spacing go on `PLATE`. Plate export leaves out the rapids DXF draws between parts.
 
+### For laser software
+
+`SvgExportOptions.LaserSoftware` writes a file to cut from directly in hobby laser software such as LightBurn, which makes one cut layer per stroke color and ignores `data-layer`. File > Export offers it as **SVG for laser software, e.g. LightBurn** (WinForms only; the Avalonia picker chooses a format by extension, and `.svg` stays the plain export).
+
+- `CutAndMarksOnly` leaves out what is never cut: `PLATE`, `RAPID`, `DISPLAY`, `DISPLAY PERIMETER` and `TAB`.
+- `LaserLayerColors` strokes from LightBurn's palette: `CUT` with its leads and `COMMON LINE` C00 black, `SCRIBE` C01 blue, `BREAK` C02 red, and any other layer the next color from C03 in order of first appearance.
+
+Units and arcs are written as in the default export, so the file still needs no scale prompt. The palette values are not yet checked against a LightBurn install.
+
 ## CAD Converter export
 
 **Export...** writes the current drawing with `CadExporter`: DXF R14 to 2018, DWG 2004 to 2018 or SVG. Entities keep their layers. Bends go on `BEND` as `CENTER` lines with an MText note such as `UP 90° R 0.06`, the form `SolidWorksBendDetector` reads, so importing the file again gives back the same bends; a line picked as a bend is written only as that bend. Etch marks go on `ETCH`, which import drops and makes again from the bends. Files before 2007 write non-ASCII note characters as `\U+XXXX` escapes. ACadSharp cannot write DWG 2007, and its DWG R14 and 2000 output loses entities and layers, so those are not offered.

@@ -62,15 +62,16 @@ namespace OpenNest.IO
         public static void ExportProgram(Program program, Stream stream, Units units) =>
             ExportEntities(ConvertProgram.ToGeometry(program), stream, units);
 
-        public static void ExportPlate(Plate plate, string path, Units units)
+        public static void ExportPlate(Plate plate, string path, Units units, SvgExportOptions options = null)
         {
             using var stream = File.Create(path);
-            ExportPlate(plate, stream, units);
+            ExportPlate(plate, stream, units, options);
         }
 
-        public static void ExportPlate(Plate plate, Stream stream, Units units)
+        public static void ExportPlate(Plate plate, Stream stream, Units units, SvgExportOptions options = null)
         {
-            var entities = PlateOutline(plate);
+            options ??= SvgExportOptions.Default;
+            var entities = options.CutAndMarksOnly ? new List<Entity>() : PlateOutline(plate);
 
             foreach (var part in plate.Parts)
             {
@@ -80,7 +81,7 @@ namespace OpenNest.IO
                 entities.AddRange(geometry);
             }
 
-            ExportEntities(entities, stream, units);
+            ExportEntities(entities, null, stream, units, options);
         }
 
         /// <summary>
@@ -116,10 +117,14 @@ namespace OpenNest.IO
             IEnumerable<Entity> entities,
             IEnumerable<Bend> bends,
             Stream stream,
-            Units units
+            Units units,
+            SvgExportOptions options = null
         )
         {
-            var list = entities.ToList();
+            options ??= SvgExportOptions.Default;
+            var list = entities
+                .Where(e => !options.CutAndMarksOnly || !NeverCutLayers.Contains(LayerName(e)))
+                .ToList();
             var bendList = bends?.ToList() ?? new List<Bend>();
             var extents = list.Concat(bendList.Select(b => (Entity)b.ToLine())).ToList();
             var bounds = extents.Count > 0 ? extents.GetBoundingBox() : new Box(0, 0, 1, 1);
@@ -144,8 +149,12 @@ namespace OpenNest.IO
                 new XAttribute("fill", "none")
             );
 
-            foreach (var layer in list.GroupBy(e => e.Layer?.Name ?? Layer.Default.Name))
-                root.Add(LayerGroup(layer.Key, layer.ToList()));
+            var layers = list.GroupBy(LayerName).ToList();
+            var strokes = options.LaserLayerColors
+                ? LaserStrokes(layers.Select(g => g.Key))
+                : layers.ToDictionary(g => g.Key, g => StrokeOf(g.Key));
+            foreach (var layer in layers)
+                root.Add(LayerGroup(layer.Key, layer.ToList(), strokes[layer.Key]));
 
             if (bendList.Count > 0)
                 root.Add(BendGroup(bendList, units));
@@ -153,12 +162,12 @@ namespace OpenNest.IO
             new XDocument(new XDeclaration("1.0", "utf-8", null), root).Save(stream);
         }
 
-        private static XElement LayerGroup(string name, List<Entity> entities)
+        private static XElement LayerGroup(string name, List<Entity> entities, string stroke)
         {
             var group = new XElement(
                 Ns + "g",
                 new XAttribute("data-layer", name),
-                new XAttribute("stroke", StrokeOf(name)),
+                new XAttribute("stroke", stroke),
                 new XAttribute("stroke-width", "1"),
                 new XAttribute("vector-effect", "non-scaling-stroke")
             );
@@ -276,6 +285,53 @@ namespace OpenNest.IO
                 new XAttribute("cy", Number(-center.Y)),
                 new XAttribute("r", Number(radius))
             );
+
+        // Geometry that is never cut: what SvgExportOptions.CutAndMarksOnly leaves out.
+        private static readonly HashSet<string> NeverCutLayers = new(StringComparer.OrdinalIgnoreCase)
+        {
+            PlateLayerName,
+            SpecialLayers.Rapid.Name,
+            SpecialLayers.Display.Name,
+            SpecialLayers.DisplayPerimeter.Name,
+            SpecialLayers.Tab.Name,
+        };
+
+        // A lead or common line is cut with its contour, so it shares the cut's layer color.
+        private static readonly HashSet<string> CutLayers = new(StringComparer.OrdinalIgnoreCase)
+        {
+            SpecialLayers.Cut.Name,
+            SpecialLayers.Leadin.Name,
+            SpecialLayers.Leadout.Name,
+            SpecialLayers.CommonLine.Name,
+        };
+
+        // LightBurn's first layer colors (C00 to C07), so each kind of cut lands on its own layer.
+        private static readonly string[] LaserPalette =
+        {
+            "#000000", "#0000FF", "#FF0000", "#00E000", "#D0D000", "#FF8000", "#00E0E0", "#FF00FF",
+        };
+
+        private static string LayerName(Entity entity) => entity.Layer?.Name ?? Layer.Default.Name;
+
+        // Cuts are C00, scribe marks C01 and break cuts C02; any other layer takes the next color
+        // in the order it first appears, cycling once the palette runs out.
+        private static Dictionary<string, string> LaserStrokes(IEnumerable<string> layers)
+        {
+            var strokes = new Dictionary<string, string>();
+            var next = 3;
+            foreach (var layer in layers)
+            {
+                if (CutLayers.Contains(layer))
+                    strokes[layer] = LaserPalette[0];
+                else if (string.Equals(layer, SpecialLayers.Scribe.Name, StringComparison.OrdinalIgnoreCase))
+                    strokes[layer] = LaserPalette[1];
+                else if (string.Equals(layer, SpecialLayers.Break.Name, StringComparison.OrdinalIgnoreCase))
+                    strokes[layer] = LaserPalette[2];
+                else
+                    strokes[layer] = LaserPalette[next++ % LaserPalette.Length];
+            }
+            return strokes;
+        }
 
         private static string StrokeOf(string layer)
         {
