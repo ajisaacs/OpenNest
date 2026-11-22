@@ -80,6 +80,18 @@ Both leave every layout bit-identical; they only skip work whose outcome is neve
 
 `StripeConvergenceCache` lives in the pipeline's `FillContext.SharedState` and reaches pair remnant strips through `PairFiller`. It keeps each stripe convergence by pair, drawing, axis, variant, span, spacing and row cap, the pair's turned bounds by angle, and each estimate row by angle (one thread tiles a row while others wait). Row and Column converge identical layouts, remnant strips along a full side repeat spans, and trajectories revisit angles; each value is a pure function of its key. `DeferredGridCheckTests` holds both to the eager results.
 
+### Work kept between the fills of one solve
+
+Auto Nest's block and band proposals fill the same part in the same box once per remaining quantity. Three things those fills repeated are now kept, each leaving every layout bit-identical:
+
+- Herringbone pairs (`HerringbonePatterns`) follow from the drawing's canonical geometry and the spacing alone. The search's result (each pair's start offset and slide, not its parts) is kept beside the drawing's best-fit candidates for that spacing (`BestFitCache.GetOrAddDerived`): shared, pooled by geometry and dropped with them. Every fill rebuilds the parts for its own canonical copy by the steps the search placed them with, so a kept pair and a searched one are the same poses; `PairsKeptWithTheBestFitsRebuildTheSearchedPatterns` holds them bitwise equal. Anything else kept this way must be immutable and read the drawing in its canonical frame.
+- `OutlineOverlapMemo` keeps the tilted-remnant step's `SpacingOutline.Overlaps` verdicts by the exact coordinates of both perimeters, in the order tested. The block catalog owns one per solve and passes it to its private fills (`PrivatePlateFill.Run`); interactive fills pass none. It is bounded (two generations of coordinates and verdicts) and holds no triangulations. Do not key it by anything looser than the vertices: a triangulation is not invariant under translation in floating point.
+- `SlideContactGeometry.GetMaterialSector` skips entities whose near box (built in `Prepare`) misses the contact point. The box must hold every point `DistanceTo` can measure within the incidence tolerance of the entity, including what `Box.Contains` and `Angle.IsBetweenRad` accept past a line's box or an arc's ends; `SlideContactNearBoxTests` checks that. A change to `DistanceTo` or those tolerances must revisit `NearBox`.
+
+Whole fills cannot be skipped the same way, even when a box plainly holds fewer copies than any quantity asked for: each proposal charges the solve's work meter, adds orientations and feeds `FillResultCache`, all of which later decisions read.
+
+To check a change of this kind, solve each `auto-nest` problem nest with the Default engine before and after and compare a hash of every reported plan's placements (part ID and the bits of X, Y and rotation) and of the final result; `IrregularNestingEngine { GroupLikeParts = false, BandLikeParts = false }` is a quick oracle for the ungrouped search. The corpus run's `the saved layout, unchanged` lines say the same for nests whose baseline layout is saved.
+
 ## Entity identity and hot-test configuration
 
 Use `-c Release` for routine cross-platform test runs, matching CI. Continue running counter-based regressions explicitly in Debug; do not treat fewer Release test cases as lost coverage without checking the DEBUG-only methods and individual skipped outcomes.
