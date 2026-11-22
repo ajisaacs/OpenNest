@@ -77,6 +77,13 @@ ending sooner is only reported, with the line to record. A line without `ends` c
 count alone. Every run prints each nest's end, and a missing baseline's failure prints the whole
 line, the end rounded up to a tenth.
 
+Some jobs get better with more sheets of less material, so a sheet count would pass a regression
+there. Their line also records the job's cost: `auto-nest: 8 sheets, cost 54144` (the job cost
+of the layout, rounded up to a whole unit; without stock prices, the sheets' area). With a cost the
+cost decides: a layout costing more than 0.5 over it fails whatever its sheet count, and one
+costing less is only reported, with the line to record. The end, if the line has one, is then
+not checked. Every run prints each nest's cost.
+
 #### Saved layouts
 
 A nest can also hold the layout its baseline describes, so nobody has to nest the old code again

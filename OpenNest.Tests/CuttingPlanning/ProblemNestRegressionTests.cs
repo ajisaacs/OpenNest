@@ -147,11 +147,13 @@ public partial class ProblemNestRegressionTests(ITestOutputHelper output)
                 ?? throw new InvalidOperationException($"'{record.Name}' has no file.");
             var baseline = SheetBaseline(record.Comments);
             var endBaseline = EndBaseline(record.Comments);
+            var costBaseline = CostBaseline(record.Comments);
             var watch = Stopwatch.StartNew();
             var run = AutoNest(bytes, limit);
-            var (sheets, end, problem) = (run.Sheets, run.End, run.Problem);
-            output.WriteLine($"{record.Name}: {(problem ?? $"{sheets} sheets, ends {Number(end)}")} "
-                + $"(baseline {baseline?.ToString() ?? "none"}{(endBaseline is { } recorded ? $", ends {Number(recorded)}" : "")}), "
+            var (sheets, end, problem, cost) = (run.Sheets, run.End, run.Problem, run.Cost);
+            output.WriteLine($"{record.Name}: {(problem ?? $"{sheets} sheets, ends {Number(end)}, cost {Number(cost)}")} "
+                + $"(baseline {baseline?.ToString() ?? "none"}{(endBaseline is { } recorded ? $", ends {Number(recorded)}" : "")}"
+                + $"{(costBaseline is { } shownCost ? $", cost {Number(shownCost)}" : "")}), "
                 + $"{watch.Elapsed.TotalSeconds:0.0} s");
             var failed = failures.Count;
             if (problem != null)
@@ -161,6 +163,14 @@ public partial class ProblemNestRegressionTests(ITestOutputHelper output)
             else if (baseline == null)
                 failures.Add($"{record.Name} has no Auto Nest baseline. Add this line to its comments: "
                     + AutoNestBaselineLine(sheets, end));
+            else if (costBaseline is { } priced)
+            {
+                // A recorded cost decides: a plan can take more sheets for less material.
+                if (cost > priced + CostTolerance)
+                    failures.Add($"{record.Name}: costs {Number(cost)}, more than baseline {Number(priced)}.");
+                else if (cost < priced - 2 * CostTolerance)
+                    output.WriteLine($"  cheaper than {Number(priced)}; update the baseline: {AutoNestBaselineLine(sheets, end, cost)}");
+            }
             else if (sheets > baseline)
                 failures.Add($"{record.Name}: {sheets} sheets, worse than baseline {baseline}.");
             else if (sheets < baseline)
@@ -181,7 +191,9 @@ public partial class ProblemNestRegressionTests(ITestOutputHelper output)
             // A layout inside the tolerance past the recorded end keeps that end: recording
             // again and again must not let the baseline creep.
             var keptEnd = endBaseline is { } known && sheets == baseline && end > known ? known : (double?)null;
-            var numbers = keptEnd is { } stays ? $"{AutoNestLine} {sheets} sheets, ends {Number(stays)}"
+            var keptCost = costBaseline is { } knownCost && cost > knownCost ? knownCost : (double?)null;
+            var numbers = costBaseline != null ? AutoNestBaselineLine(sheets, end, keptCost ?? cost)
+                : keptEnd is { } stays ? $"{AutoNestLine} {sheets} sheets, ends {Number(stays)}"
                 : AutoNestBaselineLine(sheets, end);
             if (CannotSave(guards, run) is { } why)
             {
@@ -203,7 +215,11 @@ public partial class ProblemNestRegressionTests(ITestOutputHelper output)
 
     /// <summary>One Auto Nest of a problem nest: its sheet count and where its last sheet ends,
     /// or why the layout cannot be kept; the job and result when the engine returned one.</summary>
-    internal sealed record AutoNestRun(int Sheets, double End, string Problem, NestJob Job, NestJobResult Result);
+    internal sealed record AutoNestRun(int Sheets, double End, string Problem, NestJob Job, NestJobResult Result)
+    {
+        /// <summary>The job cost of a kept layout (<see cref="NestJobCost.Evaluate"/>); zero otherwise.</summary>
+        public double Cost { get; init; }
+    }
 
     // Auto Nest on the nest's demand.
     private static AutoNestRun AutoNest(byte[] bytes, TimeSpan limit)
@@ -218,7 +234,10 @@ public partial class ProblemNestRegressionTests(ITestOutputHelper output)
                 return new AutoNestRun(result.Plates.Count, 0, "invalid layout: " + string.Join(" | ", violations.Take(3)), job, result);
             var unplaced = result.Fulfillment.Sum(f => f.Unplaced);
             return unplaced != 0 ? new AutoNestRun(result.Plates.Count, 0, $"{unplaced} parts unplaced", job, result)
-                : new AutoNestRun(result.Plates.Count, LastSheetEnd(job, result), null, job, result);
+                : new AutoNestRun(result.Plates.Count, LastSheetEnd(job, result), null, job, result)
+                {
+                    Cost = OpenNest.Engine.Jobs.NestJobCost.Evaluate(job, result),
+                };
         }
         catch (OperationCanceledException)
         {
@@ -397,9 +416,23 @@ public partial class ProblemNestRegressionTests(ITestOutputHelper output)
     // A recorded end is rounded to a tenth; a layout within half of that is the same layout.
     internal const double EndTolerance = 0.05;
 
-    /// <summary>The baseline line for a result, its end rounded up to a tenth so the result meets it.</summary>
-    internal static string AutoNestBaselineLine(int sheets, double end) =>
-        $"{AutoNestLine} {sheets} sheets, ends {Number(System.Math.Ceiling(end * 10 - 1e-6) / 10)}";
+    /// <summary>
+    /// The job cost from an "auto-nest: 8 sheets, ends 95.5, cost 54144" comment line; null when
+    /// the line records none. With a cost the cost decides, not the sheet count or the end: for a
+    /// job whose better plan takes more sheets of less material.
+    /// </summary>
+    internal static double? CostBaseline(string comments) =>
+        CommentLine(comments, AutoNestLine) is { } line && CostEntry().Match(line) is { Success: true } cost
+            ? double.Parse(cost.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture) : null;
+
+    // A recorded cost is rounded up to a whole unit; a layout within half of that is the same.
+    internal const double CostTolerance = 0.5;
+
+    /// <summary>The baseline line for a result, its end rounded up to a tenth and any cost up to a
+    /// whole unit, so the result meets it.</summary>
+    internal static string AutoNestBaselineLine(int sheets, double end, double? cost = null) =>
+        $"{AutoNestLine} {sheets} sheets, ends {Number(System.Math.Ceiling(end * 10 - 1e-6) / 10)}"
+        + (cost is { } c ? $", cost {Number(System.Math.Ceiling(c - 1e-6))}" : "");
 
     private static string Number(double value) =>
         value.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
@@ -763,6 +796,9 @@ public partial class ProblemNestRegressionTests(ITestOutputHelper output)
 
     [GeneratedRegex(@"\bends\s+(?:at\s+)?(\d+(?:\.\d+)?)", RegexOptions.IgnoreCase)]
     private static partial Regex EndEntry();
+
+    [GeneratedRegex(@"\bcost\s+(\d+(?:\.\d+)?)", RegexOptions.IgnoreCase)]
+    private static partial Regex CostEntry();
 }
 
 public class ProblemNestBaselineTests
@@ -819,6 +855,19 @@ public class ProblemNestBaselineTests
         Assert.Equal(1575, ProblemNestRegressionTests.EndBaseline("auto-nest: 2 sheets, ends at 1575"));
         Assert.Null(ProblemNestRegressionTests.EndBaseline("It ends 80 along.\nauto-nest: 2 sheets"));
         Assert.Null(ProblemNestRegressionTests.EndBaseline("planning: 1=Ready"));
+    }
+
+    [Fact]
+    public void CostBaseline_ReadsTheCostWhenTheLineSaysSo()
+    {
+        const string comments = "checks: auto-nest\nauto-nest: 8 sheets, ends 95.5, cost 54144";
+
+        Assert.Equal(8, ProblemNestRegressionTests.SheetBaseline(comments));
+        Assert.Equal(95.5, ProblemNestRegressionTests.EndBaseline(comments));
+        Assert.Equal(54144, ProblemNestRegressionTests.CostBaseline(comments));
+        Assert.Null(ProblemNestRegressionTests.CostBaseline("auto-nest: 2 sheets, ends 40"));
+        Assert.Equal("auto-nest: 8 sheets, ends 95.5, cost 54144",
+            ProblemNestRegressionTests.AutoNestBaselineLine(8, 95.43, 54143.2));
     }
 
     [Fact]
