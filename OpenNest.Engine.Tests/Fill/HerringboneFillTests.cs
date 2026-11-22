@@ -55,6 +55,43 @@ public class HerringboneFillTests
     }
 
     [Fact]
+    public void PairsKeptWithTheBestFitsRebuildTheSearchedPatterns()
+    {
+        const double spacing = 0.25;
+        // Without best fits for the spacing nothing is kept, so this build searches.
+        var searched = Describe(HerringbonePatterns.Build(AngleBracket(), spacing, CancellationToken.None));
+        Assert.NotEmpty(searched);
+
+        var drawing = AngleBracket();
+        try
+        {
+            OpenNest.Engine.BestFit.BestFitCache.GetOrCompute(drawing, 96, 48, spacing);
+            // Each fill works on its own canonical copy: the first build searches and keeps the
+            // pairs, the second rebuilds them for another copy.
+            foreach (var copy in new[] { CanonicalFrame.AsCanonicalCopy(drawing), CanonicalFrame.AsCanonicalCopy(drawing) })
+            {
+                var groups = HerringbonePatterns.Build(copy, spacing, CancellationToken.None);
+                Assert.Equal(searched, Describe(groups));
+                Assert.All(groups.SelectMany(g => g).SelectMany(p => p.Pattern.Parts),
+                    part => Assert.Same(copy, part.BaseDrawing));
+            }
+        }
+        finally
+        {
+            OpenNest.Engine.BestFit.BestFitCache.Invalidate(drawing);
+        }
+    }
+
+    /// <summary>Every pattern's row axis and its parts' exact poses and bounds, group by group.</summary>
+    private static List<string> Describe(List<List<(Pattern Pattern, NestDirection Dir)>> groups) =>
+        groups.Select(group => string.Join(" | ", group.Select(p => p.Dir + ":" + string.Join(";",
+            p.Pattern.Parts.Select(part => string.Join(",", new[]
+            {
+                part.Location.X, part.Location.Y, part.Rotation, part.BoundingBox.X, part.BoundingBox.Y,
+                part.BoundingBox.Length, part.BoundingBox.Width,
+            }.Select(BitConverter.DoubleToInt64Bits))))))).ToList();
+
+    [Fact]
     public void RotationsLayEachHullEdgeAlongTheSheetInEveryQuarterTurn()
     {
         var degrees = HerringbonePatterns.Rotations(AngleBracket())

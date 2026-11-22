@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using OpenNest.Engine.BestFit;
 using OpenNest.Geometry;
 using OpenNest.Math;
 
@@ -30,6 +31,20 @@ namespace OpenNest.Engine.Fill
 
         private static readonly double AngleTolerance = Angle.ToRadians(1);
 
+        /// <summary>One herringbone pair of a row: where the reversed part starts beside the row
+        /// and how far it slides back onto it.</summary>
+        private readonly record struct Shift(Vector Offset, Vector Slide);
+
+        /// <summary>The pairs kept for one part rotation and row axis.</summary>
+        private sealed record Row(double Rotation, NestDirection Axis, Shift[] Shifts);
+
+        /// <summary>
+        /// Every pair of a drawing at one spacing, grouped by part rotation: what the search
+        /// found, without the parts. It depends on the drawing's geometry and the spacing alone,
+        /// so it is kept with the drawing's best fits and each fill only rebuilds the parts.
+        /// </summary>
+        private sealed record Recipe(List<List<Row>> Groups);
+
         /// <summary>
         /// The patterns to tile, grouped by part rotation, each group with its row axis. Every
         /// pattern holds two parts, the second turned 180° from the first and clear of it by
@@ -41,22 +56,75 @@ namespace OpenNest.Engine.Fill
             CancellationToken token
         )
         {
+            // A drawing in its canonical frame shares the search with every fill of its
+            // geometry at this spacing; the parts are always made for the drawing given.
+            var recipe = Tolerance.IsEqualTo(drawing.Source?.Angle ?? 0.0, 0)
+                ? BestFitCache.GetOrAddDerived(drawing, partSpacing, () => Search(drawing, partSpacing, token))
+                : Search(drawing, partSpacing, token);
+
             var groups = new List<List<(Pattern, NestDirection)>>();
-            foreach (var rotation in Rotations(drawing))
+            foreach (var rows in recipe.Groups)
             {
                 token.ThrowIfCancellationRequested();
                 var group = new List<(Pattern, NestDirection)>();
+                foreach (var row in rows)
+                {
+                    foreach (var pattern in Patterns(drawing, row))
+                        group.Add((pattern, row.Axis));
+                }
+
+                groups.Add(group);
+            }
+
+            return groups;
+        }
+
+        /// <summary>Searches every rotation and row axis for its pairs; a rotation without a
+        /// pair is left out.</summary>
+        private static Recipe Search(Drawing drawing, double partSpacing, CancellationToken token)
+        {
+            var groups = new List<List<Row>>();
+            foreach (var rotation in Rotations(drawing))
+            {
+                token.ThrowIfCancellationRequested();
+                var group = new List<Row>();
                 foreach (var axis in new[] { NestDirection.Horizontal, NestDirection.Vertical })
                 {
-                    foreach (var pattern in BuildPairs(drawing, rotation, axis, partSpacing))
-                        group.Add((pattern, axis));
+                    var shifts = FindShifts(drawing, rotation, axis, partSpacing);
+                    if (shifts.Length > 0)
+                        group.Add(new Row(rotation, axis, shifts));
                 }
 
                 if (group.Count > 0)
                     groups.Add(group);
             }
 
-            return groups;
+            return new Recipe(groups);
+        }
+
+        /// <summary>The row's pairs as patterns of parts of <paramref name="drawing"/>, built
+        /// by the steps the search placed them with.</summary>
+        private static List<Pattern> Patterns(Drawing drawing, Row row)
+        {
+            var first = Part.CreateAtOrigin(drawing, row.Rotation);
+            var reversed = Part.CreateAtOrigin(drawing, Angle.NormalizeRad(row.Rotation + System.Math.PI));
+            var result = new List<Pattern>(row.Shifts.Length);
+            foreach (var shift in row.Shifts)
+                result.Add(Pair(first, reversed, shift));
+            return result;
+        }
+
+        /// <summary>The first part, and the reversed part moved beside the row and slid onto it.</summary>
+        private static Pattern Pair(Part first, Part reversed, Shift shift)
+        {
+            var moved = reversed.CloneAtOffset(shift.Offset).CloneAtOffset(shift.Slide);
+            var pattern = new Pattern();
+            pattern.Parts.Add((Part)first.Clone());
+            pattern.Parts.Add(moved);
+            foreach (var part in pattern.Parts)
+                part.UpdateBounds();
+            pattern.UpdateBounds();
+            return pattern;
         }
 
         /// <summary>
@@ -96,18 +164,19 @@ namespace OpenNest.Engine.Fill
             return difference < AngleTolerance || Angle.HalfPI - difference < AngleTolerance;
         }
 
-        private static List<Pattern> BuildPairs(
+        /// <summary>The pairs making the shallowest double rows at one rotation and row axis.</summary>
+        private static Shift[] FindShifts(
             Drawing drawing,
             double rotation,
             NestDirection axis,
             double partSpacing
         )
         {
-            var result = new List<Pattern>();
+            var result = new List<Shift>();
             var first = Part.CreateAtOrigin(drawing, rotation);
             var reversed = Part.CreateAtOrigin(drawing, Angle.NormalizeRad(rotation + System.Math.PI));
             if (first.BoundingBox.Area() <= 0)
-                return result;
+                return result.ToArray();
 
             var single = new Pattern();
             single.Parts.Add(first);
@@ -116,7 +185,7 @@ namespace OpenNest.Engine.Fill
             var huge = new Box(0, 0, 1e6, 1e6);
             var pitch = new FillLinear(huge, partSpacing).CopyDistance(single, axis);
             if (!(pitch > Tolerance.Epsilon) || double.IsInfinity(pitch))
-                return result;
+                return result.ToArray();
 
             var horizontal = axis == NestDirection.Horizontal;
             var halfSpacing = partSpacing / 2;
@@ -141,7 +210,7 @@ namespace OpenNest.Engine.Fill
                 ? firstBox.Top - reversedBox.Bottom + partSpacing + 1
                 : firstBox.Right - reversedBox.Left + partSpacing + 1;
 
-            Pattern Place(double shift)
+            (Pattern Pattern, Shift Shift)? Place(double shift)
             {
                 var offset = horizontal
                     ? new Vector(firstBox.Left - reversedBox.Left + shift, across)
@@ -155,44 +224,37 @@ namespace OpenNest.Engine.Fill
                 if (distance >= double.MaxValue || distance < 0)
                     return null;
 
-                moved = moved.CloneAtOffset(horizontal ? new Vector(0, -distance) : new Vector(-distance, 0));
-                var pattern = new Pattern();
-                pattern.Parts.Add((Part)first.Clone());
-                pattern.Parts.Add(moved);
-                foreach (var part in pattern.Parts)
-                    part.UpdateBounds();
-                pattern.UpdateBounds();
-                return pattern;
+                var placed = new Shift(offset, horizontal ? new Vector(0, -distance) : new Vector(-distance, 0));
+                return (Pair(first, reversed, placed), placed);
             }
 
             double Depth(Pattern pattern) =>
                 horizontal ? pattern.BoundingBox.Width : pattern.BoundingBox.Length;
 
             var step = pitch / ShiftSamples;
-            var sampled = new List<(double Shift, Pattern Pattern)>();
+            var sampled = new List<(double Shift, (Pattern Pattern, Shift Shift) Placed)>();
             for (var i = 0; i < ShiftSamples; i++)
             {
-                var pattern = Place(i * step);
-                if (pattern != null)
-                    sampled.Add((i * step, pattern));
+                if (Place(i * step) is { } placed)
+                    sampled.Add((i * step, placed));
             }
 
-            foreach (var (shift, coarse) in sampled.OrderBy(s => Depth(s.Pattern)).Take(KeptShifts))
+            foreach (var (shift, coarse) in sampled.OrderBy(s => Depth(s.Placed.Pattern)).Take(KeptShifts))
             {
                 var best = coarse;
                 for (var j = -RefineSamples; j <= RefineSamples; j++)
                 {
                     if (j == 0)
                         continue;
-                    var pattern = Place(shift + j * step / RefineSamples);
-                    if (pattern != null && Depth(pattern) < Depth(best) - Tolerance.Epsilon)
-                        best = pattern;
+                    if (Place(shift + j * step / RefineSamples) is { } placed
+                        && Depth(placed.Pattern) < Depth(best.Pattern) - Tolerance.Epsilon)
+                        best = placed;
                 }
 
-                result.Add(best);
+                result.Add(best.Shift);
             }
 
-            return result;
+            return result.ToArray();
         }
     }
 }

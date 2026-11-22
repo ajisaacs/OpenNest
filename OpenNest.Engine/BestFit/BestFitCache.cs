@@ -37,6 +37,14 @@ namespace OpenNest.Engine.BestFit
             _pool = new(new PoolKeyComparer());
         private static int _sharedCapacity = 512;
 
+        // Values derived from a candidate set's geometry and spacing, keyed by the set's
+        // computation: drawings of one pooled geometry share that instance, and the values
+        // go when it does.
+        private static readonly ConditionalWeakTable<
+            Lazy<List<BestFitResult>>,
+            Dictionary<Type, object>
+        > _derived = new();
+
         public static Func<Drawing, double, IPairEvaluator> CreateEvaluator { get; set; }
         public static Func<ISlideComputer> CreateSlideComputer { get; set; }
 
@@ -123,6 +131,32 @@ namespace OpenNest.Engine.BestFit
                 .WaitAsync(token)
                 .GetAwaiter()
                 .GetResult();
+        }
+
+        /// <summary>
+        /// A value that, like the candidates, follows from the drawing's canonical geometry and
+        /// the spacing alone, kept beside the candidates of that spacing: computed once and
+        /// shared, dropped and pooled by geometry with them. The first caller computes while
+        /// others of the same geometry wait; a computation that throws is not kept. Without
+        /// candidates for the spacing nothing is kept and <paramref name="compute"/> runs.
+        /// The value must be immutable, and <paramref name="compute"/> must read the
+        /// drawing in its canonical frame.
+        /// </summary>
+        internal static T GetOrAddDerived<T>(Drawing drawing, double spacing, Func<T> compute)
+            where T : class
+        {
+            if (!GetEntry(drawing).Unfiltered.TryGetValue(spacing, out var candidates))
+                return compute();
+
+            var values = _derived.GetValue(candidates, _ => new Dictionary<Type, object>());
+            lock (values)
+            {
+                if (values.TryGetValue(typeof(T), out var kept))
+                    return (T)kept;
+                var value = compute();
+                values[typeof(T)] = value;
+                return value;
+            }
         }
 
         /// <summary>True when <see cref="GetOrCompute(Drawing, double, double, double)"/> would return at once.</summary>
