@@ -201,13 +201,16 @@ internal sealed class BlockCatalog : IDisposable
 
     /// <summary>
     /// The free rectangles of a work area blocks are offered: the largest clear of the parts
-    /// placed, their spacing included.
+    /// placed, their spacing included. Only the largest are searched for: on a sheet of many
+    /// detailed parts, sorting out every maximal rectangle takes minutes.
     /// </summary>
-    internal static IReadOnlyList<Box> Rectangles(Box work, IReadOnlyList<Placed> placed, double spacing) =>
-        MaximalRectangles.InRegion(FreeRegion(work, placed, spacing)).OrderByDescending(b => b.Area())
+    internal static IReadOnlyList<Box> Rectangles(Box work, IReadOnlyList<Placed> placed, double spacing,
+        CancellationToken token = default) =>
+        MaximalRectangles.InRegion(FreeRegion(work, placed, spacing, token), largest: MaxRectangles, token: token)
+            .OrderByDescending(b => b.Area())
             .ThenBy(b => b.Left).ThenBy(b => b.Bottom).ThenBy(b => b.Length).Take(MaxRectangles).ToArray();
 
-    private static PathsD FreeRegion(Box work, IReadOnlyList<Placed> placed, double spacing)
+    private static PathsD FreeRegion(Box work, IReadOnlyList<Placed> placed, double spacing, CancellationToken token)
     {
         var free = new PathsD { new PathD
         {
@@ -216,6 +219,7 @@ internal sealed class BlockCatalog : IDisposable
         } };
         foreach (var part in placed)
         {
+            token.ThrowIfCancellationRequested();
             // Physical occupied material, not a reference-point region for any moving part.
             // The catalog currently prepares solid outlines; future profile preparation owns holes.
             var blocked = Clipper.InflatePaths(new PathsD { part.Orientation.Outline },

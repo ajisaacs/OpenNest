@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using Clipper2Lib;
 
 namespace OpenNest.Geometry;
@@ -29,11 +30,20 @@ public static class MaximalRectangles
     /// <param name="minDimension">Rectangles narrower than this in either axis are dropped.</param>
     /// <param name="divisions">Even subdivisions of the region's bounds per axis, which bound the
     /// staircase loss along slanted edges.</param>
+    /// <param name="largest">Results wanted: the search stops once it has this many, keeping
+    /// every further result as large as the last of them, so the results returned are exactly
+    /// those of the full search whose area is at least the area of its result at that rank.
+    /// A region with many edges can have very many candidate rectangles, and ruling out the
+    /// dominated ones costs time quadratic in them, so ask only for what is used.</param>
+    /// <param name="token">Checked throughout; the search is long for a region with many edges.</param>
     /// <returns>Rectangles not contained in another result, largest area first.</returns>
-    public static List<Box> InRegion(PathsD region, double minDimension = 0, int divisions = 64)
+    public static List<Box> InRegion(PathsD region, double minDimension = 0, int divisions = 64,
+        int largest = int.MaxValue, CancellationToken token = default)
     {
         ArgumentNullException.ThrowIfNull(region);
         ArgumentOutOfRangeException.ThrowIfLessThan(divisions, 1);
+        ArgumentOutOfRangeException.ThrowIfLessThan(largest, 1);
+        token.ThrowIfCancellationRequested();
 
         var paths = region.Where(path => path.Count >= 3).ToList();
         if (paths.Count == 0)
@@ -52,6 +62,7 @@ public static class MaximalRectangles
         var crossed = new bool[rows, cols];
         foreach (var path in paths)
         {
+            token.ThrowIfCancellationRequested();
             var previous = path[^1];
             foreach (var current in path)
             {
@@ -67,6 +78,7 @@ public static class MaximalRectangles
             // Even-odd scan along the row's center line. No vertex lies on it, and an edge that
             // meets it strictly inside a cell has already marked that cell crossed, so each
             // uncrossed cell is on the same side as its center.
+            token.ThrowIfCancellationRequested();
             var y = (ys[r] + ys[r + 1]) / 2;
             crossings.Clear();
             foreach (var path in paths)
@@ -91,7 +103,8 @@ public static class MaximalRectangles
             }
         }
 
-        return FromGrid(xs, ys, empty, minDimension);
+        var merged = MergeCells(xs, ys, empty, token);
+        return RemoveDominated(FilterBySize(merged, minDimension), largest, token);
     }
 
     /// <summary>
@@ -111,9 +124,9 @@ public static class MaximalRectangles
         double minDimension = 0
     )
     {
-        var merged = MergeCells(xs, ys, empty);
+        var merged = MergeCells(xs, ys, empty, default);
         var sized = FilterBySize(merged, minDimension);
-        return RemoveDominated(sized);
+        return RemoveDominated(sized, int.MaxValue, default);
     }
 
     private static List<double> GridLines(IEnumerable<double> vertices, double min, double max, int divisions)
@@ -206,7 +219,8 @@ public static class MaximalRectangles
         return true;
     }
 
-    private static List<Box> MergeCells(IReadOnlyList<double> xs, IReadOnlyList<double> ys, bool[,] empty)
+    private static List<Box> MergeCells(IReadOnlyList<double> xs, IReadOnlyList<double> ys, bool[,] empty,
+        CancellationToken token)
     {
         var rows = empty.GetLength(0);
         var cols = empty.GetLength(1);
@@ -222,6 +236,7 @@ public static class MaximalRectangles
 
         for (var r = 0; r < rows; r++)
         {
+            token.ThrowIfCancellationRequested();
             var stack = new Stack<(int startCol, int h)>();
 
             for (var c = 0; c <= cols; c++)
@@ -268,13 +283,21 @@ public static class MaximalRectangles
         return result;
     }
 
-    private static List<Box> RemoveDominated(List<Box> boxes)
+    /// <summary>
+    /// The boxes not within a larger one, largest first. Stops at the first box smaller than the
+    /// result at rank <paramref name="largest"/>: boxes are taken in order, each against the
+    /// results before it, so the results kept up to there are those of the full pass.
+    /// </summary>
+    private static List<Box> RemoveDominated(List<Box> boxes, int largest, CancellationToken token)
     {
         boxes.Sort((a, b) => b.Area().CompareTo(a.Area()));
         var results = new List<Box>();
 
         foreach (var box in boxes)
         {
+            if (results.Count >= largest && box.Area() < results[largest - 1].Area())
+                break;
+            token.ThrowIfCancellationRequested();
             var dominated = false;
 
             foreach (var larger in results)

@@ -336,7 +336,7 @@ internal sealed class FrontierPacker
         if (blocks == null || sheet.BlockPreparations++ >= MaxBlockPreparations)
             return;
         var left = sheet.Left;
-        var rectangles = BlockCatalog.Rectangles(work, sheet.Placed, stock.PartSpacing);
+        var rectangles = BlockCatalog.Rectangles(work, sheet.Placed, stock.PartSpacing, sheet.Token);
         foreach (var type in types.Where(t => left[t.Index] >= MinBlockCopies)
             .OrderByDescending(t => t.Area * left[t.Index]).ThenBy(t => t.Index).Take(MaxBlockTypes))
             foreach (var rectangle in rectangles)

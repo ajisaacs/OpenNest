@@ -104,6 +104,42 @@ public class MaximalRectanglesTests
         Assert.Empty(MaximalRectangles.InRegion(new PathsD()));
     }
 
+    [Fact]
+    public void InRegion_Largest_KeepsTheFullSearchsResultsDownToThatRank()
+    {
+        // A sheet with holes punched in a staggered grid: many maximal rectangles, with ties.
+        var paths = new List<PathD> { Rect(0, 0, 60, 40) };
+        for (var x = 3; x < 57; x += 7)
+            for (var y = 3 + x % 3; y < 36; y += 6)
+            {
+                var hole = Rect(x, y, x + 2.5, y + 1.5 + x % 2);
+                hole.Reverse();
+                paths.Add(hole);
+            }
+        var region = Region(paths.ToArray());
+
+        var full = MaximalRectangles.InRegion(region);
+        foreach (var largest in new[] { 1, 2, 5, 20 })
+        {
+            var cut = full[largest - 1].Area();
+            var expected = full.Where(b => b.Area() >= cut).ToList();
+            var result = MaximalRectangles.InRegion(region, largest: largest);
+
+            Assert.Equal(expected.Count, result.Count);
+            Assert.All(expected, box => Assert.Contains(result, r => Matches(r, box.Left, box.Bottom, box.Length, box.Width)));
+        }
+    }
+
+    [Fact]
+    public void InRegion_CancelledToken_Throws()
+    {
+        using var cancelled = new CancellationTokenSource();
+        cancelled.Cancel();
+
+        Assert.ThrowsAny<OperationCanceledException>(() =>
+            MaximalRectangles.InRegion(Region(Rect(0, 0, 10, 10)), token: cancelled.Token));
+    }
+
     private static PathsD Region(params PathD[] paths) => new(paths);
 
     private static PathD Rect(double left, double bottom, double right, double top) =>
