@@ -31,6 +31,7 @@ namespace OpenNest.Shapes
             {
                 new Entry("48x96", 48, 96), // 4608
                 new Entry("48x120", 48, 120), // 5760
+                new Entry("60x96", 60, 96), // 5760
                 new Entry("48x144", 48, 144), // 6912
                 new Entry("60x120", 60, 120), // 7200
                 new Entry("60x144", 60, 144), // 8640
