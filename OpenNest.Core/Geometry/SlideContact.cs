@@ -52,6 +52,14 @@ namespace OpenNest.Geometry
         private readonly int[] following;
         private readonly bool[] materialLeft;
 
+        // Per entity, a box holding every point GetMaterialSector could find within the
+        // incidence tolerance of it, and per loop its entity count. Null when unresolved.
+        private readonly double[] nearMinX;
+        private readonly double[] nearMinY;
+        private readonly double[] nearMaxX;
+        private readonly double[] nearMaxY;
+        private readonly int[] loopLength;
+
         private SlideContactGeometry(
             List<Entity> entities,
             int[] loopOf,
@@ -65,7 +73,102 @@ namespace OpenNest.Geometry
             this.previous = previous;
             this.following = following;
             this.materialLeft = materialLeft;
+            if (materialLeft == null)
+                return;
+
+            var count = entities.Count;
+            nearMinX = new double[count];
+            nearMinY = new double[count];
+            nearMaxX = new double[count];
+            nearMaxY = new double[count];
+            loopLength = new int[materialLeft.Length];
+            for (var i = 0; i < count; i++)
+            {
+                NearBox(entities[i], out nearMinX[i], out nearMinY[i], out nearMaxX[i], out nearMaxY[i]);
+                loopLength[loopOf[i]]++;
+            }
         }
+
+        // Slack of the near boxes beyond the incidence tolerance: Box.Contains and
+        // Angle.IsBetweenRad accept points Tolerance.Epsilon outside a line's box or past an
+        // arc's ends, and DistanceTo measures from what they accept.
+        private const double NearPad = 10 * Tolerance.Epsilon;
+
+        /// <summary>
+        /// A box no point within <see cref="IncidenceTolerance"/> of the entity, as
+        /// <see cref="DistanceTo"/> measures it, lies outside. An entity whose box misses a
+        /// point is therefore farther from it than the tolerance without measuring.
+        /// </summary>
+        internal static void NearBox(Entity entity, out double minX, out double minY, out double maxX, out double maxY)
+        {
+            switch (entity)
+            {
+                case Line line:
+                    {
+                        // The closest point is the foot of the perpendicular when the line's
+                        // own box holds it (to Tolerance.Epsilon), else an end point.
+                        var box = line.BoundingBox;
+                        minX = System.Math.Min(box.Left, System.Math.Min(line.pt1.X, line.pt2.X)) - NearPad;
+                        minY = System.Math.Min(box.Bottom, System.Math.Min(line.pt1.Y, line.pt2.Y)) - NearPad;
+                        maxX = System.Math.Max(box.Right, System.Math.Max(line.pt1.X, line.pt2.X)) + NearPad;
+                        maxY = System.Math.Max(box.Top, System.Math.Max(line.pt1.Y, line.pt2.Y)) + NearPad;
+                        break;
+                    }
+                case Arc arc:
+                    {
+                        // On the circle at an angle the arc takes (to Tolerance.Epsilon past
+                        // either end, a chord of at most radius x Epsilon), else at an end.
+                        var r = System.Math.Abs(arc.Radius);
+                        var pad = NearPad + r * NearPad;
+                        var start = arc.StartPoint();
+                        var end = arc.EndPoint();
+                        minX = System.Math.Min(start.X, end.X);
+                        minY = System.Math.Min(start.Y, end.Y);
+                        maxX = System.Math.Max(start.X, end.X);
+                        maxY = System.Math.Max(start.Y, end.Y);
+                        if (Angle.IsBetweenRad(0, arc.StartAngle, arc.EndAngle, arc.IsReversed))
+                            maxX = System.Math.Max(maxX, arc.Center.X + r);
+                        if (Angle.IsBetweenRad(Angle.HalfPI, arc.StartAngle, arc.EndAngle, arc.IsReversed))
+                            maxY = System.Math.Max(maxY, arc.Center.Y + r);
+                        if (Angle.IsBetweenRad(System.Math.PI, arc.StartAngle, arc.EndAngle, arc.IsReversed))
+                            minX = System.Math.Min(minX, arc.Center.X - r);
+                        if (Angle.IsBetweenRad(3 * Angle.HalfPI, arc.StartAngle, arc.EndAngle, arc.IsReversed))
+                            minY = System.Math.Min(minY, arc.Center.Y - r);
+                        minX -= pad;
+                        minY -= pad;
+                        maxX += pad;
+                        maxY += pad;
+                        break;
+                    }
+                case Circle circle:
+                    {
+                        var reach = System.Math.Abs(circle.Radius) * (1 + NearPad) + NearPad;
+                        minX = circle.Center.X - reach;
+                        minY = circle.Center.Y - reach;
+                        maxX = circle.Center.X + reach;
+                        maxY = circle.Center.Y + reach;
+                        break;
+                    }
+                default:
+                    // DistanceTo never finds such an entity near; its box rejects nothing.
+                    minX = minY = double.NegativeInfinity;
+                    maxX = maxY = double.PositiveInfinity;
+                    break;
+            }
+            // A box that is not a number rejects nothing either.
+            if (double.IsNaN(minX) || double.IsNaN(minY) || double.IsNaN(maxX) || double.IsNaN(maxY))
+            {
+                minX = minY = double.NegativeInfinity;
+                maxX = maxY = double.PositiveInfinity;
+            }
+        }
+
+        /// <summary>
+        /// True when the point is outside the entity's near box, so farther from the entity
+        /// than the incidence tolerance. False for a point that is not a number.
+        /// </summary>
+        private bool FarFrom(int index, double x, double y) =>
+            x < nearMinX[index] || x > nearMaxX[index] || y < nearMinY[index] || y > nearMaxY[index];
 
         /// <summary>True when every entity belongs to a closed loop with a known material side.</summary>
         public bool IsResolved => materialLeft != null;
@@ -177,10 +280,17 @@ namespace OpenNest.Geometry
             if (materialLeft == null)
                 return ContactSide.Unresolved;
 
+            // Entities whose near box misses the point are farther than the tolerance: they
+            // cannot be the nearest of a point on the boundary, nor make it ambiguous. When
+            // every entity is that far the point is off the boundary, as when measured.
+            var x = point.X;
+            var y = point.Y;
             var best = -1;
             var bestDistance = double.MaxValue;
             for (var i = 0; i < entities.Count; i++)
             {
+                if (FarFrom(i, x, y))
+                    continue;
                 var distance = DistanceTo(entities[i], point);
                 if (distance < bestDistance)
                 {
@@ -193,7 +303,7 @@ namespace OpenNest.Geometry
                 return ContactSide.Off;
 
             // Walk to the entities that enter and leave the tolerance disc.
-            var loopLength = LoopLength(best);
+            var loopLength = this.loopLength[loopOf[best]];
             var incoming = best;
             var steps = 0;
             var smoothLoop = loopLength == 1 && (entities[best] is Circle
@@ -218,7 +328,7 @@ namespace OpenNest.Geometry
             // makes the local material side ambiguous.
             for (var i = 0; i < entities.Count; i++)
             {
-                if (InRun(i, incoming, outgoing))
+                if (FarFrom(i, x, y) || InRun(i, incoming, outgoing))
                     continue;
                 if (DistanceTo(entities[i], point) <= IncidenceTolerance)
                     return ContactSide.Ambiguous;
@@ -252,14 +362,6 @@ namespace OpenNest.Geometry
                 && width < Angle.TwoPI - 2 * SlideContact.SplitOverlap
                 ? ContactSide.Sector
                 : ContactSide.Ambiguous;
-        }
-
-        private int LoopLength(int index)
-        {
-            var length = 1;
-            for (var i = following[index]; i != index; i = following[i])
-                length++;
-            return length;
         }
 
         private bool StartsNear(int index, Vector point) =>
@@ -337,7 +439,7 @@ namespace OpenNest.Geometry
             return length > 0 ? new Vector(dx / length, dy / length) : new Vector();
         }
 
-        private static double DistanceTo(Entity entity, Vector point)
+        internal static double DistanceTo(Entity entity, Vector point)
         {
             switch (entity)
             {
