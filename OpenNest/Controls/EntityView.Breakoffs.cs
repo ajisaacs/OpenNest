@@ -66,7 +66,8 @@ namespace OpenNest.Controls
             if (draggedTab == null)
                 draggedCutoutTab = HitTestCutoutTab(e.Location);
             var dimension = draggedTab == null && draggedCutoutTab == null && BeginDimensionDrag(e.Location);
-            if (draggedTab == null && draggedCutoutTab == null && !dimension)
+            var label = draggedTab == null && draggedCutoutTab == null && !dimension && BeginLabelBoxDrag(e.Location);
+            if (draggedTab == null && draggedCutoutTab == null && !dimension && !label)
                 BeginWindowSelect(e);
             else
                 suppressNextClick = true; // A tab press or drag does not change the selection.
@@ -79,6 +80,7 @@ namespace OpenNest.Controls
                 return;
             EndWindowSelect(e);
             EndDimensionDrag();
+            EndLabelBoxDrag();
             if (draggedCutoutTab is { } cutoutTab)
             {
                 draggedCutoutTab = null;
@@ -98,12 +100,16 @@ namespace OpenNest.Controls
                 RaiseCutoutTabDragged(cutoutTab, e.Location, finished: false);
             else if (draggedDimension is { } dimension)
                 RaiseDimensionDragged(dimension, e.Location);
+            else if (draggedLabelBoxPart != null)
+                RaiseLabelBoxDragged(e.Location);
             else if (e.Button == MouseButtons.None && !IsPicking)
             {
                 if (HitTestTab(e.Location) != null || HitTestCutoutTab(e.Location) != null)
                     Cursor = Cursors.SizeAll;
                 else if (HitTestDimension(e.Location) is { } hover)
                     Cursor = DimensionCursor(hover);
+                else if (HitTestLabelBox(e.Location) is { } labelPart)
+                    Cursor = LabelBoxCursor(labelPart);
                 else
                     Cursor = Cursors.Cross;
             }

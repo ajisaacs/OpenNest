@@ -17,6 +17,7 @@ using OpenNest.Converters;
 using OpenNest.CutOffs;
 using OpenNest.Dimensions;
 using OpenNest.Geometry;
+using OpenNest.Labels;
 using OpenNest.Support;
 using OpenNest.TabbedCutouts;
 using static OpenNest.IO.NestFormat;
@@ -366,6 +367,7 @@ namespace OpenNest.IO
                 drawing.Breakoffs = ReadBreakoffs(d);
                 drawing.TabbedCutouts = ReadTabbedCutouts(d);
                 drawing.Dimensions = ReadDimensions(d);
+                drawing.LabelBox = ReadLabelBox(d);
                 map[d.Id] = drawing;
             }
             return map;
@@ -511,6 +513,21 @@ namespace OpenNest.IO
                 }
             }
             return dimensions;
+        }
+
+        // The label box is an annotation: one that cannot be read is dropped, never what is cut.
+        private LabelBox ReadLabelBox(DrawingDto d)
+        {
+            if (d.LabelBox == null)
+                return null;
+
+            var box = new LabelBox(new Vector(d.LabelBox.X, d.LabelBox.Y), d.LabelBox.Width, d.LabelBox.Height,
+                d.LabelBox.Rotation);
+            if (box.IsValid)
+                return box;
+
+            warnings.Add($"Drawing '{d.Name}': its label box could not be read; skipped it.");
+            return null;
         }
 
         private bool ReadPinsOff(PartDto dto, int plateId, int partIndex, Part part)

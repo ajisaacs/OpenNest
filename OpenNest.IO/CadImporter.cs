@@ -10,6 +10,7 @@ using OpenNest.Converters;
 using OpenNest.Dimensions;
 using OpenNest.Geometry;
 using OpenNest.IO.Bending;
+using OpenNest.Labels;
 using OpenNest.Math;
 using OpenNest.TabbedCutouts;
 
@@ -187,6 +188,7 @@ namespace OpenNest.IO
         /// on the drawing; display-only entities stay out of the program.
         /// </param>
         /// <param name="dimensions">Dimensions to keep on the drawing; they never affect the program.</param>
+        /// <param name="labelBox">The part number label box to keep on the drawing; it never affects the program.</param>
         public static Drawing BuildDrawing(
             CadImportResult result,
             IEnumerable<Entity> entities,
@@ -197,7 +199,8 @@ namespace OpenNest.IO
             IReadOnlyList<Breakoff> breakoffs = null,
             IReadOnlyList<TabbedCutout> tabbedCutouts = null,
             IReadOnlyDictionary<System.Guid, EntityRole> entityRoles = null,
-            IReadOnlyList<DrawingDimension> dimensions = null
+            IReadOnlyList<DrawingDimension> dimensions = null,
+            LabelBox labelBox = null
         )
         {
             var visible = entityRoles is { Count: > 0 }
@@ -237,6 +240,7 @@ namespace OpenNest.IO
             drawing.Breakoffs = breakoffs?.Select(b => b.Clone()).ToList() ?? new List<Breakoff>();
             drawing.TabbedCutouts = tabbedCutouts?.Select(c => c.Clone()).ToList() ?? new List<TabbedCutout>();
             drawing.Dimensions = dimensions?.Select(d => d.Clone()).ToList() ?? new List<DrawingDimension>();
+            drawing.LabelBox = labelBox?.Clone();
             drawing.Program = editedProgram ?? pgm;
 
             var bendSources = new HashSet<Entity>(
@@ -314,6 +318,7 @@ namespace OpenNest.IO
             existing.Breakoffs = edited.Breakoffs;
             existing.TabbedCutouts = edited.TabbedCutouts;
             existing.Dimensions = edited.Dimensions;
+            existing.LabelBox = edited.LabelBox;
         }
 
         private static bool IsRepairMark(Entity e) =>

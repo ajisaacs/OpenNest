@@ -152,6 +152,12 @@ namespace OpenNest
         public List<Dimensions.DrawingDimension> Dimensions { get; set; } = new List<Dimensions.DrawingDimension>();
 
         /// <summary>
+        /// Where the part number label would be etched, in the source frame, or null when none is
+        /// set. Placement only: it never affects <see cref="Program"/>, nesting or posts.
+        /// </summary>
+        public Labels.LabelBox LabelBox { get; set; }
+
+        /// <summary>
         /// Complete set of source entities with stable GUIDs.
         /// Null when the drawing was created from G-code or an older nest file.
         /// </summary>

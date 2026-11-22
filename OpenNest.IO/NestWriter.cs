@@ -304,6 +304,16 @@ namespace OpenNest.IO
                                 Angle = m.IsRadial ? m.Angle : null,
                             }).ToList()
                             : null,
+                        LabelBox = d.LabelBox is { IsValid: true } box
+                            ? new LabelBoxDto
+                            {
+                                X = box.Center.X,
+                                Y = box.Center.Y,
+                                Width = box.Width,
+                                Height = box.Height,
+                                Rotation = box.Rotation,
+                            }
+                            : null,
                     }
                 );
             }

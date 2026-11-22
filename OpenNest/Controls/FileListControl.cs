@@ -31,6 +31,9 @@ namespace OpenNest.Controls
         public List<Breakoffs.Breakoff> Breakoffs { get; set; } = new();
         public List<TabbedCutouts.TabbedCutout> TabbedCutouts { get; set; } = new();
         public List<Dimensions.DrawingDimension> Dimensions { get; set; } = new();
+
+        /// <summary>Where the part number label would be etched, in the entities' frame; null when none is set.</summary>
+        public Labels.LabelBox LabelBox { get; set; }
         public HashSet<Guid> SuppressedEntityIds { get; set; }
 
         /// <summary>Entities the user excluded one by one; they stay excluded whatever the filters show.</summary>

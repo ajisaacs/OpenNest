@@ -346,8 +346,8 @@ fixed archive timestamps and dates, and no best-fit entries, so equal content ha
 equal bytes and SHA-256. The server stores each distinct package once by that hash.
 
 A package holds geometry and geometry-bound data only: program, source entities and
-offset, suppressed entity IDs, entity roles, bends, cut pins, breakoffs, tabbed cutouts, dimensions
-and material density. Fields
+offset, suppressed entity IDs, entity roles, bends, cut pins, breakoffs, tabbed cutouts, dimensions,
+label box and material density. Fields
 the server's library record owns are written as their defaults, so editing them never
 changes the hash:
 
@@ -453,6 +453,16 @@ Values are not stored: they are measured when shown. An entry with an unknown ki
 offset that is zero or not finite, or a radius or diameter without a non-empty `entityId` and
 a finite `angle` is dropped with a reader warning; the drawing and its program are
 unaffected. Versions without radius and diameter support drop those entries the same way.
+
+## Drawing label box
+
+A drawing may carry a `labelBox` object, omitted when none is set: where its part number
+label would be etched, in the source frame. `x` and `y` are the center, `width` is the side
+along the text and `height` the side across it (both positive), and `rotation` is the
+counterclockwise turn about the center in radians, omitted when zero. It is placement only
+and never affects the program. A box that is not finite or has a non-positive side is
+dropped with a reader warning; versions without label box support ignore it. See
+[label box](label-box.md).
 
 ## Drawing entity roles
 
