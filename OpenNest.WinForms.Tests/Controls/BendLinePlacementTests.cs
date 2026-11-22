@@ -38,40 +38,27 @@ public class BendLinePlacementTests
         Assert.Equal(25, world.Y, 9);
     }
 
-    // Grain angle 0 runs along X, the long side-to-side direction of a 60x120 sheet.
-    // Bends should run across it (perpendicular) to avoid cracking.
     [Theory]
-    [InlineData(0, 0, true)] // bend along X, with the grain
-    [InlineData(0, 90, false)] // bend along Y, across the grain
-    [InlineData(90, 90, true)] // rotated 90°, now with the grain
-    [InlineData(0, 45, true)] // diagonal
-    [InlineData(0, 87, false)] // inside the 5° tolerance
-    [InlineData(0, 270, false)] // direction of the bend line does not matter
-    public void HasBendNotAcrossGrain_FlagsBendsThatAreNotPerpendicularToTheGrain(
-        double rotationDegrees, double bendDegrees, bool flagged)
+    [InlineData(BendGrainKind.AcrossGrain)]
+    [InlineData(BendGrainKind.WithGrain)]
+    [InlineData(BendGrainKind.Other)]
+    public void BendGrainColor_GivesEachKindItsOwnColor(BendGrainKind kind)
     {
-        var angle = Angle.ToRadians(bendDegrees);
-        var drawing = new Drawing("bent", new CNC.Program());
-        drawing.Bends.Add(new Bend
+        var colors = new[]
         {
-            StartPoint = new Vector(0, 0),
-            EndPoint = new Vector(10 * System.Math.Cos(angle), 10 * System.Math.Sin(angle)),
-        });
-        var part = new Part(drawing, new Vector(0, 0));
-        if (rotationDegrees != 0)
-            part.Rotate(Angle.ToRadians(rotationDegrees), part.Location);
+            PlateRenderer.BendGrainColor(BendGrainKind.AcrossGrain),
+            PlateRenderer.BendGrainColor(BendGrainKind.WithGrain),
+            PlateRenderer.BendGrainColor(BendGrainKind.Other),
+        };
 
-        Assert.Equal(flagged, PlateRenderer.HasBendNotAcrossGrain(part, grainAngle: 0));
+        Assert.Equal(3, colors.Distinct().Count());
+        Assert.Equal(colors[(int)kind], PlateRenderer.BendGrainColor(kind));
     }
 
     [Fact]
-    public void HasBendNotAcrossGrain_FlagsAPartWhenAnyBendRunsWithTheGrain()
+    public void BendGrainColor_KeepsTheBendColorAcrossTheGrainAndOrangeWithIt()
     {
-        var drawing = new Drawing("bracket", new CNC.Program());
-        drawing.Bends.Add(new Bend { StartPoint = new Vector(5, 0), EndPoint = new Vector(5, 10) });
-        drawing.Bends.Add(new Bend { StartPoint = new Vector(0, 5), EndPoint = new Vector(10, 5) });
-        var part = new Part(drawing, new Vector(0, 0));
-
-        Assert.True(PlateRenderer.HasBendNotAcrossGrain(part, grainAngle: 0));
+        Assert.Equal(System.Drawing.Color.Yellow, PlateRenderer.BendGrainColor(BendGrainKind.AcrossGrain));
+        Assert.Equal(System.Drawing.Color.FromArgb(255, 140, 0), PlateRenderer.BendGrainColor(BendGrainKind.WithGrain));
     }
 }

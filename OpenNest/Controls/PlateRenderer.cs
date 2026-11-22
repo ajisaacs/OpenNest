@@ -165,7 +165,6 @@ namespace OpenNest.Controls
                     part.Draw(g, number.ToString(), muted);
                 DrawBendLines(g, part.BasePart, muted);
                 DrawEtchMarks(g, part.BasePart, muted);
-                DrawGrainWarning(g, part, muted);
             }
 
             var previewParts = view.PreviewParts;
@@ -529,6 +528,19 @@ namespace OpenNest.Controls
             }
         }
 
+        // Bend lines are coloured by how they run against the sheet's grain. Across the grain is
+        // the preferred direction, so it keeps the plain bend colour; the others stand out.
+        private static readonly Color AcrossGrainBendColor = Color.Yellow;
+        private static readonly Color WithGrainBendColor = Color.FromArgb(255, 140, 0);
+        private static readonly Color OtherGrainBendColor = Color.DeepSkyBlue;
+
+        internal static Color BendGrainColor(BendGrainKind kind) => kind switch
+        {
+            BendGrainKind.WithGrain => WithGrainBendColor,
+            BendGrainKind.Other => OtherGrainBendColor,
+            _ => AcrossGrainBendColor,
+        };
+
         private void DrawBendLines(Graphics g, Part part, bool muted)
         {
             if (
@@ -538,11 +550,21 @@ namespace OpenNest.Controls
             )
                 return;
 
-            using var bendPen = new Pen(muted ? Color.Gray : Color.Yellow, 1.5f)
+            var plate = view.DisplayPlate;
+            using var pen = new Pen(Color.Gray, 1.5f)
             {
                 DashStyle = System.Drawing.Drawing2D.DashStyle.Dash,
             };
-            DrawBendLines(g, part, bendPen);
+
+            foreach (var bend in part.BaseDrawing.Bends)
+            {
+                // Without a plate there is no grain to compare with: plain bend colour.
+                var kind = plate == null
+                    ? BendGrainKind.AcrossGrain
+                    : BendGrain.Classify(bend, part.Rotation, plate.GrainAngle);
+                pen.Color = muted ? Color.Gray : BendGrainColor(kind);
+                DrawBendLine(g, part, bend, pen);
+            }
         }
 
         private void DrawBendLines(Graphics g, Part part, Pen bendPen)
@@ -551,12 +573,15 @@ namespace OpenNest.Controls
                 return;
 
             foreach (var bend in part.BaseDrawing.Bends)
-            {
-                var pt1 = view.PointWorldToGraph(BendToWorld(part, bend.StartPoint));
-                var pt2 = view.PointWorldToGraph(BendToWorld(part, bend.EndPoint));
+                DrawBendLine(g, part, bend, bendPen);
+        }
 
-                g.DrawLine(bendPen, pt1, pt2);
-            }
+        private void DrawBendLine(Graphics g, Part part, Bend bend, Pen bendPen)
+        {
+            var pt1 = view.PointWorldToGraph(BendToWorld(part, bend.StartPoint));
+            var pt2 = view.PointWorldToGraph(BendToWorld(part, bend.EndPoint));
+
+            g.DrawLine(bendPen, pt1, pt2);
         }
 
         /// <summary>
@@ -614,62 +639,6 @@ namespace OpenNest.Controls
                     g.DrawLine(etchPen, s2, e2);
                 }
             }
-        }
-
-        private void DrawGrainWarning(Graphics g, LayoutPart layoutPart, bool muted)
-        {
-            var plate = view.DisplayPlate;
-            var part = layoutPart.BasePart;
-            if (
-                !view.ShowBendLines
-                || plate == null
-                || part.BaseDrawing.Bends == null
-                || part.BaseDrawing.Bends.Count == 0
-                || layoutPart.Path == null
-            )
-                return;
-
-            if (!HasBendNotAcrossGrain(part, plate.GrainAngle))
-                return;
-
-            // Trace the part's own cut contours, not its bounding box, so the warning
-            // stays on the part instead of running across its neighbors.
-            using var warnPen = new Pen(muted ? Color.Gray : Color.FromArgb(220, 255, 140, 0), 2.5f)
-            {
-                LineJoin = LineJoin.Round,
-            };
-            g.DrawPath(warnPen, layoutPart.Path);
-        }
-
-        /// <summary>
-        /// Whether any of the placed part's bends is not across the grain. Bend lines should run
-        /// perpendicular to the sheet's grain to avoid cracking on the outside of the bend, so a
-        /// bend more than 5° off perpendicular is flagged.
-        /// </summary>
-        internal static bool HasBendNotAcrossGrain(Part part, double grainAngle)
-        {
-            var bends = part.BaseDrawing.Bends;
-            if (bends == null)
-                return false;
-
-            var tolerance = Angle.ToRadians(5);
-            foreach (var bend in bends)
-            {
-                var diff = LineAngleBetween(bend.LineAngle + part.Rotation, grainAngle);
-                if (System.Math.Abs(diff - Angle.HalfPI) > tolerance)
-                    return true;
-            }
-
-            return false;
-        }
-
-        /// <summary>The angle between two undirected lines, in [0, π/2].</summary>
-        private static double LineAngleBetween(double a, double b)
-        {
-            var diff = (a - b) % System.Math.PI;
-            if (diff < 0)
-                diff += System.Math.PI;
-            return System.Math.Min(diff, System.Math.PI - diff);
         }
 
         private void DrawOffsetGeometry(Graphics g)
