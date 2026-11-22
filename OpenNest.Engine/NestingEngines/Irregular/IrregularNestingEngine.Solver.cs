@@ -38,6 +38,9 @@ public sealed partial class IrregularNestingEngine
         /// <summary>Whether the decode under way is <see cref="QuickPlan"/>'s, which offers no blocks.</summary>
         private bool quick;
 
+        /// <summary>Whether a pass runs <see cref="Apart"/>: blocks come only from catalogs already built.</summary>
+        private bool apart;
+
         public WorkCounter Work { get; private set; } = new();
 
         /// <summary>
@@ -100,6 +103,33 @@ public sealed partial class IrregularNestingEngine
             {
                 Work = meter;
                 quick = false;
+                Alternatives = Array.Empty<Plan>();
+            }
+        }
+
+        /// <summary>
+        /// Runs <paramref name="pass"/> on a work meter of its own, offering only Lattice blocks
+        /// already prepared and preparing none, so the passes after it run as without it: what it
+        /// adds to the shared caches (no-fit polygons, pairs, clamps, boundaries) depends only on the
+        /// job. A catalog is never built during it, as a catalog keeps the meter it was built with.
+        /// </summary>
+        public T Apart<T>(Func<T> pass)
+        {
+            var meter = Work;
+            Work = new WorkCounter();
+            apart = true;
+            foreach (var catalog in blocks.Values)
+                catalog.Frozen = true;
+            try
+            {
+                return pass();
+            }
+            finally
+            {
+                foreach (var catalog in blocks.Values)
+                    catalog.Frozen = false;
+                Work = meter;
+                apart = false;
                 Alternatives = Array.Empty<Plan>();
             }
         }
@@ -246,7 +276,8 @@ public sealed partial class IrregularNestingEngine
             // Grouped fills pack groups from singles and pairs: Fill blocks cost far more per fill
             // there and gave no denser groups. A banded fill's bands are Fill patterns already; its
             // gap fill takes singles and pairs.
-            var offersBlocks = strategy.Rule == SheetRule.Frontier && !quick;
+            var offersBlocks = strategy.Rule == SheetRule.Frontier && !quick
+                && (!apart || blocks.ContainsKey(Clearance(stock)));
             FrontierPacker Packer(IReadOnlyList<int>? ranks, double? reach) => new(types, CacheFor(stock),
                 PairsFor(stock), stock, strategy.Axis, strategy.Beta, Work, offersBlocks ? BlocksFor(stock) : null,
                 ClampsFor(stock), BoundaryFor(stock), strategy.Weights, ranks, reach);
@@ -257,7 +288,7 @@ public sealed partial class IrregularNestingEngine
                 SheetRule.Grouped when GroupedFill.Applies(types, remaining) =>
                     new GroupedFill(types, Packer, strategy.Axis, stock.Outline == null, CompareSheets, Work, groupedBudget)
                         .Fill(remaining, token),
-                _ => Packer(null, null).Fill(remaining, token),
+                _ => Packer(strategy.Ranks, null).Fill(remaining, token),
             };
         }
 

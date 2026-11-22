@@ -67,6 +67,34 @@ public sealed partial class IrregularNestingEngine : INestingEngine
     /// <summary>Work budgets after which the banded variant does not start.</summary>
     internal const int BandedWorkLimit = 3;
 
+    /// <summary>Whether the large-first variants run; off only in tests of the search before them.</summary>
+    internal bool LargeFirst { get; init; } = true;
+
+    /// <summary>Most large/small splits the large-first variants try, widest drop in box area first.</summary>
+    internal const int MaxLargeSplits = 3;
+
+    /// <summary>
+    /// Per-type ranks for each large-first split of the job, widest split first: 0 for the large
+    /// types, 1 for the rest. A split falls below each drop in minimum box area (over the type's
+    /// orientations) to half or less of the next larger type with demand, as Rectangles splits.
+    /// Ranks serve after priority, so a split is skipped when no priority holds both a large and a
+    /// small type with demand: its decodes would repeat the strategy variants.
+    /// </summary>
+    internal static IEnumerable<int[]> LargeFirstRanks(IReadOnlyList<PartType> types, int[] demand)
+    {
+        var box = types.Select(t => t.Orientations.Count == 0 ? 0
+            : t.Orientations.Min(o => (o.MaxX - o.MinX) * (o.MaxY - o.MinY))).ToArray();
+        var areas = types.Where(t => demand[t.Index] > 0).Select(t => box[t.Index])
+            .Distinct().OrderByDescending(a => a).ToArray();
+        return Enumerable.Range(1, System.Math.Max(0, areas.Length - 1))
+            .Where(i => areas[i] <= areas[i - 1] * 0.5)
+            .OrderBy(i => areas[i] / areas[i - 1]).ThenBy(i => i)
+            .Take(MaxLargeSplits)
+            .Select(i => types.Select(t => box[t.Index] >= areas[i - 1] ? 0 : 1).ToArray())
+            .Where(ranks => types.Where(t => demand[t.Index] > 0).GroupBy(t => t.Part.Priority)
+                .Any(level => level.Select(t => ranks[t.Index]).Distinct().Count() > 1));
+    }
+
     /// <summary>Whether the sheet-reduction pass runs; off only in tests of the search before it.</summary>
     internal bool ReduceSheets { get; init; } = true;
 
@@ -167,6 +195,14 @@ public sealed partial class IrregularNestingEngine : INestingEngine
             search.QuickPlan();
 
         search.StrategyVariants();
+
+        // Then the large parts first: each sheet packs the large types before any small one, so the
+        // small parts fill the large parts' gaps instead of spending the first, densest sheets on
+        // their own and leaving the large parts sheets with nothing beside them. Metered apart and
+        // preparing no Lattice blocks, so the passes after it run as without it; it only changes
+        // them by beating the best plan, which they must then beat.
+        if (LargeFirst)
+            search.LargeFirstVariants();
 
         // Like parts grouped, the groups' stragglers filling the gaps after them. These run last, on
         // their own budget, so the search above is the same with or without them; a grouped plan
@@ -278,6 +314,36 @@ public sealed partial class IrregularNestingEngine : INestingEngine
                 return;
             token.ThrowIfCancellationRequested();
             Offer(solver.Plan(demand, Strategy.Banded));
+        }
+
+        /// <summary>
+        /// Decodes <see cref="Variants"/> with the large types ranked first, for each large/small
+        /// split, on a work meter of its own (<see cref="Solver.Apart"/>). Each split gets one work
+        /// budget; its first variant always runs.
+        /// </summary>
+        public void LargeFirstVariants()
+        {
+            var splits = LargeFirstRanks(types, demand).ToList();
+            if (splits.Count > 0)
+                solver.Apart(() => LargeFirstSplits(splits));
+        }
+
+        private bool LargeFirstSplits(IReadOnlyList<int[]> splits)
+        {
+            foreach (var ranks in splits)
+            {
+                var limit = solver.Work.Value + WorkBudget;
+                var first = true;
+                foreach (var (axis, beta) in Variants)
+                {
+                    token.ThrowIfCancellationRequested();
+                    if (!first && solver.Work.Value >= limit)
+                        break;
+                    first = false;
+                    Offer(solver.Plan(demand, new Strategy(axis, beta, Ranks: ranks)));
+                }
+            }
+            return true;
         }
 
         public void ReduceSheets() => Replace(solver.ReduceSheets(Best));

@@ -71,6 +71,12 @@ internal sealed class BlockCatalog : IDisposable
 
     private readonly Dictionary<PatternKey, IReadOnlyList<Placed>> blocks = new();
 
+    /// <summary>
+    /// While set, <see cref="Get"/> returns only blocks already kept and prepares none, so a pass
+    /// metered apart leaves the catalog, and every decision read from it later, as it found it.
+    /// </summary>
+    public bool Frozen { get; set; }
+
     /// <summary>Guarded by its own lock, as are its entries' members and charge.</summary>
     private readonly Dictionary<PatternKey, BandEntry> bands = new();
 
@@ -234,7 +240,8 @@ internal sealed class BlockCatalog : IDisposable
     /// <summary>
     /// The type's Lattice pattern in the rectangle, up to <paramref name="quantity"/> copies, as a
     /// block: kept per type, quantity and rectangle size once prepared. Empty when no block comes
-    /// of it, or when the type's preparations or the solve's work budget are spent.
+    /// of it, or when the type's preparations or the solve's work budget are spent, or when the
+    /// catalog is <see cref="Frozen"/> and has not kept it.
     /// </summary>
     public IReadOnlyList<Placed> Get(PartType type, int quantity, Box rectangle, CancellationToken token)
     {
@@ -245,7 +252,7 @@ internal sealed class BlockCatalog : IDisposable
         var key = request.Key;
         if (blocks.TryGetValue(key, out var kept))
             return kept;
-        if (CannotPrepare(request))
+        if (Frozen || CannotPrepare(request))
             return Array.Empty<Placed>();
         preparations[type.Index] = PreparationsOf(type) + 1;
         var block = Prepare(request, token);

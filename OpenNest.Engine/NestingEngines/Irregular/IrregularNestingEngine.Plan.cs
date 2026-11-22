@@ -26,10 +26,12 @@ public sealed partial class IrregularNestingEngine
 
     /// <summary>
     /// One whole-job decode: the front direction and area exponent of the placement rule, the
-    /// per-type weights on it (none outside a seeded search), and how each sheet is filled.
+    /// per-type weights on it (none outside a seeded search), how each sheet is filled, and for a
+    /// frontier fill optional per-type ranks served after priority (a large-first decode ranks
+    /// the large types 0 and the rest 1, so the small parts take only the large parts' gaps).
     /// </summary>
     private sealed record Strategy(PackAxis Axis, double Beta, IReadOnlyList<double>? Weights = null,
-        SheetRule Rule = SheetRule.Frontier)
+        SheetRule Rule = SheetRule.Frontier, IReadOnlyList<int>? Ranks = null)
     {
         public static Strategy Grouped(PackAxis axis, IReadOnlyList<double>? weights = null) =>
             new(axis, 1.0, weights, SheetRule.Grouped);
