@@ -3,6 +3,7 @@ using System.Linq;
 using System.Text;
 using OpenNest.Bending;
 using OpenNest.CNC;
+using OpenNest.CNC.CuttingStrategy;
 using OpenNest.Geometry;
 using OpenNest.Math;
 
@@ -68,10 +69,13 @@ namespace OpenNest.Labels
         /// The label text for a drawing placed at <paramref name="partRotation"/>: its name, then a
         /// dash and its bend groups when it has bends, for example <c>1234-AB</c>. Characters the
         /// stroke font lacks are dropped from the name. Empty when nothing is left to etch.
+        /// With <see cref="PartLabelMode.PartNumber"/> it is the name alone, and with
+        /// <see cref="PartLabelMode.Off"/> it is empty.
         /// </summary>
-        public static string Text(Drawing drawing, double partRotation, double grainAngle)
+        public static string Text(Drawing drawing, double partRotation, double grainAngle,
+            PartLabelMode mode = PartLabelMode.PartNumberAndBendGroups)
         {
-            if (drawing == null)
+            if (drawing == null || mode == PartLabelMode.Off)
                 return string.Empty;
 
             var name = new StringBuilder();
@@ -79,7 +83,9 @@ namespace OpenNest.Labels
                 if (StrokeFont.Has(character) && !char.IsWhiteSpace(character))
                     name.Append(char.ToUpperInvariant(character));
 
-            var groups = GroupLetters(drawing.Bends, partRotation, grainAngle);
+            var groups = mode == PartLabelMode.PartNumberAndBendGroups
+                ? GroupLetters(drawing.Bends, partRotation, grainAngle)
+                : string.Empty;
             if (groups.Length == 0)
                 return name.ToString();
 
@@ -97,13 +103,14 @@ namespace OpenNest.Labels
         /// less when the text is longer than the box: it is shrunk to fit, to
         /// <see cref="MinimumHeightShare"/> of the box height at the least.
         /// </remarks>
-        public static List<List<Vector>> Strokes(Drawing drawing, double partRotation, double grainAngle)
+        public static List<List<Vector>> Strokes(Drawing drawing, double partRotation, double grainAngle,
+            PartLabelMode mode = PartLabelMode.PartNumberAndBendGroups)
         {
             var box = drawing?.LabelBox;
             if (box == null || !box.IsValid || !double.IsFinite(partRotation) || !double.IsFinite(grainAngle))
                 return null;
 
-            var text = Text(drawing, partRotation, grainAngle);
+            var text = Text(drawing, partRotation, grainAngle, mode);
             if (text.Length == 0)
                 return null;
 
@@ -137,9 +144,10 @@ namespace OpenNest.Labels
         /// (etch) moves, each stroke started by a rapid. Returns false and leaves the program
         /// unchanged when <see cref="Strokes"/> has nothing to etch.
         /// </summary>
-        public static bool AddTo(Program program, Drawing drawing, double partRotation, double grainAngle)
+        public static bool AddTo(Program program, Drawing drawing, double partRotation, double grainAngle,
+            PartLabelMode mode = PartLabelMode.PartNumberAndBendGroups)
         {
-            var strokes = Strokes(drawing, partRotation, grainAngle);
+            var strokes = Strokes(drawing, partRotation, grainAngle, mode);
             if (program == null || strokes == null || strokes.Count == 0)
                 return false;
 

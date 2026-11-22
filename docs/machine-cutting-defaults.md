@@ -27,7 +27,7 @@ save them on close; thicknesses matching none stay blank.
 
 Every setting in Plan Cutting's Cutting Parameters dialog and the Place Lead-in panel is kept on
 the nest's machine thickness: leads on the Outside Cuts and Inside Cuts tabs, lead-in angle
-rounding, tabs, [slug slicing](support-tabs.md#slug-slices), [part label etching](label-box.md#etching-the-label) and pierce on the Tabs & Pierce tab
+rounding, tabs, [slug slicing](support-tabs.md#slug-slices), [part label etching](label-box.md#etching-the-label) (off, part number, or part number and bend groups) and pierce on the Tabs & Pierce tab
 (`ThicknessConfig.Cutting`). So 0.25 in can
 tab parts while 0.5 in tabs none, and in Database mode every workstation gets the same
 settings. The dialog names what it edits above its fields ("Saved for Fiber 1 · Mild Steel A36

@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using OpenNest.CNC.CuttingStrategy;
 
 namespace OpenNest.Data;
 
@@ -33,8 +34,24 @@ public class ThicknessCuttingConfig
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     public bool SliceTippingSlugs { get; set; }
 
+    /// <summary>What Plan Cutting etches in each part's label box; written only when not off.</summary>
+    [JsonConverter(typeof(JsonStringEnumConverter))]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public PartLabelMode LabelMode { get; set; }
+
+    /// <summary>
+    /// Read only: the old on/off part label option, which meant the number with its bend
+    /// groups. Never written; files saved with it load as <see cref="PartLabelMode.PartNumberAndBendGroups"/>.
+    /// </summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     public bool EtchPartLabels { get; set; }
+
+    /// <summary><see cref="LabelMode"/>, or the full label when only the old on/off option is set.</summary>
+    [JsonIgnore]
+    public PartLabelMode ResolvedLabelMode =>
+        LabelMode != PartLabelMode.Off ? LabelMode
+        : EtchPartLabels ? PartLabelMode.PartNumberAndBendGroups
+        : PartLabelMode.Off;
 
     public double PierceClearance { get; set; } = 0.0625;
 

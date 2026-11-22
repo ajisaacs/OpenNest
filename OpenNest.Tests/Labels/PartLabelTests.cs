@@ -251,10 +251,13 @@ public class PartLabelTests
 
     // ---- Plan Cutting ----
 
-    private static CuttingParameters Parameters(bool labels)
+    private static CuttingParameters Parameters(bool labels) =>
+        Parameters(labels ? PartLabelMode.PartNumberAndBendGroups : PartLabelMode.Off);
+
+    private static CuttingParameters Parameters(PartLabelMode mode)
     {
         var parameters = ExplicitContourTests.Parameters();
-        parameters.EtchPartLabels = labels;
+        parameters.LabelMode = mode;
         return parameters;
     }
 
@@ -334,18 +337,126 @@ public class PartLabelTests
     // ---- the option ----
 
     [Fact]
+    public void PlanCutting_PartNumberMode_EtchesTheNumberWithoutTheGroups()
+    {
+        // "7" alone is one glyph; "7-A" adds a dash and a letter, so it has more strokes.
+        var drawing = Panel("7", BendAt(Quarter));
+        var strokesOf = (PartLabelMode mode) =>
+        {
+            var (plate, _) = PlateOf(drawing, Parameters(mode));
+            var result = CuttingPlanService.Plan(CuttingPlanRequest.ForPlate(plate, Vector.Zero,
+                confirmedParameters: Parameters(mode)));
+            Assert.Equal(CuttingPlanStatus.Ready, result.Status);
+            return ScribeOf(result).Count;
+        };
+
+        var numberOnly = strokesOf(PartLabelMode.PartNumber);
+        var full = strokesOf(PartLabelMode.PartNumberAndBendGroups);
+
+        Assert.True(numberOnly > 0);
+        Assert.True(full > numberOnly);
+        Assert.Equal(0, strokesOf(PartLabelMode.Off));
+    }
+
+    // ---- the option ----
+
+    [Fact]
+    public void Text_PartNumberMode_OmitsTheGroups_AndOffIsEmpty()
+    {
+        var drawing = Panel("1234", BendAt(0), BendAt(Quarter));
+
+        Assert.Equal("1234", PartLabels.Text(drawing, 0, 0, PartLabelMode.PartNumber));
+        Assert.Equal("1234-AB", PartLabels.Text(drawing, 0, 0, PartLabelMode.PartNumberAndBendGroups));
+        Assert.Equal("1234-AB", PartLabels.Text(drawing, 0, 0));
+        Assert.Equal(string.Empty, PartLabels.Text(drawing, 0, 0, PartLabelMode.Off));
+        // A name the font cannot draw is nothing to etch in number mode, even with bends.
+        Assert.Equal(string.Empty, PartLabels.Text(Panel("()", BendAt(Quarter)), 0, 0, PartLabelMode.PartNumber));
+    }
+
+    [Fact]
+    public void AddTo_OffMode_LeavesTheProgramAlone()
+    {
+        var drawing = Panel("1234", BendAt(Quarter));
+        var program = (Program)drawing.Program.Clone();
+        var before = program.Codes.Count;
+
+        Assert.False(PartLabels.AddTo(program, drawing, 0, 0, PartLabelMode.Off));
+        Assert.Equal(before, program.Codes.Count);
+        Assert.True(PartLabels.AddTo(program, drawing, 0, 0, PartLabelMode.PartNumber));
+    }
+
+    [Fact]
     public void Option_IsOffByDefault_AndSurvivesEveryCopyAndSave()
     {
-        Assert.False(new CuttingParameters().EtchPartLabels);
+        Assert.Equal(PartLabelMode.Off, new CuttingParameters().LabelMode);
 
-        var on = Parameters(true);
-        Assert.True(OwnedCuttingParameters.Copy(on).EtchPartLabels);
-        Assert.True(CuttingParametersSerializer.Deserialize(CuttingParametersSerializer.Serialize(on)).EtchPartLabels);
-        Assert.False(CuttingParametersSerializer.Deserialize(CuttingParametersSerializer.Serialize(Parameters(false))).EtchPartLabels);
+        foreach (var mode in new[] { PartLabelMode.PartNumber, PartLabelMode.PartNumberAndBendGroups })
+        {
+            var on = Parameters(mode);
+            Assert.Equal(mode, OwnedCuttingParameters.Copy(on).LabelMode);
+            Assert.Equal(mode, CuttingParametersSerializer.Deserialize(CuttingParametersSerializer.Serialize(on)).LabelMode);
 
-        var config = MachineCuttingDefaults.ToCuttingConfig(on);
-        Assert.True(config.EtchPartLabels);
-        Assert.True(MachineCuttingDefaults.CuttingOf(config).EtchPartLabels);
-        Assert.False(MachineCuttingDefaults.CuttingOf(null).EtchPartLabels);
+            var config = MachineCuttingDefaults.ToCuttingConfig(on);
+            Assert.Equal(mode, config.LabelMode);
+            Assert.Equal(mode, MachineCuttingDefaults.CuttingOf(config).LabelMode);
+        }
+
+        Assert.Equal(PartLabelMode.Off,
+            CuttingParametersSerializer.Deserialize(CuttingParametersSerializer.Serialize(Parameters(false))).LabelMode);
+        Assert.Equal(PartLabelMode.Off, MachineCuttingDefaults.CuttingOf(null).LabelMode);
+    }
+
+    [Fact]
+    public void Fingerprint_SeparatesTheThreeModes_AndKeepsTheOldFullLabelOne()
+    {
+        var off = StateFingerprint.Of(Parameters(PartLabelMode.Off));
+        var number = StateFingerprint.Of(Parameters(PartLabelMode.PartNumber));
+        var full = StateFingerprint.Of(Parameters(PartLabelMode.PartNumberAndBendGroups));
+
+        Assert.NotEqual(off, number);
+        Assert.NotEqual(off, full);
+        Assert.NotEqual(number, full);
+    }
+
+    [Fact]
+    public void OldOnOffOption_LoadsAsTheFullLabel()
+    {
+        // Settings saved before the mode existed wrote the option as "etchPartLabels": true.
+        var current = CuttingParametersSerializer.Serialize(Parameters(PartLabelMode.PartNumberAndBendGroups));
+        Assert.DoesNotContain("etchPartLabels", current);
+        Assert.Contains("\"labelMode\":\"PartNumberAndBendGroups\"", current);
+
+        var on = current.Replace("\"labelMode\":\"PartNumberAndBendGroups\"", "\"etchPartLabels\":true");
+        Assert.Equal(PartLabelMode.PartNumberAndBendGroups, CuttingParametersSerializer.Deserialize(on).LabelMode);
+
+        var off = current.Replace("\"labelMode\":\"PartNumberAndBendGroups\"", "\"etchPartLabels\":false");
+        Assert.Equal(PartLabelMode.Off, CuttingParametersSerializer.Deserialize(off).LabelMode);
+
+        var missing = CuttingParametersSerializer.Serialize(Parameters(PartLabelMode.Off));
+        Assert.DoesNotContain("labelMode", missing);
+        Assert.Equal(PartLabelMode.Off, CuttingParametersSerializer.Deserialize(missing).LabelMode);
+
+        // The new key wins when both are present.
+        var both = current.Replace("\"labelMode\":\"PartNumberAndBendGroups\"",
+            "\"labelMode\":\"PartNumber\",\"etchPartLabels\":true");
+        Assert.Equal(PartLabelMode.PartNumber, CuttingParametersSerializer.Deserialize(both).LabelMode);
+    }
+
+    [Fact]
+    public void OldOnOffOption_InAMachineThicknessConfig_LoadsAsTheFullLabel()
+    {
+        var options = new System.Text.Json.JsonSerializerOptions();
+        var old = System.Text.Json.JsonSerializer.Deserialize<ThicknessCuttingConfig>(
+            "{\"EtchPartLabels\":true}", options);
+        Assert.Equal(PartLabelMode.PartNumberAndBendGroups, MachineCuttingDefaults.CuttingOf(old).LabelMode);
+
+        var off = System.Text.Json.JsonSerializer.Deserialize<ThicknessCuttingConfig>("{}", options);
+        Assert.Equal(PartLabelMode.Off, MachineCuttingDefaults.CuttingOf(off).LabelMode);
+
+        // Saving it again writes the mode, not the old key.
+        var saved = System.Text.Json.JsonSerializer.Serialize(
+            MachineCuttingDefaults.ToCuttingConfig(MachineCuttingDefaults.CuttingOf(old)), options);
+        Assert.Contains("\"LabelMode\":\"PartNumberAndBendGroups\"", saved);
+        Assert.DoesNotContain("EtchPartLabels", saved);
     }
 }

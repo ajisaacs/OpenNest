@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using OpenNest.CNC;
 using OpenNest.CNC.CuttingPlanning;
+using OpenNest.CNC.CuttingStrategy;
 using OpenNest.CutOffs;
 using OpenNest.Diagnostics;
 using OpenNest.Geometry;
@@ -156,9 +157,9 @@ public static class CuttingPlanService
                 }
                 // The label is etched, never material: clean bounds and lead material skip scribe
                 // moves, and the planner emits them like any other mark (docs/label-box.md).
-                else if (request.ConfirmedParameters?.EtchPartLabels == true)
+                else if (request.ConfirmedParameters?.LabelMode is { } labelMode && labelMode != PartLabelMode.Off)
                     PartLabels.AddTo(ownedClean, source.BaseDrawing, source.Rotation,
-                        request.Plate?.GrainAngle ?? 0);
+                        request.Plate?.GrainAngle ?? 0, labelMode);
                 // Material extent only: remote rapids and scribe marks must not widen it, or a
                 // genuine insert could fail the containment prefilter.
                 var cleanBounds = NestedPartContainment.CleanBounds(ownedClean, source.Location, token);

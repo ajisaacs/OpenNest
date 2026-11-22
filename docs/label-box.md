@@ -2,7 +2,7 @@
 
 A drawing can carry a label box: the rectangle where its part number and bend groups are
 etched, found on flat material clear of everything else. The CAD Converter stores and shows the
-placement; Plan Cutting etches the text when **Etch part number and bend groups** is on (see
+placement; Plan Cutting etches the text when **Etch part label** is not Off (see
 [Etching the label](#etching-the-label)).
 
 In the CAD Converter, **Label Box...** (bottom bar) finds the best spot for the shown part.
@@ -47,17 +47,33 @@ File format: see [drawing label box](nest-file-format.md#drawing-label-box).
 
 ## Etching the label
 
-Cutting Parameters > Marks > **Etch part number and bend groups** (`CuttingParameters.EtchPartLabels`)
-is off by default and kept per machine thickness like the other cutting options
+Cutting Parameters > Marks > **Etch part label** (`CuttingParameters.LabelMode`, a `PartLabelMode`)
+is **Off** by default and kept per machine thickness like the other cutting options
 ([machine cutting defaults](machine-cutting-defaults.md), saved with the nest and the machine's
-thickness settings). When it is on, Plan Cutting adds each part's label to the clean program it
+thickness settings). It has three choices:
+
+| Choice | Etched | Example |
+|--------|--------|---------|
+| Off | nothing | |
+| Part number | the drawing name | `1234` |
+| Part number and bend groups | the name, then a dash and the bend groups | `1234-AB` |
+
+When it is not Off, Plan Cutting adds each part's label to the clean program it
 plans from, so the label is emitted as scribe (etch) moves like any other mark: it shows in the plan,
 counts in cut time, posts through the etch path and never enters nesting or collision geometry
 (marks are not material). Nothing changes while the option is off, and parts planned before it was
-turned on keep no label until planned again.
+turned on keep no label until planned again. The plan fingerprint records the mode, so changing it
+makes an earlier plan stale.
+
+Settings saved before the mode existed held an on/off `etchPartLabels` value (in the nest's cutting
+parameters, the desktop settings and a machine thickness's cutting settings). It meant the full
+label, so `true` loads as **Part number and bend groups** and `false` or a missing value as **Off**;
+the old key is read but never written again. When both keys are present, `labelMode` wins.
 
 - **Text.** `PartLabels.Text` is the drawing name in capitals (characters the font lacks are
-  dropped), then a dash and the part's bend groups when it has bends: `1234-AB`.
+  dropped), then, in **Part number and bend groups** mode, a dash and the part's bend groups when it
+  has bends: `1234-AB`. **Part number** mode leaves the groups out, so a part with bends still gets
+  `1234`.
 - **Bend groups.** A bend's group is its line's direction against the sheet grain in 15° steps
   (`BendGrain.Bucket`, bend line plus the part's rotation against `Plate.GrainAngle`), named by a
   fixed letter so a group means the same thing on every part and sheet: **A** across the grain,

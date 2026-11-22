@@ -97,8 +97,12 @@ internal static class StateFingerprint
             // Only when on, so fingerprints taken before the setting existed still match.
             if (p.SliceTippingSlugs)
                 text.Append("slugSlices;");
-            if (p.EtchPartLabels)
+            // "partLabels;" is what the old on/off option wrote for the full label, so those
+            // fingerprints still match.
+            if (p.LabelMode == PartLabelMode.PartNumberAndBendGroups)
                 text.Append("partLabels;");
+            else if (p.LabelMode == PartLabelMode.PartNumber)
+                text.Append("partLabelNumber;");
             Sequence(p.Sequencing);
             Assignment(p.Assignment);
             text.Append('}');

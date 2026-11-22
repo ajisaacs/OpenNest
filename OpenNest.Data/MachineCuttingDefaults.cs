@@ -132,7 +132,7 @@ public static class MachineCuttingDefaults
             TabSizeMinWidth = parameters.TabSizeMinWidth * scale,
             TabSizeMaxWidth = parameters.TabSizeMaxWidth * scale,
             SliceTippingSlugs = parameters.SliceTippingSlugs,
-            EtchPartLabels = parameters.EtchPartLabels,
+            LabelMode = parameters.LabelMode,
             PierceClearance = parameters.PierceClearance * scale,
             PierceDiameter = parameters.PierceDiameter * scale,
             Unknown = previous?.Unknown,
@@ -151,7 +151,7 @@ public static class MachineCuttingDefaults
         parameters.TabSizeMinWidth = cutting.TabSizeMinWidth * scale;
         parameters.TabSizeMaxWidth = cutting.TabSizeMaxWidth * scale;
         parameters.SliceTippingSlugs = cutting.SliceTippingSlugs;
-        parameters.EtchPartLabels = cutting.EtchPartLabels;
+        parameters.LabelMode = cutting.ResolvedLabelMode;
         parameters.PierceClearance = cutting.PierceClearance * scale;
         parameters.PierceDiameter = cutting.PierceDiameter * scale;
     }

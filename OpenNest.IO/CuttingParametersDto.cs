@@ -41,8 +41,20 @@ public class CuttingParametersDto
     // Written only when on, so files and settings saved without it are unchanged.
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
     public bool SliceTippingSlugs { get; set; }
+    [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter))]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    public PartLabelMode LabelMode { get; set; }
+    // Read only: the old on/off part label option, which meant the number with its bend groups.
+    // Never written; files saved with it load as PartNumberAndBendGroups.
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
     public bool EtchPartLabels { get; set; }
+
+    /// <summary><see cref="LabelMode"/>, or the full label when only the old on/off option is set.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public PartLabelMode ResolvedLabelMode =>
+        LabelMode != PartLabelMode.Off ? LabelMode
+        : EtchPartLabels ? PartLabelMode.PartNumberAndBendGroups
+        : PartLabelMode.Off;
     public SequenceDto Sequencing { get; set; } = new();
     public AssignmentDto Assignment { get; set; } = new();
 
