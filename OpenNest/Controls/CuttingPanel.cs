@@ -32,6 +32,7 @@ namespace OpenNest.Controls
         private readonly NumericUpDown nudTabSizeMax;
         private readonly NumericUpDown nudTabHeldMax;
         private readonly CheckBox chkSliceSlugs;
+        private readonly CheckBox chkEtchPartLabels;
         private readonly NumericUpDown nudPierceClearance;
         private readonly NumericUpDown nudPierceDiameter;
 
@@ -283,6 +284,21 @@ namespace OpenNest.Controls
             layout.Controls.Add(chkSliceSlugs);
             chkSliceSlugs.CheckedChanged += (s, e) => OnParametersChanged();
 
+            // Marks: the part number and bend groups etched in each drawing's label box.
+            AddSection("Marks");
+
+            chkEtchPartLabels = new CheckBox
+            {
+                Text = "Etch part number and bend groups",
+                AutoSize = true,
+                Margin = new Padding(0, 3, 0, 3),
+            };
+            toolTip.SetToolTip(chkEtchPartLabels,
+                "Plan Cutting etches each part's number and bend groups (A across the grain, B with it, "
+                + "then C and on) in the label box set in the CAD Converter. Parts with no label box get none.");
+            layout.Controls.Add(chkEtchPartLabels);
+            chkEtchPartLabels.CheckedChanged += (s, e) => OnParametersChanged();
+
             // Pierce
             AddSection("Pierce");
 
@@ -373,6 +389,7 @@ namespace OpenNest.Controls
             parameters.TabSizeMaxWidth = (double)nudTabSizeMax.Value;
             parameters.TabHeldMaxLength = (double)nudTabHeldMax.Value;
             parameters.SliceTippingSlugs = chkSliceSlugs.Checked;
+            parameters.EtchPartLabels = chkEtchPartLabels.Checked;
             return parameters;
         }
 
@@ -400,6 +417,7 @@ namespace OpenNest.Controls
             tabOptions.Enabled = chkTabsEnabled.Checked;
             UpdateSupportTabOptions();
             chkSliceSlugs.Checked = p.SliceTippingSlugs;
+            chkEtchPartLabels.Checked = p.EtchPartLabels;
             nudPierceClearance.Value = Clamp(nudPierceClearance, p.PierceClearance);
             nudPierceDiameter.Value = Clamp(nudPierceDiameter, p.PierceDiameter);
             chkRoundLeadInAngles.Checked = p.RoundLeadInAngles;

@@ -1,8 +1,9 @@
 # Part number label box
 
-A drawing can carry a label box: the rectangle where its part number will be etched, found
-on flat material clear of everything else. This stage stores and shows the placement only;
-nothing is etched yet.
+A drawing can carry a label box: the rectangle where its part number and bend groups are
+etched, found on flat material clear of everything else. The CAD Converter stores and shows the
+placement; Plan Cutting etches the text when **Etch part number and bend groups** is on (see
+[Etching the label](#etching-the-label)).
 
 In the CAD Converter, **Label Box...** (bottom bar) finds the best spot for the shown part.
 The box is drawn as a dashed rectangle. Drag its body to move it and a corner to resize it
@@ -40,14 +41,50 @@ nesting geometry, cut time or posts, and it does not appear in DXF, DWG or SVG e
   clearance.
 - Split pieces start with no label box, like dimensions, breakoffs and tabbed cutouts.
 
-Out of scope for now: etching the text, the bend group letters, and an automatic placement
-on import; the box is placed when asked.
+The box is placed when asked, not automatically on import.
 
 File format: see [drawing label box](nest-file-format.md#drawing-label-box).
+
+## Etching the label
+
+Cutting Parameters > Marks > **Etch part number and bend groups** (`CuttingParameters.EtchPartLabels`)
+is off by default and kept per machine thickness like the other cutting options
+([machine cutting defaults](machine-cutting-defaults.md), saved with the nest and the machine's
+thickness settings). When it is on, Plan Cutting adds each part's label to the clean program it
+plans from, so the label is emitted as scribe (etch) moves like any other mark: it shows in the plan,
+counts in cut time, posts through the etch path and never enters nesting or collision geometry
+(marks are not material). Nothing changes while the option is off, and parts planned before it was
+turned on keep no label until planned again.
+
+- **Text.** `PartLabels.Text` is the drawing name in capitals (characters the font lacks are
+  dropped), then a dash and the part's bend groups when it has bends: `1234-AB`.
+- **Bend groups.** A bend's group is its line's direction against the sheet grain in 15° steps
+  (`BendGrain.Bucket`, bend line plus the part's rotation against `Plate.GrainAngle`), named by a
+  fixed letter so a group means the same thing on every part and sheet: **A** across the grain,
+  **B** with it, then **C** to **L** for the steps between, in bucket order from the grain. Bends
+  with the same letter can be formed in one setup. The letters depend on how the part is
+  rotated on the sheet, which is why the text is made when cutting is planned, not stored with the
+  box.
+- **Font.** `StrokeFont` is a small built-in single-stroke font (digits, capitals, `- _ . /`), so
+  the label needs no font file. The CHR reader (`ChrFont`) loads vendor fonts from disk and is not
+  used.
+- **Fit.** The text is centered in the box and reads along it at the box's height. A name longer
+  than the box is shrunk to fit, to half the box height at the least; a longer one is not etched.
+  The text turns with the part, so it can read upside down or sideways on the sheet.
+- **Frames.** The box and the bends are in the source frame: the program's offset
+  (`Drawing.Source.Offset`) comes off, then the part's rotation applies, as `BendToWorld` does.
+- **What gets none.** A drawing with no box, parts whose cutting is locked or left out of the plan
+  (the label is added only where Plan Cutting regenerates the program), and common-line members
+  (their programs are rebuilt from their shared spans).
+
+Not done yet: a plan-time warning for a label that cannot fit (it is skipped without a message),
+a group letter next to each bend's own etch dashes, and a parts-per-bend-group list in the part
+printout and nest report.
 
 ## Regression checks
 
 ```sh
 dotnet test OpenNest.Tests/OpenNest.Tests.csproj -c Release --filter "FullyQualifiedName~Labels"
+dotnet test OpenNest.Tests/OpenNest.Tests.csproj -c Release --filter "FullyQualifiedName~PartLabelTests"
 scripts/Test-Hidden.ps1 OpenNest.WinForms.Tests/OpenNest.WinForms.Tests.csproj --filter FullyQualifiedName~CadConverterLabelBoxTests
 ```

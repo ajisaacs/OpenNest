@@ -113,6 +113,13 @@ namespace OpenNest.CNC.CuttingStrategy
         /// </summary>
         public bool SliceTippingSlugs { get; set; }
 
+        /// <summary>
+        /// Etches each part's number and bend groups in its drawing's label box when cutting is
+        /// planned (see docs/label-box.md). Off by default; parts whose drawing has no label box,
+        /// and common-line members, get no label.
+        /// </summary>
+        public bool EtchPartLabels { get; set; }
+
         public SequenceParameters Sequencing { get; set; } = new SequenceParameters();
         public AssignmentParameters Assignment { get; set; } = new AssignmentParameters();
     }

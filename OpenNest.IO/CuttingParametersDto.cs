@@ -41,6 +41,8 @@ public class CuttingParametersDto
     // Written only when on, so files and settings saved without it are unchanged.
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
     public bool SliceTippingSlugs { get; set; }
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    public bool EtchPartLabels { get; set; }
     public SequenceDto Sequencing { get; set; } = new();
     public AssignmentDto Assignment { get; set; } = new();
 

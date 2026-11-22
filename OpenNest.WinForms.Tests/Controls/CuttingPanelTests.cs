@@ -63,6 +63,20 @@ public class CuttingPanelTests
     }
 
     [Fact]
+    public void EtchPartLabels_IsOffByDefault_AndRoundTrips()
+    {
+        StaTestThread.Run(() =>
+        {
+            using var panel = new CuttingPanel();
+            panel.LoadFromParameters(new CuttingParameters());
+            Assert.False(panel.BuildParameters().EtchPartLabels);
+
+            panel.LoadFromParameters(new CuttingParameters { EtchPartLabels = true });
+            Assert.True(panel.BuildParameters().EtchPartLabels);
+        }, TimeSpan.FromSeconds(30), "The cutting panel did not round-trip the part label option.");
+    }
+
+    [Fact]
     public void TabEveryPart_LoadsAsTabsBySizeOverEveryWidth()
     {
         StaTestThread.Run(() =>

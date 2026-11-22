@@ -1,0 +1,159 @@
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using OpenNest.Bending;
+using OpenNest.CNC;
+using OpenNest.Geometry;
+using OpenNest.Math;
+
+namespace OpenNest.Labels
+{
+    /// <summary>
+    /// The text etched in a part's <see cref="LabelBox"/>: its drawing name and the bend groups
+    /// its bends fall in for the way it is placed against the sheet grain.
+    /// </summary>
+    /// <remarks>
+    /// A bend group is the bend line's direction relative to the grain (<see cref="BendGrain.Bucket"/>),
+    /// named by a fixed letter so a group has the same letter on every part and sheet of a nest:
+    /// A across the grain, B with it, then C and on for the 15° steps between, in bucket order.
+    /// Bends sharing a letter can be formed in one setup. Like a dimension, the box only stores
+    /// placement; the text is made when the part is planned, because the letters depend on how the
+    /// part was rotated.
+    /// </remarks>
+    public static class PartLabels
+    {
+        /// <summary>The smallest share of the box height the text may be shrunk to; a longer name is not etched.</summary>
+        public const double MinimumHeightShare = 0.5;
+
+        // Letter per bucket, indexed by BendGrain.Bucket: with the grain B, across it A, the rest C on.
+        private static readonly char[] BucketLetters = BuildBucketLetters();
+
+        private static char[] BuildBucketLetters()
+        {
+            var letters = new char[BendGrain.BucketCount];
+            letters[0] = 'B';
+            letters[BendGrain.BucketCount / 2] = 'A';
+            var next = 'C';
+            for (var bucket = 0; bucket < letters.Length; bucket++)
+                if (letters[bucket] == 0)
+                    letters[bucket] = next++;
+            return letters;
+        }
+
+        /// <summary>The bend group letter of a bend line (already rotated into the plate) against the grain.</summary>
+        public static char GroupLetter(double lineAngle, double grainAngle) =>
+            BucketLetters[BendGrain.Bucket(lineAngle, grainAngle)];
+
+        /// <summary>
+        /// The distinct bend group letters of <paramref name="bends"/> for a part placed at
+        /// <paramref name="partRotation"/>, in alphabetical order. Empty without bends.
+        /// </summary>
+        public static string GroupLetters(IEnumerable<Bend> bends, double partRotation, double grainAngle)
+        {
+            if (bends == null)
+                return string.Empty;
+
+            var letters = new SortedSet<char>();
+            foreach (var bend in bends)
+            {
+                if (bend == null || bend.Length <= Tolerance.Epsilon)
+                    continue;
+                letters.Add(GroupLetter(bend.LineAngle + partRotation, grainAngle));
+            }
+
+            return new string(letters.ToArray());
+        }
+
+        /// <summary>
+        /// The label text for a drawing placed at <paramref name="partRotation"/>: its name, then a
+        /// dash and its bend groups when it has bends, for example <c>1234-AB</c>. Characters the
+        /// stroke font lacks are dropped from the name. Empty when nothing is left to etch.
+        /// </summary>
+        public static string Text(Drawing drawing, double partRotation, double grainAngle)
+        {
+            if (drawing == null)
+                return string.Empty;
+
+            var name = new StringBuilder();
+            foreach (var character in drawing.Name ?? string.Empty)
+                if (StrokeFont.Has(character) && !char.IsWhiteSpace(character))
+                    name.Append(char.ToUpperInvariant(character));
+
+            var groups = GroupLetters(drawing.Bends, partRotation, grainAngle);
+            if (groups.Length == 0)
+                return name.ToString();
+
+            return name.Length == 0 ? groups : name + "-" + groups;
+        }
+
+        /// <summary>
+        /// The etch strokes of <paramref name="drawing"/>'s label for a part placed at
+        /// <paramref name="partRotation"/>, as polylines in the drawing's program frame turned with
+        /// the part (the frame <c>Part.Program</c> is in before it is located). Null when the drawing
+        /// has no valid box, no text, or the text cannot be shrunk to fit the box legibly.
+        /// </summary>
+        /// <remarks>
+        /// The text is centered in the box and reads along it. Its height is the box height, or
+        /// less when the text is longer than the box: it is shrunk to fit, to
+        /// <see cref="MinimumHeightShare"/> of the box height at the least.
+        /// </remarks>
+        public static List<List<Vector>> Strokes(Drawing drawing, double partRotation, double grainAngle)
+        {
+            var box = drawing?.LabelBox;
+            if (box == null || !box.IsValid || !double.IsFinite(partRotation) || !double.IsFinite(grainAngle))
+                return null;
+
+            var text = Text(drawing, partRotation, grainAngle);
+            if (text.Length == 0)
+                return null;
+
+            var height = box.Height;
+            var width = StrokeFont.Measure(text) * height;
+            if (width > box.Width)
+            {
+                height *= box.Width / width;
+                width = box.Width;
+            }
+
+            if (height < box.Height * MinimumHeightShare - Tolerance.Epsilon)
+                return null;
+
+            var offset = drawing.Source?.Offset ?? Vector.Zero;
+            var strokes = StrokeFont.Strokes(text, height);
+            foreach (var stroke in strokes)
+                for (var i = 0; i < stroke.Count; i++)
+                {
+                    var local = new Vector(stroke[i].X - width / 2, stroke[i].Y - height / 2);
+                    // The source frame loses the program's offset, then turns with the part, as bends do.
+                    var point = box.ToWorld(local) - offset;
+                    stroke[i] = partRotation == 0 ? point : point.Rotate(partRotation);
+                }
+
+            return strokes;
+        }
+
+        /// <summary>
+        /// Appends <paramref name="drawing"/>'s label to <paramref name="program"/> as scribe
+        /// (etch) moves, each stroke started by a rapid. Returns false and leaves the program
+        /// unchanged when <see cref="Strokes"/> has nothing to etch.
+        /// </summary>
+        public static bool AddTo(Program program, Drawing drawing, double partRotation, double grainAngle)
+        {
+            var strokes = Strokes(drawing, partRotation, grainAngle);
+            if (program == null || strokes == null || strokes.Count == 0)
+                return false;
+
+            foreach (var stroke in strokes)
+            {
+                if (stroke.Count < 2)
+                    continue;
+
+                program.Codes.Add(new RapidMove(stroke[0]));
+                for (var i = 1; i < stroke.Count; i++)
+                    program.Codes.Add(new LinearMove(stroke[i]) { Layer = LayerType.Scribe });
+            }
+
+            return true;
+        }
+    }
+}

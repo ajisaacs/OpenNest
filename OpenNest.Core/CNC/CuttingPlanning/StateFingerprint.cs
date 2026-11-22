@@ -97,6 +97,8 @@ internal static class StateFingerprint
             // Only when on, so fingerprints taken before the setting existed still match.
             if (p.SliceTippingSlugs)
                 text.Append("slugSlices;");
+            if (p.EtchPartLabels)
+                text.Append("partLabels;");
             Sequence(p.Sequencing);
             Assignment(p.Assignment);
             text.Append('}');

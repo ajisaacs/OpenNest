@@ -95,6 +95,7 @@ public static class CuttingParametersSerializer
             NoBedTabMaxWidth = parameters.TabSizeMaxWidth,
             TabHeldMaxLength = parameters.TabHeldMaxLength,
             SliceTippingSlugs = parameters.SliceTippingSlugs,
+            EtchPartLabels = parameters.EtchPartLabels,
             Sequencing = ToSequenceDto(parameters.Sequencing),
             Assignment = ToAssignmentDto(parameters.Assignment),
         };
@@ -133,6 +134,7 @@ public static class CuttingParametersSerializer
             TabSizeMaxWidth = dto.NoBedTabMaxWidth,
             TabHeldMaxLength = dto.TabHeldMaxLength,
             SliceTippingSlugs = dto.SliceTippingSlugs,
+            EtchPartLabels = dto.EtchPartLabels,
             Sequencing = FromSequenceDto(dto.Sequencing),
             Assignment = FromAssignmentDto(dto.Assignment),
         };

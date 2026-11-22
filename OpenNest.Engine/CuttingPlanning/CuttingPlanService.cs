@@ -7,6 +7,7 @@ using OpenNest.CNC.CuttingPlanning;
 using OpenNest.CutOffs;
 using OpenNest.Diagnostics;
 using OpenNest.Geometry;
+using OpenNest.Labels;
 using OpenNest.Support;
 
 namespace OpenNest.Engine.CuttingPlanning;
@@ -153,6 +154,11 @@ public static class CuttingPlanService
                             + ", or cut the plate's common lines twice.");
                     ownedClean = commonLines.Mark(source, ownedClean, source.Location, index);
                 }
+                // The label is etched, never material: clean bounds and lead material skip scribe
+                // moves, and the planner emits them like any other mark (docs/label-box.md).
+                else if (request.ConfirmedParameters?.EtchPartLabels == true)
+                    PartLabels.AddTo(ownedClean, source.BaseDrawing, source.Rotation,
+                        request.Plate?.GrainAngle ?? 0);
                 // Material extent only: remote rapids and scribe marks must not widen it, or a
                 // genuine insert could fail the containment prefilter.
                 var cleanBounds = NestedPartContainment.CleanBounds(ownedClean, source.Location, token);

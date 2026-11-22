@@ -33,6 +33,9 @@ public class ThicknessCuttingConfig
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     public bool SliceTippingSlugs { get; set; }
 
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool EtchPartLabels { get; set; }
+
     public double PierceClearance { get; set; } = 0.0625;
 
     /// <summary>The pierce zone's diameter; 0 turns it off.</summary>
