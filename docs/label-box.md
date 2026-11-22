@@ -63,7 +63,9 @@ plans from, so the label is emitted as scribe (etch) moves like any other mark: 
 counts in cut time, posts through the etch path and never enters nesting or collision geometry
 (marks are not material). Nothing changes while the option is off, and parts planned before it was
 turned on keep no label until planned again. The plan fingerprint records the mode, so changing it
-makes an earlier plan stale.
+makes an earlier plan stale. While labels are on, so does changing a drawing's name, label box,
+bends or source offset, or the plate's grain, between planning and Apply. Once applied, the etched
+label stays as planned until the plate is planned again.
 
 Settings saved before the mode existed held an on/off `etchPartLabels` value (in the nest's cutting
 parameters, the desktop settings and a machine thickness's cutting settings). It meant the full

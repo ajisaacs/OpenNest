@@ -35,7 +35,8 @@ public static class CuttingPlanService
             if (request?.Plate != null)
             {
                 // Exact freshness record first, on the caller thread; the planned list must be it.
-                plateState = PlateCuttingState.Capture(request.Plate, token);
+                plateState = PlateCuttingState.Capture(request.Plate, token,
+                    labels: request.ConfirmedParameters?.LabelMode is { } mode && mode != PartLabelMode.Off);
                 if (request.Parts == null || !request.Parts.SequenceEqual(plateState.Order, ReferenceEqualityComparer.Instance))
                     throw new ArgumentException("The plate's parts changed after the request was created.");
                 if (request.Parts.Count == 0 && request.ExpansionBudget > 0 && request.MaxEntries > 0)

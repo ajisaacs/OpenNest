@@ -15,6 +15,8 @@ namespace OpenNest.CNC.CuttingPlanning;
 /// part list instance and order, plate quantity/size/quadrant/settings, cutoff definitions, and
 /// each part's complete cutting state with owned copies of its placed and drawing programs,
 /// drawing cutoff classification, drawing pins and pins-off, and exact settings content.
+/// When labels are etched it also records what the label text and placement are made from:
+/// each drawing's name, label box, bends and source offset, and the plate's grain.
 /// A commit compares it with the live plate and refuses when anything differs.
 /// </summary>
 public sealed class PlateCuttingState
@@ -32,10 +34,14 @@ public sealed class PlateCuttingState
     private readonly ObservableList<CommonLineGroup> commonLineList;
     private readonly CommonLineRecord[] commonLines;
     private readonly bool cutCommonLinesTwice;
+    private readonly bool labels;
+    private readonly double grainAngle;
 
     private PlateCuttingState(Plate plate, PartRecord[] parts, CutOffRecord[] cutOffs,
-        Dictionary<Drawing, DrawingRecord> drawings, Dictionary<CuttingParameters, string> settings)
+        Dictionary<Drawing, DrawingRecord> drawings, Dictionary<CuttingParameters, string> settings, bool labels)
     {
+        this.labels = labels;
+        grainAngle = plate.GrainAngle;
         commonLineList = plate.CommonLines;
         commonLines = plate.CommonLines.Select(group => new CommonLineRecord(group, group.Kerf,
             group.Members.ToArray())).ToArray();
@@ -63,9 +69,11 @@ public sealed class PlateCuttingState
     /// Captures on the caller thread. Unsupported or malformed programs throw
     /// <see cref="ArgumentException"/> or <see cref="NotSupportedException"/>; so do part or
     /// plate settings that are not exact built-in settings types, whose state cannot be
-    /// captured exactly.
+    /// captured exactly. With <paramref name="labels"/> (the plan etches part labels) a later
+    /// change to a drawing's name, label box, bends or source offset, or to the plate's grain,
+    /// also makes the state stale, since the etched text and its placement come from them.
     /// </summary>
-    public static PlateCuttingState Capture(Plate plate, CancellationToken token = default)
+    public static PlateCuttingState Capture(Plate plate, CancellationToken token = default, bool labels = false)
     {
         ArgumentNullException.ThrowIfNull(plate);
         if (plate.Parts == null || plate.CutOffs == null)
@@ -83,7 +91,8 @@ public sealed class PlateCuttingState
             if (!drawings.ContainsKey(drawing))
                 drawings.Add(drawing, new(drawing.Program, drawing.Program == null ? null
                     : OwnedProgramCopy.Copy(drawing.Program, token), drawing.IsCutOff,
-                    drawing.CutPins, StateFingerprint.Of(drawing.CutPins)));
+                    drawing.CutPins, StateFingerprint.Of(drawing.CutPins),
+                    labels ? LabelInputs(drawing) : null));
             var state = part.CaptureCuttingState();
             Fingerprint(state.CuttingParameters);
             records.Add(new(part, state, OwnedProgramCopy.Copy(part.Program, token), BoxValues(state.BoundingBox),
@@ -93,7 +102,7 @@ public sealed class PlateCuttingState
             ? throw new ArgumentException("Plate contains a missing cutoff definition.")
             : new CutOffRecord(c, c.Drawing, c.Axis, c.Position, c.StartLimit, c.EndLimit, c.Gaps,
                 c.HeadLockOvercut, c.FarEdgeFirst)).ToArray();
-        return new(plate, records.ToArray(), cutOffs, drawings, settings);
+        return new(plate, records.ToArray(), cutOffs, drawings, settings, labels);
 
         void Fingerprint(CuttingParameters parameters)
         {
@@ -117,6 +126,9 @@ public sealed class PlateCuttingState
             return "Plate quantity, size or quadrant changed.";
         if (!ReferenceEquals(plate.CuttingParameters, plateSettings) || !SameSettings(plateSettings))
             return "Plate cutting settings changed.";
+        // The bend group letters of every etched label are read against the grain.
+        if (labels && !Bits(plate.GrainAngle, grainAngle))
+            return "Plate grain changed.";
         if (plate.Parts.Count != parts.Length)
             return "Parts were added or removed.";
         for (var i = 0; i < parts.Length; i++)
@@ -155,6 +167,8 @@ public sealed class PlateCuttingState
             if (!ReferenceEquals(part.BaseDrawing.CutPins, drawing.Pins)
                 || StateFingerprint.Of(drawing.Pins) != drawing.PinsFingerprint)
                 return $"Part {i + 1} drawing pins changed.";
+            if (labels && LabelInputs(part.BaseDrawing) != drawing.LabelInputs)
+                return $"Part {i + 1} drawing name, label box or bends changed.";
         }
         if (plate.CutOffs.Count != cutOffs.Length)
             return "Cutoffs were added or removed.";
@@ -216,6 +230,39 @@ public sealed class PlateCuttingState
         [BitConverter.DoubleToInt64Bits(box.X), BitConverter.DoubleToInt64Bits(box.Y),
          BitConverter.DoubleToInt64Bits(box.Width), BitConverter.DoubleToInt64Bits(box.Length)];
 
+    // Exact text of what a part label is made from (PartLabels.Strokes): the name, the box, the
+    // bends and the source offset, doubles by bit pattern.
+    private static string LabelInputs(Drawing drawing)
+    {
+        var text = new System.Text.StringBuilder();
+        text.Append(drawing.Name?.Length ?? -1).Append(':').Append(drawing.Name).Append(';');
+        var box = drawing.LabelBox;
+        if (box == null)
+            text.Append("nobox;");
+        else
+            Values(box.Center.X, box.Center.Y, box.Width, box.Height, box.Rotation);
+        var offset = drawing.Source?.Offset ?? Vector.Zero;
+        Values(offset.X, offset.Y);
+        if (drawing.Bends == null)
+            text.Append("nobends;");
+        else
+            foreach (var bend in drawing.Bends)
+            {
+                if (bend == null)
+                    text.Append("null;");
+                else
+                    Values(bend.StartPoint.X, bend.StartPoint.Y, bend.EndPoint.X, bend.EndPoint.Y);
+            }
+        return text.ToString();
+
+        void Values(params double[] values)
+        {
+            foreach (var value in values)
+                text.Append(BitConverter.DoubleToInt64Bits(value).ToString(System.Globalization.CultureInfo.InvariantCulture)).Append(',');
+            text.Append(';');
+        }
+    }
+
     private static bool Bits(double a, double b) =>
         BitConverter.DoubleToInt64Bits(a) == BitConverter.DoubleToInt64Bits(b);
 
@@ -226,7 +273,7 @@ public sealed class PlateCuttingState
         bool DrawingPinsOff);
 
     private sealed record DrawingRecord(Program Program, Program Copy, bool IsCutOff,
-        List<ContourCutPin> Pins, string PinsFingerprint);
+        List<ContourCutPin> Pins, string PinsFingerprint, string LabelInputs);
 
     private sealed record CommonLineRecord(CommonLineGroup Group, double Kerf, Part[] Members);
 

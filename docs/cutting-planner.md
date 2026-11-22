@@ -678,7 +678,9 @@ replans. Each plate is compared exactly with the state captured with its request
 part list instance and order, plate quantity/size/quadrant and settings, cutoff
 definitions, and for every part its program reference and exact content (an
 in-place edit counts), drawing program, cutoff classification and cut pins, pose bits,
-lead-in/lock/pins-off flags, settings (reference and exact content) and bounds. Any
+lead-in/lock/pins-off flags, settings (reference and exact content) and bounds. When the
+confirmed settings etch part labels, it also compares each drawing's name, label box, bends
+and source offset and the plate's grain, which the etched text is made from. Any
 difference on any plate returns `Stale` and changes nothing, so a proposal that
 changes a plate can be applied once; an unchanged (no-op) proposal stays current.
 A malformed live program is also `Stale`, not an exception. A part repeated on

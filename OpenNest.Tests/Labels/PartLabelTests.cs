@@ -334,6 +334,42 @@ public class PartLabelTests
         Assert.NotEqual(ScribeOf(a).Count, ScribeOf(b).Count);
     }
 
+    // The etched text and its place come from the drawing's name, box and bends and the plate's
+    // grain, so changing any of them after planning makes the plan stale, but only when labels are on.
+    [Theory]
+    [InlineData("name")]
+    [InlineData("box")]
+    [InlineData("boxInPlace")]
+    [InlineData("bends")]
+    [InlineData("bendInPlace")]
+    [InlineData("offset")]
+    [InlineData("grain")]
+    public void Apply_LabelInputChangedAfterPlanning_IsStaleOnlyWhenLabelsAreOn(string change)
+    {
+        foreach (var mode in new[] { PartLabelMode.PartNumberAndBendGroups, PartLabelMode.Off })
+        {
+            var drawing = Panel("7", BendAt(Quarter));
+            var (plate, _) = PlateOf(drawing, Parameters(mode));
+            var result = CuttingPlanService.Plan(CuttingPlanRequest.ForPlate(plate, Vector.Zero,
+                confirmedParameters: Parameters(mode)));
+            Assert.Equal(CuttingPlanStatus.Ready, result.Status);
+
+            switch (change)
+            {
+                case "name": drawing.Name = "8"; break;
+                case "box": drawing.LabelBox = new LabelBox(new Vector(6, 5), 3.5, 0.5, 0); break;
+                case "boxInPlace": drawing.LabelBox.Width = 3; break;
+                case "bends": drawing.Bends.Add(BendAt(0)); break;
+                case "bendInPlace": drawing.Bends[0].EndPoint = new Vector(6, 2); break;
+                case "offset": drawing.Source.Offset = new Vector(0.5, 0); break;
+                case "grain": plate.GrainAngle = Quarter; break;
+            }
+
+            Assert.Equal(mode == PartLabelMode.Off ? CuttingCommitStatus.Applied : CuttingCommitStatus.Stale,
+                CuttingPlanService.Apply([result]).Status);
+        }
+    }
+
     // ---- the option ----
 
     [Fact]
