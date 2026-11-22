@@ -528,8 +528,8 @@ namespace OpenNest.Controls
             }
         }
 
-        // Bend lines are coloured by how they run against the sheet's grain. Across the grain is
-        // the preferred direction, so it keeps the plain bend colour; the others stand out.
+        // Bend lines are colored by how they run against the sheet's grain. Across the grain is
+        // the preferred direction, so it keeps the plain bend color; the others stand out.
         private static readonly Color AcrossGrainBendColor = Color.Yellow;
         private static readonly Color WithGrainBendColor = Color.FromArgb(255, 140, 0);
         private static readonly Color OtherGrainBendColor = Color.DeepSkyBlue;
@@ -558,7 +558,7 @@ namespace OpenNest.Controls
 
             foreach (var bend in part.BaseDrawing.Bends)
             {
-                // Without a plate there is no grain to compare with: plain bend colour.
+                // Without a plate there is no grain to compare with: plain bend color.
                 var kind = plate == null
                     ? BendGrainKind.AcrossGrain
                     : BendGrain.Classify(bend, part.Rotation, plate.GrainAngle);

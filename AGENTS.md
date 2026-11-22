@@ -7,6 +7,7 @@ OpenNest is a .NET 8 Windows CNC-nesting application with cross-platform librari
 
 - Prefer Roslyn Bridge MCP for symbols, references and diagnostics when available; fall back to text search.
 - Use `var` for locals and namespaces matching project directories. Follow `.editorconfig`; format only changed C# files with `dotnet format OpenNest.sln --include <paths>`, then repeat with `--verify-no-changes`. On Linux, prefix both commands with `EnableWindowsTargeting=true`.
+- Spell identifiers, comments, docs and commit messages as the .NET framework does (American English: `color`, `behavior`, `center`), never `colour`, `behaviour` or `centre`.
 - Keep instructions concise: commands, boundaries and non-obvious safeguards, not class inventories or session history. Update affected instructions and user-facing docs with behavior/build changes; put detailed contracts in `docs/`. User guides and their screenshots live in the separate `ajisaacs/opennest-help` repo: update or recapture them when a UI change alters a documented screen, and never rename a `HelpTopics` ID.
 - Never commit design specs, implementation plans, progress notes or temporary benchmark reports. Keep working records under local, ignored `.hermes/plans/` or `.hermes/progress/`; retain reusable verification procedures in `docs/`.
 - Keep vendor manuals/full-text extracts out of source control unless redistribution is authorized. Write project-specific behavior summaries with citations, separating controller rules, machine macros and unconfirmed behavior.
