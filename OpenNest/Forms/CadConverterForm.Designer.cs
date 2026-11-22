@@ -34,6 +34,7 @@ namespace OpenNest.Forms
             btnSeparate = new System.Windows.Forms.Button();
             btnExport = new System.Windows.Forms.Button();
             btnHoleTable = new System.Windows.Forms.Button();
+            btnLabelBox = new System.Windows.Forms.Button();
             chkShowOriginal = new System.Windows.Forms.CheckBox();
             chkLabels = new System.Windows.Forms.CheckBox();
             lblDetect = new System.Windows.Forms.Label();
@@ -175,6 +176,7 @@ namespace OpenNest.Forms
             detailBar.Controls.Add(btnSimplify);
             detailBar.Controls.Add(btnExport);
             detailBar.Controls.Add(btnHoleTable);
+            detailBar.Controls.Add(btnLabelBox);
             detailBar.Controls.Add(chkShowOriginal);
             detailBar.Controls.Add(chkLabels);
             detailBar.Controls.Add(lblDetect);
@@ -317,6 +319,19 @@ namespace OpenNest.Forms
             btnHoleTable.TabIndex = 8;
             btnHoleTable.Text = "Holes...";
             btnHoleTable.Click += OnHoleTableClick;
+            // 
+            // btnLabelBox
+            // 
+            btnLabelBox.AutoSize = true;
+            btnLabelBox.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            btnLabelBox.Font = new System.Drawing.Font("Segoe UI", 9F);
+            btnLabelBox.Location = new System.Drawing.Point(600, 6);
+            btnLabelBox.Margin = new System.Windows.Forms.Padding(0, 0, 10, 0);
+            btnLabelBox.Name = "btnLabelBox";
+            btnLabelBox.Size = new System.Drawing.Size(86, 27);
+            btnLabelBox.TabIndex = 8;
+            btnLabelBox.Text = "Label Box...";
+            btnLabelBox.Click += OnLabelBoxClick;
             // 
             // chkShowOriginal
             // 
@@ -465,6 +480,7 @@ namespace OpenNest.Forms
         private System.Windows.Forms.Button btnSimplify;
         private System.Windows.Forms.Button btnExport;
         private System.Windows.Forms.Button btnHoleTable;
+        private System.Windows.Forms.Button btnLabelBox;
         private System.Windows.Forms.CheckBox chkShowOriginal;
         private System.Windows.Forms.CheckBox chkLabels;
         private System.Windows.Forms.ComboBox cboBendDetector;

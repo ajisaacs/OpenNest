@@ -505,6 +505,22 @@ namespace OpenNest.IO
             /// <summary>Dimension placements; values are measured when shown. Omitted when there are none.</summary>
             [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
             public List<DimensionDto> Dimensions { get; init; }
+
+            /// <summary>Where the part number label is etched, in the source frame. Omitted when none is set.</summary>
+            [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+            public LabelBoxDto LabelBox { get; init; }
+        }
+
+        public record LabelBoxDto
+        {
+            public double X { get; init; }
+            public double Y { get; init; }
+            public double Width { get; init; }
+            public double Height { get; init; }
+
+            /// <summary>Counterclockwise turn about the center in radians. Omitted when zero.</summary>
+            [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+            public double Rotation { get; init; }
         }
 
         public record DimensionDto

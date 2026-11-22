@@ -71,6 +71,7 @@ namespace OpenNest.Forms
             filterPanel.DimensionSelected += OnDimensionSelected;
             filterPanel.DimensionRemoved += OnDimensionRemoved;
             entityView1.DimensionDragged += OnDimensionDragged;
+            entityView1.LabelBoxChanged += OnLabelBoxChanged;
             entityView1.TextConvertRequested += OnTextConvertRequested;
             entityView1.EntityActionRequested += OnEntityActionRequested;
             btnSplit.Click += OnSplitClicked;
@@ -254,6 +255,7 @@ namespace OpenNest.Forms
             filterPanel.LoadItem(item.Entities, item.Bends);
             RefreshBreakoffs(item);
             RefreshTabbedCutouts(item);
+            RefreshLabelBox(item);
 
             numQuantity.Value = item.Quantity;
             txtCustomer.Text = item.Customer ?? "";
@@ -325,6 +327,7 @@ namespace OpenNest.Forms
             lblEntityCount.Text = "";
             entityView1.Entities.Clear();
             entityView1.DimensionLayouts = Array.Empty<DimensionLayout>();
+            RefreshLabelBox(null);
             entityView1.Invalidate();
             RefreshHoleTable();
             RefreshSeparable(null);
@@ -1440,6 +1443,7 @@ namespace OpenNest.Forms
                     Breakoffs = drawing.Breakoffs?.Select(b => b.Clone()).ToList() ?? new List<Breakoff>(),
                     TabbedCutouts = drawing.TabbedCutouts?.Select(c => c.Clone()).ToList() ?? new List<TabbedCutout>(),
                     Dimensions = drawing.Dimensions?.Select(d => d.Clone()).ToList() ?? new List<DrawingDimension>(),
+                    LabelBox = drawing.LabelBox?.Clone(),
                     SuppressedEntityIds =
                         drawing.SuppressedEntityIds.Count > 0
                             ? new HashSet<Guid>(drawing.SuppressedEntityIds)
@@ -1495,7 +1499,8 @@ namespace OpenNest.Forms
                     item.Breakoffs,
                     item.TabbedCutouts,
                     item.EntityRoles,
-                    item.Dimensions
+                    item.Dimensions,
+                    item.LabelBox
                 );
 
                 drawings.Add(drawing);
