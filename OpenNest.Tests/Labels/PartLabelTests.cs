@@ -249,6 +249,31 @@ public class PartLabelTests
         Assert.Equal(before, untouched.Codes.Count);
     }
 
+    // Imported drawings are incremental: each move is a step from the last, so the label's
+    // points must be written as steps from where the program stops, not as absolute points.
+    [Fact]
+    public void AddTo_InAnIncrementalProgram_EtchesTheSamePointsAsInAnAbsoluteOne()
+    {
+        var drawing = Panel("1234", BendAt(Quarter));
+        var absolute = (Program)drawing.Program.Clone();
+        var incremental = (Program)drawing.Program.Clone();
+        incremental.Mode = Mode.Incremental;
+        var before = absolute.Codes.Count;
+
+        Assert.True(PartLabels.AddTo(absolute, drawing, Quarter, 0));
+        Assert.True(PartLabels.AddTo(incremental, drawing, Quarter, 0));
+        incremental.Mode = Mode.Absolute;
+
+        var expected = absolute.Codes.Skip(before).OfType<Motion>().Select(m => m.EndPoint).ToList();
+        var actual = incremental.Codes.Skip(before).OfType<Motion>().Select(m => m.EndPoint).ToList();
+        Assert.Equal(expected.Count, actual.Count);
+        for (var i = 0; i < expected.Count; i++)
+        {
+            Assert.Equal(expected[i].X, actual[i].X, 9);
+            Assert.Equal(expected[i].Y, actual[i].Y, 9);
+        }
+    }
+
     // ---- Plan Cutting ----
 
     private static CuttingParameters Parameters(bool labels) =>
@@ -279,10 +304,14 @@ public class PartLabelTests
             .Where(m => !m.Rapid && m.Layer == LayerType.Scribe).ToList();
     }
 
-    [Fact]
-    public void PlanCutting_EtchesTheLabelInsideTheBoxOnTheSheet_WhenOn()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void PlanCutting_EtchesTheLabelInsideTheBoxOnTheSheet_WhenOn(bool incremental)
     {
         var drawing = Panel("1234", BendAt(0), BendAt(Quarter));
+        if (incremental)
+            drawing.Program.Mode = Mode.Incremental;
         var (plate, _) = PlateOf(drawing, Parameters(true));
 
         var result = CuttingPlanService.Plan(CuttingPlanRequest.ForPlate(plate, Vector.Zero,
@@ -494,5 +523,21 @@ public class PartLabelTests
             MachineCuttingDefaults.ToCuttingConfig(MachineCuttingDefaults.CuttingOf(old)), options);
         Assert.Contains("\"LabelMode\":\"PartNumberAndBendGroups\"", saved);
         Assert.DoesNotContain("EtchPartLabels", saved);
+    }
+
+    // The reader accepts numbers for the mode, so a hand-edited file can name one that does not exist.
+    [Fact]
+    public void ANumberNamingNoMode_LoadsAsOff_OrAsTheOldOptionWhenItIsSet()
+    {
+        var current = CuttingParametersSerializer.Serialize(Parameters(PartLabelMode.PartNumber));
+        var unknown = current.Replace("\"labelMode\":\"PartNumber\"", "\"labelMode\":7");
+        Assert.Equal(PartLabelMode.Off, CuttingParametersSerializer.Deserialize(unknown).LabelMode);
+        var numbered = current.Replace("\"labelMode\":\"PartNumber\"", "\"labelMode\":1");
+        Assert.Equal(PartLabelMode.PartNumber, CuttingParametersSerializer.Deserialize(numbered).LabelMode);
+        var withOld = current.Replace("\"labelMode\":\"PartNumber\"", "\"labelMode\":-1,\"etchPartLabels\":true");
+        Assert.Equal(PartLabelMode.PartNumberAndBendGroups, CuttingParametersSerializer.Deserialize(withOld).LabelMode);
+
+        var config = System.Text.Json.JsonSerializer.Deserialize<ThicknessCuttingConfig>("{\"LabelMode\":7}");
+        Assert.Equal(PartLabelMode.Off, MachineCuttingDefaults.CuttingOf(config).LabelMode);
     }
 }

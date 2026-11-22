@@ -422,7 +422,8 @@ namespace OpenNest.Controls
             tabOptions.Enabled = chkTabsEnabled.Checked;
             UpdateSupportTabOptions();
             chkSliceSlugs.Checked = p.SliceTippingSlugs;
-            cboLabelMode.SelectedIndex = (int)p.LabelMode;
+            // A mode the list does not offer (set in code; files load it as Off) shows as Off.
+            cboLabelMode.SelectedIndex = System.Enum.IsDefined(p.LabelMode) ? (int)p.LabelMode : (int)PartLabelMode.Off;
             nudPierceClearance.Value = Clamp(nudPierceClearance, p.PierceClearance);
             nudPierceDiameter.Value = Clamp(nudPierceDiameter, p.PierceDiameter);
             chkRoundLeadInAngles.Checked = p.RoundLeadInAngles;

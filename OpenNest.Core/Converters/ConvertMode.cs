@@ -63,6 +63,12 @@ namespace OpenNest.Converters
         }
 
         /// <summary>
+        /// Where the tool stands after running <paramref name="pgm"/> from its own origin, in
+        /// its own frame, whatever its mode; sub-program calls included.
+        /// </summary>
+        public static Vector EndPosition(Program pgm) => ComputeEndPosition(pgm, new Vector(0, 0));
+
+        /// <summary>
         /// Computes the tool position after executing <paramref name="pgm"/>,
         /// given that the program's frame origin is at <paramref name="startPos"/>
         /// in the caller's frame. Walks nested sub-program calls recursively.

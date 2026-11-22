@@ -126,6 +126,22 @@ public class ConvertedEtchMarkTests
         Assert.True(loaded.Plates[0].Parts.All(p => p.HasManualLeadIns));
     }
 
+    // A drawing with a label box gets its etched label from Plan Cutting at each plan; the label
+    // in its applied programs must not be taken back into the drawing as a mark.
+    [Fact]
+    public void DrawingWithALabelBoxIsLeftWithoutMarks()
+    {
+        var nest = ConvertedNest(Mode.Incremental);
+        nest.Drawings.Single().LabelBox = new OpenNest.Labels.LabelBox(new Vector(5, 5), 2, 0.5, 0);
+        var saved = nest.Plates[0].Parts.Take(2).Select(p => NestWriter.GetProgramText(p.Program)).ToArray();
+
+        var loaded = Read(Save(nest));
+
+        Assert.Equal(0, MarkMoves(loaded.Drawings.Single().Program));
+        Assert.Equal(saved[0], NestWriter.GetProgramText(loaded.Plates[0].Parts[0].Program));
+        Assert.Equal(saved[1], NestWriter.GetProgramText(loaded.Plates[0].Parts[1].Program));
+    }
+
     /// <summary>
     /// A converted nest: the drawing is material only, two placements keep the full PEP cutting
     /// program (etch line and etch circle) at different turns, and one placement is clean.

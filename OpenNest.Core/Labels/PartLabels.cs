@@ -4,6 +4,7 @@ using System.Text;
 using OpenNest.Bending;
 using OpenNest.CNC;
 using OpenNest.CNC.CuttingStrategy;
+using OpenNest.Converters;
 using OpenNest.Geometry;
 using OpenNest.Math;
 
@@ -144,6 +145,11 @@ namespace OpenNest.Labels
         /// (etch) moves, each stroke started by a rapid. Returns false and leaves the program
         /// unchanged when <see cref="Strokes"/> has nothing to etch.
         /// </summary>
+        /// <remarks>
+        /// The strokes are points in the program's frame. An incremental program (every imported
+        /// drawing's) takes each move as a step from the last, so the moves are written as steps
+        /// from where the program stops.
+        /// </remarks>
         public static bool AddTo(Program program, Drawing drawing, double partRotation, double grainAngle,
             PartLabelMode mode = PartLabelMode.PartNumberAndBendGroups)
         {
@@ -151,14 +157,25 @@ namespace OpenNest.Labels
             if (program == null || strokes == null || strokes.Count == 0)
                 return false;
 
+            var incremental = program.Mode == Mode.Incremental;
+            var position = incremental ? ConvertMode.EndPosition(program) : Vector.Zero;
+            Vector To(Vector point)
+            {
+                if (!incremental)
+                    return point;
+                var step = point - position;
+                position = point;
+                return step;
+            }
+
             foreach (var stroke in strokes)
             {
                 if (stroke.Count < 2)
                     continue;
 
-                program.Codes.Add(new RapidMove(stroke[0]));
+                program.Codes.Add(new RapidMove(To(stroke[0])));
                 for (var i = 1; i < stroke.Count; i++)
-                    program.Codes.Add(new LinearMove(stroke[i]) { Layer = LayerType.Scribe });
+                    program.Codes.Add(new LinearMove(To(stroke[i])) { Layer = LayerType.Scribe });
             }
 
             return true;

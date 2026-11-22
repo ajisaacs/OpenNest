@@ -80,6 +80,17 @@ public class CuttingPanelTests
     }
 
     [Fact]
+    public void LabelMode_ThatNamesNoChoice_ShowsAsOff()
+    {
+        StaTestThread.Run(() =>
+        {
+            using var panel = new CuttingPanel();
+            panel.LoadFromParameters(new CuttingParameters { LabelMode = (PartLabelMode)7 });
+            Assert.Equal(PartLabelMode.Off, panel.BuildParameters().LabelMode);
+        }, TimeSpan.FromSeconds(30), "The cutting panel did not load an unknown part label mode as Off.");
+    }
+
+    [Fact]
     public void TabEveryPart_LoadsAsTabsBySizeOverEveryWidth()
     {
         StaTestThread.Run(() =>

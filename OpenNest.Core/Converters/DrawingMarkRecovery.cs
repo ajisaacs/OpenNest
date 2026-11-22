@@ -19,7 +19,9 @@ public static class DrawingMarkRecovery
     /// For each drawing without etch marks whose saved placed programs all carry the same marks,
     /// adds those marks to the drawing in its own frame and refreshes the drawing's clean placed
     /// parts. Saved programs are never changed. Drawings whose saved programs disagree, or that
-    /// already have marks, are left alone. Returns the number of drawings that were given marks.
+    /// already have marks, are left alone. So are drawings with a label box: their placed programs
+    /// may carry the label Plan Cutting etches, which is made for each plan, not a mark the drawing
+    /// lost (docs/label-box.md). Returns the number of drawings that were given marks.
     /// </summary>
     public static int Apply(Nest nest)
     {
@@ -41,6 +43,9 @@ public static class DrawingMarkRecovery
     public static bool Apply(Drawing drawing, IReadOnlyList<Part> placedParts)
     {
         if (drawing?.Program == null || drawing.IsCutOff || placedParts == null)
+            return false;
+        // The planner's etched label is not a lost mark: recovering it would etch it twice.
+        if (drawing.LabelBox != null)
             return false;
         // An incremental call's end position is not tracked by Program.EndPoint, so only
         // flat drawings (which is what conversion produces) can be extended safely.

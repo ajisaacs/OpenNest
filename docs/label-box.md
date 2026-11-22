@@ -71,6 +71,7 @@ Settings saved before the mode existed held an on/off `etchPartLabels` value (in
 parameters, the desktop settings and a machine thickness's cutting settings). It meant the full
 label, so `true` loads as **Part number and bend groups** and `false` or a missing value as **Off**;
 the old key is read but never written again. When both keys are present, `labelMode` wins.
+A `labelMode` number that names no choice (the reader accepts numbers) loads as if it were absent.
 
 - **Text.** `PartLabels.Text` is the drawing name in capitals (characters the font lacks are
   dropped), then, in **Part number and bend groups** mode, a dash and the part's bend groups when it
@@ -91,6 +92,11 @@ the old key is read but never written again. When both keys are present, `labelM
   The text turns with the part, so it can read upside down or sideways on the sheet.
 - **Frames.** The box and the bends are in the source frame: the program's offset
   (`Drawing.Source.Offset`) comes off, then the part's rotation applies, as `BendToWorld` does.
+  Imported drawings are incremental programs, so the strokes are written as steps from where the
+  program stops, not as absolute points.
+- **Reopening.** The label lives only in the applied part programs. Loading a nest never takes it
+  back into the drawing as a lost etch mark (`DrawingMarkRecovery` skips drawings with a label box),
+  so it is not etched twice and turning the option off removes it at the next plan.
 - **What gets none.** A drawing with no box, parts whose cutting is locked or left out of the plan
   (the label is added only where Plan Cutting regenerates the program), and common-line members
   (their programs are rebuilt from their shared spans).

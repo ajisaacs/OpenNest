@@ -46,10 +46,13 @@ public class ThicknessCuttingConfig
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     public bool EtchPartLabels { get; set; }
 
-    /// <summary><see cref="LabelMode"/>, or the full label when only the old on/off option is set.</summary>
+    /// <summary>
+    /// <see cref="LabelMode"/>, or the full label when only the old on/off option is set. A number
+    /// that names no mode (the reader accepts numbers) loads as the old option, so as Off without it.
+    /// </summary>
     [JsonIgnore]
     public PartLabelMode ResolvedLabelMode =>
-        LabelMode != PartLabelMode.Off ? LabelMode
+        LabelMode != PartLabelMode.Off && System.Enum.IsDefined(LabelMode) ? LabelMode
         : EtchPartLabels ? PartLabelMode.PartNumberAndBendGroups
         : PartLabelMode.Off;
 
