@@ -70,7 +70,7 @@ public class CadConverterSeparateTests
             Assert.Equal("bauble", list.SelectedItem!.Name);
             Assert.Equal(new[] { excluded.Id }, list.SelectedItem.ExcludedEntityIds);
             Assert.Empty(list.Items.Single(i => i.Name == "parts").ExcludedEntityIds);
-            WaitFor(form.BodiesSearch);
+            WaitForParts(form);
             Assert.Equal(1, form.CurrentBodies!.Count);
         }));
 
@@ -94,7 +94,7 @@ public class CadConverterSeparateTests
             using var form = new CadConverterForm { DrawingUnits = Units.Millimeters };
             Show(form);
             form.AddFile(path);
-            WaitFor(form.BodiesSearch);
+            WaitForParts(form);
             if (svg == ThreeParts)
             {
                 Assert.Equal(4, form.CurrentBodies!.Count);
@@ -112,12 +112,21 @@ public class CadConverterSeparateTests
         }
     }
 
-    private static void WaitFor(Task task)
+    // Loading an item re-checks the filter lists, which posts a filter change that restarts the
+    // parts search; wait until the latest search has finished and no newer one has started.
+    private static void WaitForParts(CadConverterForm form)
     {
         var deadline = DateTime.UtcNow.AddSeconds(30);
-        while (!task.IsCompleted && DateTime.UtcNow < deadline)
+        while (DateTime.UtcNow < deadline)
+        {
+            var search = form.BodiesSearch;
+            while (!search.IsCompleted && DateTime.UtcNow < deadline)
+                Application.DoEvents();
             Application.DoEvents();
-        Assert.True(task.IsCompleted, "The parts search did not finish.");
+            if (search.IsCompleted && search == form.BodiesSearch)
+                return;
+        }
+        Assert.Fail("The parts search did not finish.");
     }
 
     private static T Field<T>(object owner, string name) =>
