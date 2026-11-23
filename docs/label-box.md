@@ -5,7 +5,10 @@ etched, found on flat material clear of everything else. The CAD Converter store
 placement; Plan Cutting etches the text when **Etch part label** is not Off (see
 [Etching the label](#etching-the-label)).
 
-In the CAD Converter, **Label Box...** (bottom bar) finds the best spot for the shown part.
+In the CAD Converter, **Label Box...** (bottom bar) finds the best spot for the shown part, for
+the largest text that fits: half inch text if the part has room for it, so the shop can read it
+from farther off, else three eighths, else a quarter inch (12, 9 or 6 mm). The box height is the
+text height, so a box can also be resized by hand to change it.
 The box is drawn as a dashed rectangle. Drag its body to move it, a corner to resize it
 (the opposite corner stays put) and the round handle above its top side to turn it about its
 center, in 5° steps or freely with Shift held. Once a box exists the button offers **Find Best
@@ -22,9 +25,9 @@ leaves it under half the box height, the box turns red, the shrunk text is drawn
 **Too small to etch** shows under it, because Plan Cutting would etch nothing there. To run the
 text up the part, turn the box first (**Rotate 90°**) and then resize it.
 
-When the label fits nowhere, the button still places a full-size box for hand placement and
-says so: centered on the roomiest flat spot a smaller label (three quarters, half, then a
-quarter of its size) fits clear of everything, at that spot's angle, or in the middle of the
+When even the quarter inch label fits nowhere, the button still places a quarter inch box for
+hand placement and says so: centered on the roomiest flat spot a smaller label (three quarters,
+half, then a quarter of its size) fits clear of everything, at that spot's angle, or in the middle of the
 part's bounds when even the smallest does not fit. The box may then overlap edges or bend
 lines until it is moved or resized.
 
@@ -38,10 +41,11 @@ nesting geometry, cut time or posts, and it does not appear in DXF, DWG or SVG e
   converter's entities. Null when none is set.
 - `LabelBoxFinder` (`OpenNest.Core/Labels`) is a pure, deterministic function of the part as
   it will be cut (visible, roles, breakoffs and tabbed cutouts applied, as the Dimensions
-  code reads it), its bends and a `LabelBoxOptions`. The converter uses
-  `LabelBoxOptions.Default(units)`: eight characters (room for a four-digit part number and two
-  circled bend group letters, `1234 AB`) of a quarter inch (6 mm) stroke font, an eighth inch
-  (3 mm) clear of anything else.
+  code reads it), its bends and a `LabelBoxOptions`. The converter tries
+  `LabelBoxOptions.Sizes(units)` largest first and keeps the first box found: eight characters
+  (room for a four-digit part number and two circled bend group letters, `1234 AB`) of a half
+  inch, three eighths and quarter inch (12, 9 and 6 mm) stroke font, each an eighth inch (3 mm)
+  clear of anything else. Boxes placed before keep their size until found again.
 - Material is what nesting reads (`NestingMaterial.ForNesting`, marks excluded), so a tabbed
   cutout's slug counts as part and etch, scribe and break cuts do not. The material is
   eroded by the clearance with the same Clipper inward offset the pierce search uses, a band

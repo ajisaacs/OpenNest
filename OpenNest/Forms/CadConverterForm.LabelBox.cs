@@ -55,8 +55,9 @@ namespace OpenNest.Forms
         private static readonly double[] FallbackLabelScales = { 0.75, 0.5, 0.25 };
 
         /// <summary>
-        /// Places the label box on the best flat area of the part as it will be cut. When the label
-        /// does not fit, a box is still placed for the user to adjust by hand: the full-size box
+        /// Places the label box on the best flat area of the part as it will be cut, at the largest
+        /// text size that fits (<see cref="LabelBoxOptions.Sizes"/>). When even the smallest label
+        /// does not fit, a box is still placed for the user to adjust by hand: the smallest-size box
         /// centered on the roomiest flat spot a smaller label fits, else on the middle of the part,
         /// and the user is told so.
         /// </summary>
@@ -70,9 +71,13 @@ namespace OpenNest.Forms
                 .Select(l => (System.Collections.Generic.IEnumerable<Geometry.Entity>)l.Scrap)
                 .ToList();
 
+            // The largest label size that fits; only when even the smallest does not is a box
+            // placed for hand adjustment, at that smallest size.
             var entities = DimensionedEntities(item);
-            var options = LabelBoxOptions.Default(DrawingUnits);
-            var box = LabelBoxFinder.Find(entities, item.Bends, options, scrap);
+            var sizes = LabelBoxOptions.Sizes(DrawingUnits);
+            var box = sizes.Select(size => LabelBoxFinder.Find(entities, item.Bends, size, scrap))
+                .FirstOrDefault(found => found != null);
+            var options = sizes[^1];
             if (box != null)
             {
                 item.LabelBox = box;

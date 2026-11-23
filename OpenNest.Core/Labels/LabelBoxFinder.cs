@@ -42,10 +42,21 @@ namespace OpenNest.Labels
                 Clearance = clearance,
             };
 
-        /// <summary>A quarter inch (6 mm) label of <see cref="DefaultCharacters"/> characters, an eighth inch (3 mm) from anything else.</summary>
-        public static LabelBoxOptions Default(Units units) => units == Units.Millimeters
-            ? ForText(DefaultCharacters, 6, 3)
-            : ForText(DefaultCharacters, 0.25, 0.125);
+        /// <summary>
+        /// The label sizes to try, largest first: <see cref="DefaultCharacters"/> characters of
+        /// half inch, three eighths and quarter inch text (12, 9 and 6 mm), each an eighth inch
+        /// (3 mm) from anything else. Big text reads from farther off; smaller parts take the
+        /// largest that fits.
+        /// </summary>
+        public static IReadOnlyList<LabelBoxOptions> Sizes(Units units) => units == Units.Millimeters
+            ? [ForText(DefaultCharacters, 12, 3), ForText(DefaultCharacters, 9, 3), ForText(DefaultCharacters, 6, 3)]
+            : [ForText(DefaultCharacters, 0.5, 0.125), ForText(DefaultCharacters, 0.375, 0.125), ForText(DefaultCharacters, 0.25, 0.125)];
+
+        /// <summary>The largest of <see cref="Sizes"/>: a half inch (12 mm) label.</summary>
+        public static LabelBoxOptions Default(Units units) => Sizes(units)[0];
+
+        /// <summary>The smallest of <see cref="Sizes"/>: a quarter inch (6 mm) label.</summary>
+        public static LabelBoxOptions Smallest(Units units) => Sizes(units)[^1];
     }
 
     /// <summary>

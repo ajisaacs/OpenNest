@@ -72,8 +72,28 @@ public class CadConverterLabelBoxTests
         form.Close();
     });
 
+    [Theory]
+    [InlineData(10, 6, 0.5)]
+    [InlineData(2.6, 0.7, 0.375)]
+    [InlineData(2.2, 0.6, 0.25)]
+    public void Finding_TakesTheLargestTextThatFits(double width, double height, double textHeight) =>
+        ArchUnitsTests.RunSta(() =>
+        {
+            // Half inch text needs about 3.25 x 0.75 of flat part, three eighths 2.5 x 0.625.
+            using var form = new LabelTestForm();
+            Show(form);
+            form.LoadDrawings([Part(width, height)]);
+            var item = Field<FileListControl>(form, "fileList").SelectedItem!;
+
+            Invoke(form, "OnLabelBoxClick", null, EventArgs.Empty);
+
+            Assert.Equal(textHeight, item.LabelBox!.Height, 6);
+            Assert.Empty(form.Messages);
+            form.Close();
+        });
+
     [Fact]
-    public void NoRoom_PlacesAFullSizeBoxOnTheRoomiestSpotToAdjustByHand() => ArchUnitsTests.RunSta(() =>
+    public void NoRoom_PlacesASmallestSizeBoxOnTheRoomiestSpotToAdjustByHand() => ArchUnitsTests.RunSta(() =>
     {
         using var form = new LabelTestForm();
         Show(form);
@@ -84,7 +104,7 @@ public class CadConverterLabelBoxTests
         Invoke(form, "OnLabelBoxClick", null, EventArgs.Empty);
 
         var box = item.LabelBox!;
-        var full = LabelBoxOptions.Default(Units.Inches);
+        var full = LabelBoxOptions.Smallest(Units.Inches);
         Assert.Equal(full.Width, box.Width, 6);
         Assert.Equal(full.Height, box.Height, 6);
         Assert.Equal(0.5, box.Center.X, 3);

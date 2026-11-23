@@ -229,6 +229,13 @@ public class LabelBoxFinderTests
         Assert.Equal(0.25, options.Height, 9);
         Assert.Equal(0.125, options.Clearance, 9);
         Assert.True(LabelBoxOptions.Default(Units.Millimeters).Height > LabelBoxOptions.Default(Units.Inches).Height);
+
+        var sizes = LabelBoxOptions.Sizes(Units.Inches);
+        Assert.Equal([0.5, 0.375, 0.25], sizes.Select(size => size.Height));
+        Assert.Equal(0.5, LabelBoxOptions.Default(Units.Inches).Height, 9);
+        Assert.Equal(0.25, LabelBoxOptions.Smallest(Units.Inches).Height, 9);
+        Assert.All(sizes, size => Assert.Equal(0.125, size.Clearance, 9));
+        Assert.Equal([12.0, 9, 6], LabelBoxOptions.Sizes(Units.Millimeters).Select(size => size.Height));
     }
 
     [Fact]
