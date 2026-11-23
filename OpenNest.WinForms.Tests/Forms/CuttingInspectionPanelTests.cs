@@ -976,6 +976,41 @@ public class CuttingInspectionPanelTests
     });
 
     [Fact]
+    public void LeadsAndTabsReplansOnlyWhenTheSettingsChange() => RunSta(() =>
+    {
+        using var editor = Editor();
+        editor.Show();
+        editor.PlateManager.LoadAt(0);
+        editor.OpenCuttingInspection();
+        var panel = editor.CuttingInspection!;
+        PumpUntil(() => panel.Proposal != null && !panel.IsPlanning);
+        var planned = panel.Proposal;
+        var settings = Field<Button>(panel, "settingsButton");
+
+        panel.ShowCuttingSettings = dialog => DialogResult.Cancel;
+        settings.PerformClick();
+        Assert.False(panel.IsPlanning);
+        Assert.Same(planned, panel.Proposal);
+
+        panel.ShowCuttingSettings = dialog => DialogResult.OK; // Unchanged.
+        settings.PerformClick();
+        Assert.False(panel.IsPlanning);
+        Assert.Same(planned, panel.Proposal);
+
+        panel.ShowCuttingSettings = dialog =>
+        {
+            var changed = dialog.GetParameters();
+            changed.SupportTabs = !changed.SupportTabs;
+            dialog.LoadParameters(changed);
+            return DialogResult.OK;
+        };
+        settings.PerformClick();
+        PumpUntil(() => panel.Proposal != null && !panel.IsPlanning);
+        Assert.NotSame(planned, panel.Proposal);
+        panel.RequestClose();
+    });
+
+    [Fact]
     public void CutOffSettingsOpensTheAutomaticCutOffDialogAndReplansWithItsChoice() => RunSta(() =>
     {
         var remembered = (System.Collections.IDictionary)typeof(CuttingInspectionPanel)
@@ -991,10 +1026,13 @@ public class CuttingInspectionPanelTests
             var panel = editor.CuttingInspection!;
             PumpUntil(() => panel.Proposal != null && !panel.IsPlanning);
             Assert.Equal(35, panel.CutOffOptions.Spacing);
+            var planned = panel.Proposal;
 
             panel.ShowCutOffSettings = form => DialogResult.Cancel;
             Field<Button>(panel, "cutOffSettingsButton").PerformClick();
-            PumpUntil(() => panel.Proposal != null && !panel.IsPlanning);
+            Assert.False(panel.IsPlanning); // Nothing was staged, so Cancel keeps the plan.
+            Assert.Same(planned, panel.Proposal);
+            Assert.True(Field<Button>(panel, "applyButton").Enabled);
             Assert.False(Field<CheckBox>(panel, "autoCutOffsCheckBox").Checked);
             Assert.Equal(35, panel.CutOffOptions.Spacing);
             Assert.Empty(plate.CutOffs);
@@ -1018,7 +1056,7 @@ public class CuttingInspectionPanelTests
             Assert.NotNull(shown);
             Assert.Equal((30.0, 10.0), (panel.CutOffOptions.Spacing, panel.CutOffOptions.MinimumTailLength));
             Assert.True(Field<CheckBox>(panel, "autoCutOffsCheckBox").Checked);
-            Assert.Contains("30 in strips", Field<CheckBox>(panel, "autoCutOffsCheckBox").Text);
+            Assert.Contains("30 in strips", Field<Label>(panel, "cutOffLabel").Text);
             Assert.NotNull(panel.StagedCutOffs);
             Assert.NotEmpty(plate.CutOffs);
             Assert.Equal(plate.CutOffs.Count, panel.Proposal.Plates[0].Result.ProposedOrder.Count(p => p.IsCutOff));

@@ -74,12 +74,12 @@ internal sealed class CuttingInspectionPanel : UserControl
         AccessibleName = "Cutting plan remedy or marker hint"
     };
     private readonly ToolTip toolTip = new();
-    private readonly Button settingsButton = new() { Text = "Cutting Settings…", AutoSize = true };
+    private readonly Button settingsButton = new() { Text = "Leads && Tabs…", AutoSize = true };
     private readonly Button applyButton = new() { Text = "Apply", AutoSize = true, Enabled = false };
     private readonly Button previousButton = new() { Text = "Previous", AutoSize = true };
     private readonly Button nextButton = new() { Text = "Next", AutoSize = true };
     private readonly CheckBox keepOrderCheckBox = new() { Text = "Keep current part order", AutoSize = true };
-    private readonly CheckBox autoCutOffsCheckBox = new() { AutoSize = true, MaximumSize = new Size(440, 0) };
+    private readonly CheckBox autoCutOffsCheckBox = new() { Text = "Add scrap cut-offs", AutoSize = true, Anchor = AnchorStyles.Left };
     private readonly StatusBanner existingWorkBanner = new() { Margin = new Padding(3, 3, 3, 8) };
     private readonly Label existingWorkLabel = new()
     {
@@ -96,7 +96,15 @@ internal sealed class CuttingInspectionPanel : UserControl
         BackColor = SystemColors.Control,
         UseVisualStyleBackColor = true
     };
-    private readonly Button cutOffSettingsButton = new() { Text = "Cut-off Settings…", AutoSize = true };
+    private readonly Button cutOffSettingsButton = new() { Text = "Strips…", AutoSize = true, Anchor = AnchorStyles.Left };
+    private readonly Label cutOffLabel = new()
+    {
+        AutoSize = true,
+        ForeColor = SystemColors.GrayText,
+        Anchor = AnchorStyles.Left,
+    };
+    private readonly GroupBox partCuttingGroup = SettingsGroup("Part cutting");
+    private readonly GroupBox cutOffGroup = SettingsGroup("Scrap cut-offs");
     private readonly Units units;
     private bool allPlates;
     private AutomaticCutOffOptions cutOffOptions;
@@ -167,6 +175,10 @@ internal sealed class CuttingInspectionPanel : UserControl
         var header = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, FlowDirection = FlowDirection.TopDown, WrapContents = false };
         var settingsRow = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Margin = Padding.Empty };
         settingsRow.Controls.AddRange([settingsButton, settingsLabel]);
+        var partCuttingContent = GroupContent();
+        partCuttingContent.FlowDirection = FlowDirection.TopDown;
+        partCuttingContent.Controls.AddRange([settingsRow, keepOrderCheckBox]);
+        partCuttingGroup.Controls.Add(partCuttingContent);
         var buttons = new FlowLayoutPanel { AutoSize = true, Margin = new Padding(0, 6, 0, 0) };
         buttons.Controls.AddRange([planButton, applyButton, cancelButton]);
         var navigation = new FlowLayoutPanel { AutoSize = true, Margin = Padding.Empty };
@@ -189,18 +201,13 @@ internal sealed class CuttingInspectionPanel : UserControl
         units = editor.Nest.Units;
         cutOffOptions = lastCutOffOptions.TryGetValue(units, out var last) ? Copy(last) : DefaultCutOffOptions(units);
         ShowCutOffOptions();
-        var cutOffRow = new FlowLayoutPanel
-        {
-            AutoSize = true,
-            FlowDirection = FlowDirection.TopDown,
-            WrapContents = false,
-            Margin = Padding.Empty
-        };
-        cutOffRow.Controls.AddRange([autoCutOffsCheckBox, cutOffSettingsButton]);
+        var cutOffContent = GroupContent();
+        cutOffContent.Controls.AddRange([autoCutOffsCheckBox, cutOffSettingsButton, cutOffLabel]);
+        cutOffGroup.Controls.Add(cutOffContent);
         existingWorkLabel.Font = new Font(Font, FontStyle.Bold);
         existingWorkBanner.Controls.AddRange([existingWorkLabel, clearExistingButton]);
         existingWorkBanner.SetTone(Tone.Bad);
-        header.Controls.AddRange([modeSelector, scopeSelector, existingWorkBanner, settingsRow, keepOrderCheckBox, cutOffRow,
+        header.Controls.AddRange([modeSelector, scopeSelector, existingWorkBanner, partCuttingGroup, cutOffGroup,
             validationScopeLabel, buttons, acceptWarningsCheckBox, navigation, previewLabel, detailLabel]);
         statusBanner.Controls.Add(statusLabel);
         var layout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3 };
@@ -304,6 +311,9 @@ internal sealed class CuttingInspectionPanel : UserControl
 
     internal AutomaticCutOffOptions CutOffOptions => Copy(cutOffOptions);
 
+    /// <summary>Shows the Leads &amp; Tabs dialog; tests replace it. Null uses ShowDialog.</summary>
+    internal Func<CuttingParametersDialog, DialogResult> ShowCuttingSettings { get; set; }
+
     private static AutomaticCutOffOptions Copy(AutomaticCutOffOptions options) => new()
     {
         Spacing = options.Spacing,
@@ -312,18 +322,38 @@ internal sealed class CuttingInspectionPanel : UserControl
         KeepHorizontalRemnant = options.KeepHorizontalRemnant,
     };
 
+    // A titled box around one set of planning options, so each settings button sits under its name.
+    private static GroupBox SettingsGroup(string title) => new()
+    {
+        Text = title,
+        AutoSize = true,
+        AutoSizeMode = AutoSizeMode.GrowAndShrink,
+        MinimumSize = new Size(440, 0),
+        Padding = new Padding(6, 3, 6, 3),
+        Margin = new Padding(3, 3, 3, 6),
+    };
+
+    private static FlowLayoutPanel GroupContent() => new()
+    {
+        Dock = DockStyle.Fill,
+        AutoSize = true,
+        WrapContents = false,
+        Margin = Padding.Empty,
+    };
+
     private void ShowCutOffOptions()
     {
         var unit = UnitsHelper.GetShortString(units);
-        autoCutOffsCheckBox.Text = $"Add scrap cut-offs ({cutOffOptions.Spacing:0.###} {unit} strips)";
-        toolTip.SetToolTip(autoCutOffsCheckBox, $"Keeps tails of {cutOffOptions.MinimumTailLength:0.###} {unit} or more. "
+        cutOffLabel.Text = $"{cutOffOptions.Spacing:0.###} {unit} strips";
+        toolTip.SetToolTip(autoCutOffsCheckBox, $"Cuts the scrap into {cutOffOptions.Spacing:0.###} {unit} strips. Keeps tails of {cutOffOptions.MinimumTailLength:0.###} {unit} or more. "
             + "The cut-offs are added for planning and removed again unless you Apply.");
     }
 
     /// <summary>
     /// Opens the Automatic Scrap Cut-offs dialog in settings mode for this panel's scope. Unapplied
     /// cut-offs come off first so its preview starts from the plates' real state; OK ticks the box
-    /// and replans with the chosen settings, Cancel replans with the previous ones.
+    /// and replans with the chosen settings. Cancel keeps the current plan when nothing had to come
+    /// off for the dialog; otherwise it replans with the previous settings.
     /// </summary>
     private void EditCutOffSettings()
     {
@@ -343,17 +373,27 @@ internal sealed class CuttingInspectionPanel : UserControl
                 inspection.RequestClose();
             return;
         }
-        ClearResult();
-        try
+        // With nothing staged the dialog sees the plates as planned, so the plan only hides behind it.
+        var keepPlan = stagedCutOffs == null && Proposal != null && !invalidated;
+        if (keepPlan)
         {
-            RevertStagedCutOffs();
+            view.ClearProposalDisplay();
+            view.ClearValidationFinding();
         }
-        catch (Exception ex)
+        else
         {
-            SetStatus(Tone.Bad, "Couldn't remove the unapplied cut-offs.", ex.Message);
-            return;
+            ClearResult();
+            try
+            {
+                RevertStagedCutOffs();
+            }
+            catch (Exception ex)
+            {
+                SetStatus(Tone.Bad, "Couldn't remove the unapplied cut-offs.", ex.Message);
+                return;
+            }
+            RefreshExistingWork();
         }
-        RefreshExistingWork();
         AutomaticCutOffOptions chosen = null;
         try
         {
@@ -373,6 +413,13 @@ internal sealed class CuttingInspectionPanel : UserControl
         }
         if (closed || closeRequested)
             return;
+        if (chosen == null && keepPlan)
+        {
+            ShowPlate(selectedPlate);
+            return;
+        }
+        if (keepPlan)
+            ClearResult();
         if (chosen != null)
         {
             cutOffOptions = Copy(chosen);
@@ -423,8 +470,7 @@ internal sealed class CuttingInspectionPanel : UserControl
         modeSelector.SelectedIndex = (int)Mode;
         ShowScope(planning);
         configuringMode = false;
-        settingsButton.Visible = settingsLabel.Visible = keepOrderCheckBox.Visible = applyButton.Visible = planning;
-        autoCutOffsCheckBox.Visible = cutOffSettingsButton.Visible = planning;
+        partCuttingGroup.Visible = cutOffGroup.Visible = applyButton.Visible = planning;
         RefreshExistingWork();
         previousButton.Visible = nextButton.Visible = planning && plates.Length > 1;
         previewLabel.Visible = planning;
@@ -956,7 +1002,7 @@ internal sealed class CuttingInspectionPanel : UserControl
         if (plate.Overlap is { } overlap && overlap.Pairs.Count > 0)
             return "Move the overlapping parts apart, then Replan.";
         if (!plate.IsRouteReady && plate.Result.Findings.Any(f => f.Kind == PostVerificationKind.MissingLeadIn))
-            return "In Cutting Settings, choose a lead-in with a nonzero length (or unlock the part), then Replan.";
+            return "In Leads & Tabs, choose a lead-in with a nonzero length (or unlock the part), then Replan.";
         if (plate.SearchLimitReached)
             return "Raise Cut planning effort in Tools > Options to search further, then Replan; it may still find no plan.";
         return null;
@@ -1269,8 +1315,12 @@ internal sealed class CuttingInspectionPanel : UserControl
             Source = MachineSettings.DescribeCuttingSource(editor.Nest),
         };
         dialog.LoadParameters(parameters);
-        if (dialog.ShowDialog(this) != DialogResult.OK || closed || closeRequested) return;
-        parameters = dialog.GetParameters();
+        if ((ShowCuttingSettings?.Invoke(dialog) ?? dialog.ShowDialog(this)) != DialogResult.OK || closed || closeRequested)
+            return;
+        var edited = dialog.GetParameters();
+        if (CuttingParametersSerializer.Serialize(edited) == CuttingParametersSerializer.Serialize(parameters))
+            return; // OK with nothing changed keeps the current plan.
+        parameters = edited;
         // Saved now, not only on Apply: a plate that will not plan must not lose the edit.
         editor.SaveCuttingParameters(parameters);
         ShowSettings();

@@ -739,8 +739,12 @@ The former standalone planning dialog is retired; only the docked Plan/Validate
 panel is wired in the editor. Non-editor callers still use the shared analyzer.
 
 - The panel starts from the plate's cutting settings (or the last-used settings) and plans
-  at once. `Cutting Settings...` edits them and `Keep the current part order` fixes the
-  whole-part order; either change replans. The settings are confirmed parameters: every
+  at once. Its options sit in two titled groups so the two settings buttons are not
+  confused: **Part cutting** holds `Leads & Tabs...` (the Cutting Parameters dialog) with a
+  summary beside it, and **Scrap cut-offs** holds the cut-off box and `Strips...`.
+  `Leads & Tabs...` edits them and `Keep the current part order` fixes the
+  whole-part order; either change replans. Canceling the dialog, or OK with nothing
+  changed, keeps the current plan. The settings are confirmed parameters: every
   unlocked part's lead-ins are regenerated. Locked parts keep their exact programs; their
   own violations are fixed-lead warnings on an UNVERIFIED plate (see
   [fixed emissions](#fixed-emissions-warn)), and any warnings require explicit review below.
@@ -766,9 +770,11 @@ panel is wired in the editor. Non-editor callers still use the shared analyzer.
   restores the earlier cut-offs and sequence. The proposal preview draws planned cut-offs
   with the same orange-red dashed line as the editor. A blocked cut-off plan adds nothing and
   plans nothing; the panel names the plate and reason.
-  `Cut-off Settings...` opens the Automatic Scrap Cut-offs dialog in settings mode for
+  `Strips...` opens the Automatic Scrap Cut-offs dialog in settings mode for
   the same scope: it previews on the active plate as usual, but `Use These Settings`
-  only returns the values (it adds nothing), ticks the box and replans. The panel
+  only returns the values (it adds nothing), ticks the box and replans. Cancel keeps the
+  current plan when the box is clear; with the box ticked the staged cut-offs had to come
+  off for the dialog, so Cancel stages them again and replans. The panel
   remembers the last settings per unit system until the application closes. Cut-off
   order follows the dependency rules above: crossing cut-offs before the parts they
   pass through, sheet-separating cut-offs last.

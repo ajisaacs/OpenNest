@@ -188,7 +188,7 @@ public class CuttingPlanMessageTests
         Assert.Contains(CuttingPlanProposal.SearchLimitHint, text);
         Assert.Contains("it may still find no plan", CuttingPlanProposal.SearchLimitHint);
         Assert.True(proposal.Plates[0].SearchLimitReached);
-        Assert.DoesNotContain("Open Cutting Settings...", text);
+        Assert.DoesNotContain("Open Leads & Tabs...", text);
         Assert.DoesNotContain("missing or zero-length lead-in", text);
         Assert.False(proposal.CanApply);
     }

@@ -10,7 +10,7 @@ namespace OpenNest.Controls
 {
     /// <summary>
     /// Edits one contour type's lead-in and lead-out: a type list for each, the chosen type's
-    /// fields below it, and a <see cref="LeadPreview"/> filling the rest. Cutting Settings and
+    /// fields below it, and a <see cref="LeadPreview"/> filling the rest. The Cutting Parameters dialog and
     /// Machine Configuration both use it; the options hide what a host cannot hold.
     /// </summary>
     public class LeadsEditor : UserControl

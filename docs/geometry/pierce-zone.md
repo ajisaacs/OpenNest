@@ -1,7 +1,7 @@
 # Pierce zones
 
 On thick plate, a laser or plasma pierce blows a crater wider than the kerf. Set
-`CuttingParameters.PierceDiameter` (Cutting Settings, **Pierce Diameter**) to the crater's
+`CuttingParameters.PierceDiameter` (Leads & Tabs, **Pierce Diameter**) to the crater's
 diameter for that machine, material and thickness. 0, the default, turns the zone off, and
 lead generation, planning and posting then behave exactly as before.
 

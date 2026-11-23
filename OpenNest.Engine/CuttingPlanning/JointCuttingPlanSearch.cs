@@ -1430,7 +1430,7 @@ internal static class JointCuttingPlanSearch
                 && reportedNoFit.Add(source.SourceOrdinal * 1000 + contour))
                 rejected.Add(Finding(source, null,
                     $"No tested lead-in fits on cutting contour {contour + 1}: {selection.Reason} "
-                    + "Try reducing the lead-in length in Cutting Settings...; if nearby parts obstruct the lead-in, "
+                    + "Try reducing the lead-in length in Leads & Tabs...; if nearby parts obstruct the lead-in, "
                     + "space the parts farther apart." + PierceZoneHint()
                     + (scrapReason == null ? "" : $" A pierce in open scrap was also tried: {scrapReason}")
                     + (erodedReason == null ? "" : $" A pierce found by eroding the cutout was also tried: {erodedReason}")

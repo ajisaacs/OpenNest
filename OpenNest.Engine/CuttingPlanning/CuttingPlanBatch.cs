@@ -484,7 +484,7 @@ public sealed class CuttingPlanProposal
     /// <summary>Operator-facing summary: one overall line, then each plate and its findings.</summary>
     /// <param name="changeSettings">How this front end changes the settings, completed by
     /// "a lead-in type other than None..." in the missing lead-in advice.</param>
-    public IReadOnlyList<string> Describe(string unit, string changeSettings = "Open Cutting Settings... and select")
+    public IReadOnlyList<string> Describe(string unit, string changeSettings = "Open Leads & Tabs... and select")
     {
         var lines = new List<string>();
         var blocked = Plates.Count(p => !p.CanApplyWithWarnings);
