@@ -85,7 +85,6 @@ namespace OpenNest.CNC.CuttingStrategy
 
             var result = new Program(Mode.Absolute);
 
-            EmitScribeContours(result, scribeEntities);
             EmitBreakCuts(result, breakCuts, BreakCutContours(profile));
 
             foreach (var entry in cutoutEntries)
@@ -109,6 +108,7 @@ namespace OpenNest.CNC.CuttingStrategy
                     ContourType.External
                 );
 
+            PrependScribeContours(result, scribeEntities);
             result.Mode = Mode.Incremental;
 
             return new CuttingResult { Program = result, LastCutPoint = perimeterPt };
@@ -141,7 +141,6 @@ namespace OpenNest.CNC.CuttingStrategy
 
             var result = new Program(Mode.Absolute);
 
-            EmitScribeContours(result, scribeEntities);
             EmitBreakCuts(result, breakCuts, BreakCutContours(profile));
 
             // Find the target shape that contains the clicked entity
@@ -184,6 +183,7 @@ namespace OpenNest.CNC.CuttingStrategy
                 EmitRawContour(result, profile.Perimeter);
             }
 
+            PrependScribeContours(result, scribeEntities);
             result.Mode = Mode.Incremental;
 
             return new CuttingResult { Program = result, LastCutPoint = point };
@@ -271,7 +271,6 @@ namespace OpenNest.CNC.CuttingStrategy
             CuttingPlanning.CommonLinePerimeter commonLine = null, IReadOnlyList<Support.SlugSlice> slugSlices = null)
         {
             var result = new Program(Mode.Absolute);
-            EmitScribeContours(result, scribes);
             EmitBreakCuts(result, breakCuts, shapes);
             EmitSlugSlices(result, slugSlices);
             foreach (var cutout in tabbedCutouts ?? Array.Empty<Shape>())
@@ -284,6 +283,7 @@ namespace OpenNest.CNC.CuttingStrategy
                 var start = GetShapeStartPoint(displayTail);
                 DisplayPerimeterTail.Append(result, ConvertShapeToMoves(displayTail, start, LayerType.DisplayPerimeter), start);
             }
+            PrependScribeContours(result, scribes);
             result.Mode = Mode.Incremental;
             return result;
         }
@@ -298,9 +298,9 @@ namespace OpenNest.CNC.CuttingStrategy
             int? perimeterOrdinal = null, CuttingPlanning.CommonLinePerimeter commonLine = null)
         {
             var result = new Program(Mode.Absolute);
-            EmitScribeContours(result, scribes);
             EmitChosenContours(result, shapes, new[] { choice }, contourParameters, perimeterOrdinal ?? shapes.Length - 1,
                 commonLine);
+            PrependScribeContours(result, scribes);
             result.Mode = Mode.Incremental;
             return result;
         }
@@ -648,18 +648,136 @@ namespace OpenNest.CNC.CuttingStrategy
                 ? winding == RotationType.CW ? RotationType.CCW : RotationType.CW
                 : winding;
 
-        private void EmitScribeContours(Program program, List<Entity> scribeEntities)
+        // Scribes are etched before any cut. They are put in front of an absolute program
+        // already holding the cuts, so their tour can end near where the first cut starts.
+        private void PrependScribeContours(Program program, List<Entity> scribeEntities)
         {
-            if (scribeEntities.Count == 0)
+            if (scribeEntities == null || scribeEntities.Count == 0)
                 return;
 
-            var shapes = ShapeBuilder.GetShapes(scribeEntities);
-            foreach (var shape in shapes)
+            var marks = new Program(Mode.Absolute);
+            foreach (var shape in SequenceScribes(ShapeBuilder.GetShapes(scribeEntities), FirstArrival(program)))
             {
                 var startPt = GetShapeStartPoint(shape);
-                program.Codes.Add(new RapidMove(startPt));
-                program.Codes.AddRange(ConvertShapeToMoves(shape, startPt, LayerType.Scribe));
+                marks.Codes.Add(new RapidMove(startPt));
+                marks.Codes.AddRange(ConvertShapeToMoves(shape, startPt, LayerType.Scribe));
             }
+            program.Codes.InsertRange(0, marks.Codes);
+        }
+
+        // Where the head first goes in an absolute program: its first rapid's end, or the first
+        // move of a hole cut as a sub-program at its offset. Null when the program starts otherwise.
+        private static Vector? FirstArrival(Program program)
+        {
+            foreach (var code in program.Codes)
+            {
+                if (code is RapidMove rapid)
+                    return rapid.EndPoint;
+                if (code is SubProgramCall call)
+                    return call.Program?.Codes.FirstOrDefault() is Motion first && call.Rotation == 0
+                        ? call.Offset + first.EndPoint
+                        : call.Offset;
+                if (code is Motion)
+                    return null;
+            }
+            return null;
+        }
+
+        // Past this many marks the start search (quadratic per start) is skipped and the
+        // nearest-neighbor tour starts from the first mark.
+        private const int ScribeStartSearchLimit = 200;
+
+        /// <summary>
+        /// Orders a part's scribe marks to shorten the rapids between them, and from the last of
+        /// them to <paramref name="next"/> (where the first cut starts) when it is known: a
+        /// nearest-neighbor tour, tried from every mark and either end of it, keeping the
+        /// shortest. An open mark
+        /// may be etched from either end; a closed one starts where it was drawn. Ties keep the
+        /// drawn order, so the result is deterministic. Reversed marks are copies, never the
+        /// caller's entities.
+        /// </summary>
+        internal static List<Shape> SequenceScribes(IReadOnlyList<Shape> shapes, Vector? next = null)
+        {
+            var count = shapes.Count;
+            if (count == 0)
+                return new List<Shape>();
+
+            var starts = new Vector[count];
+            var ends = new Vector[count];
+            var open = new bool[count];
+            for (var i = 0; i < count; i++)
+            {
+                starts[i] = GetShapeStartPoint(shapes[i]);
+                ends[i] = GetShapeEndPoint(shapes[i]);
+                open[i] = starts[i].DistanceTo(ends[i]) > Tolerance.Epsilon;
+            }
+
+            (List<(int Index, bool Reversed)> Tour, double Travel) Tour(int first, bool firstReversed)
+            {
+                var used = new bool[count];
+                var tour = new List<(int, bool)>(count) { (first, firstReversed) };
+                used[first] = true;
+                var position = firstReversed ? starts[first] : ends[first];
+                var travel = 0.0;
+                for (var step = 1; step < count; step++)
+                {
+                    var best = -1;
+                    var bestReversed = false;
+                    var bestDistance = double.MaxValue;
+                    for (var i = 0; i < count; i++)
+                    {
+                        if (used[i])
+                            continue;
+                        var forward = position.DistanceTo(starts[i]);
+                        if (forward < bestDistance)
+                        {
+                            best = i;
+                            bestReversed = false;
+                            bestDistance = forward;
+                        }
+                        if (!open[i])
+                            continue;
+                        var backward = position.DistanceTo(ends[i]);
+                        if (backward < bestDistance)
+                        {
+                            best = i;
+                            bestReversed = true;
+                            bestDistance = backward;
+                        }
+                    }
+                    used[best] = true;
+                    tour.Add((best, bestReversed));
+                    travel += bestDistance;
+                    position = bestReversed ? starts[best] : ends[best];
+                }
+                if (next is { } target)
+                    travel += position.DistanceTo(target);
+                return (tour, travel);
+            }
+
+            var bestTour = Tour(0, false);
+            if (count <= ScribeStartSearchLimit)
+                for (var first = 0; first < count; first++)
+                    for (var reversed = 0; reversed < (open[first] ? 2 : 1); reversed++)
+                    {
+                        var candidate = Tour(first, reversed == 1);
+                        if (candidate.Travel < bestTour.Travel - Tolerance.Epsilon)
+                            bestTour = candidate;
+                    }
+
+            var ordered = new List<Shape>(count);
+            foreach (var (index, reversed) in bestTour.Tour)
+            {
+                if (!reversed)
+                {
+                    ordered.Add(shapes[index]);
+                    continue;
+                }
+                var copy = (Shape)shapes[index].Clone();
+                copy.Reverse();
+                ordered.Add(copy);
+            }
+            return ordered;
         }
 
         private List<Shape> SequenceCutouts(List<Shape> cutouts, Vector startPoint)
@@ -1875,6 +1993,16 @@ namespace OpenNest.CNC.CuttingStrategy
             if (first is Circle circle)
                 return new Vector(circle.Center.X + circle.Radius, circle.Center.Y);
             return Vector.Zero;
+        }
+
+        private static Vector GetShapeEndPoint(Shape shape)
+        {
+            var last = shape.Entities[shape.Entities.Count - 1];
+            if (last is Line line)
+                return line.EndPoint;
+            if (last is Arc arc)
+                return arc.EndPoint();
+            return GetShapeStartPoint(shape);
         }
     }
 }

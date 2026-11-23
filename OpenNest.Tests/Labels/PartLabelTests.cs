@@ -49,9 +49,9 @@ public class PartLabelTests
         public double Top => Bottom + Height;
     }
 
-    private static Bounds BoundsOf(IEnumerable<List<Vector>> strokes)
+    private static Bounds BoundsOf(IEnumerable<Stroke> strokes)
     {
-        var points = strokes.SelectMany(s => s).ToList();
+        var points = strokes.SelectMany(s => s.Points()).ToList();
         var minX = points.Min(p => p.X);
         var minY = points.Min(p => p.Y);
         return new Bounds(minX, minY, points.Max(p => p.X) - minX, points.Max(p => p.Y) - minY);
@@ -67,12 +67,32 @@ public class PartLabelTests
             Assert.True(StrokeFont.Has(character), character.ToString());
             var strokes = StrokeFont.Strokes(character.ToString(), 1);
             Assert.NotEmpty(strokes);
-            Assert.All(strokes, s => Assert.True(s.Count >= 2));
+            Assert.All(strokes, s => Assert.NotEmpty(s.Segments));
             var bounds = BoundsOf(strokes);
             Assert.InRange(bounds.Left, -1e-9, StrokeFont.GlyphWidth + 1e-9);
             Assert.InRange(bounds.Right, -1e-9, StrokeFont.GlyphWidth + 1e-9);
             Assert.InRange(bounds.Bottom, -1e-9, 1 + 1e-9);
             Assert.InRange(bounds.Top, -1e-9, 1 + 1e-9);
+        }
+    }
+
+    [Fact]
+    public void Font_DrawsTheRoundDigitsWithArcs_AndEachStrokeIsContinuous()
+    {
+        foreach (var character in "0235689")
+            Assert.Contains(StrokeFont.Strokes(character.ToString(), 1), s => s.Segments.Any(g => g.IsArc));
+        Assert.DoesNotContain(StrokeFont.Strokes("147", 1), s => s.Segments.Any(g => g.IsArc));
+
+        // Every arc keeps its radius from start to end, so its move stays on its circle.
+        foreach (var stroke in StrokeFont.Strokes("0123456789", 1))
+        {
+            var position = stroke.Start;
+            foreach (var segment in stroke.Segments)
+            {
+                if (segment.IsArc)
+                    Assert.Equal(segment.Center.DistanceTo(position), segment.Center.DistanceTo(segment.End), 9);
+                position = segment.End;
+            }
         }
     }
 
@@ -241,7 +261,9 @@ public class PartLabelTests
         var added = program.Codes.Skip(before).ToList();
         Assert.IsType<RapidMove>(added[0]);
         Assert.All(added.OfType<LinearMove>(), move => Assert.Equal(LayerType.Scribe, move.Layer));
-        Assert.True(added.OfType<LinearMove>().Count() > 10);
+        Assert.All(added.OfType<ArcMove>(), move => Assert.Equal(LayerType.Scribe, move.Layer));
+        Assert.True(added.OfType<LinearMove>().Count() > 5);
+        Assert.NotEmpty(added.OfType<ArcMove>());
 
         var untouched = (Program)drawing.Program.Clone();
         drawing.LabelBox = null;
@@ -264,8 +286,10 @@ public class PartLabelTests
         Assert.True(PartLabels.AddTo(incremental, drawing, Quarter, 0));
         incremental.Mode = Mode.Absolute;
 
-        var expected = absolute.Codes.Skip(before).OfType<Motion>().Select(m => m.EndPoint).ToList();
-        var actual = incremental.Codes.Skip(before).OfType<Motion>().Select(m => m.EndPoint).ToList();
+        var expected = absolute.Codes.Skip(before).OfType<Motion>().Select(m => m.EndPoint)
+            .Concat(absolute.Codes.Skip(before).OfType<ArcMove>().Select(m => m.CenterPoint)).ToList();
+        var actual = incremental.Codes.Skip(before).OfType<Motion>().Select(m => m.EndPoint)
+            .Concat(incremental.Codes.Skip(before).OfType<ArcMove>().Select(m => m.CenterPoint)).ToList();
         Assert.Equal(expected.Count, actual.Count);
         for (var i = 0; i < expected.Count; i++)
         {

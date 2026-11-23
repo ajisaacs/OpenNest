@@ -92,15 +92,20 @@ A `labelMode` number that names no choice (the reader accepts numbers) loads as 
   rotated on the sheet, which is why the text is made when cutting is planned, not stored with the
   box.
 - **Font.** `StrokeFont` is a small built-in single-stroke font (digits, capitals, `- _ . /`), so
-  the label needs no font file. The CHR reader (`ChrFont`) loads vendor fonts from disk and is not
-  used.
+  the label needs no font file. Strokes are lines and arcs: the round digits (0, 2, 3, 5, 6, 8, 9)
+  are drawn on arcs and etch as arc moves; the zero keeps its slash so it never reads as the letter
+  O. The CHR reader (`ChrFont`) loads vendor fonts from disk and is not used.
 - **Fit.** The text is centered in the box and reads along it at the box's height. A name longer
   than the box is shrunk to fit, to half the box height at the least; a longer one is not etched.
   The text turns with the part, so it can read upside down or sideways on the sheet.
 - **Frames.** The box and the bends are in the source frame: the program's offset
   (`Drawing.Source.Offset`) comes off, then the part's rotation applies, as `BendToWorld` does.
-  Imported drawings are incremental programs, so the strokes are written as steps from where the
-  program stops, not as absolute points.
+  Imported drawings are incremental programs, so the strokes (and arc centers) are written as steps
+  from where the program stops, not as absolute points.
+- **Etch order.** A part's marks (label strokes and bend etches alike) are etched before its cuts in
+  one short tour: tried from every mark, each open mark from either end, ending as near as it can
+  to where the part's first cut starts. Bend etches on one side of a part are done together before
+  the head crosses to the other side (`ContourCuttingStrategy.SequenceScribes`).
 - **Reopening.** The label lives only in the applied part programs. Loading a nest never takes it
   back into the drawing as a lost etch mark (`DrawingMarkRecovery` skips drawings with a label box),
   so it is not etched twice and turning the option off removes it at the next plan.

@@ -96,7 +96,7 @@ namespace OpenNest.Labels
 
         /// <summary>
         /// The etch strokes of <paramref name="drawing"/>'s label for a part placed at
-        /// <paramref name="partRotation"/>, as polylines in the drawing's program frame turned with
+        /// <paramref name="partRotation"/>, as paths of lines and arcs in the drawing's program frame turned with
         /// the part (the frame <c>Part.Program</c> is in before it is located). Null when the drawing
         /// has no valid box, no text, or the text cannot be shrunk to fit the box legibly.
         /// </summary>
@@ -105,7 +105,7 @@ namespace OpenNest.Labels
         /// less when the text is longer than the box: it is shrunk to fit, to
         /// <see cref="MinimumHeightShare"/> of the box height at the least.
         /// </remarks>
-        public static List<List<Vector>> Strokes(Drawing drawing, double partRotation, double grainAngle,
+        public static List<Stroke> Strokes(Drawing drawing, double partRotation, double grainAngle,
             PartLabelMode mode = PartLabelMode.PartNumberAndBendGroups)
         {
             var box = drawing?.LabelBox;
@@ -128,15 +128,12 @@ namespace OpenNest.Labels
                 return null;
 
             var offset = drawing.Source?.Offset ?? Vector.Zero;
-            var strokes = StrokeFont.Strokes(text, height);
-            foreach (var stroke in strokes)
-                for (var i = 0; i < stroke.Count; i++)
-                {
-                    var local = new Vector(stroke[i].X - width / 2, stroke[i].Y - height / 2);
-                    // The source frame loses the program's offset, then turns with the part, as bends do.
-                    var point = box.ToWorld(local) - offset;
-                    stroke[i] = partRotation == 0 ? point : point.Rotate(partRotation);
-                }
+            // The source frame loses the program's offset, then turns with the part, as bends do.
+            var strokes = StrokeFont.Strokes(text, height).ConvertAll(stroke => stroke.Map(point =>
+            {
+                var world = box.ToWorld(new Vector(point.X - width / 2, point.Y - height / 2)) - offset;
+                return partRotation == 0 ? world : world.Rotate(partRotation);
+            }));
 
             return strokes;
         }
@@ -148,8 +145,8 @@ namespace OpenNest.Labels
         /// </summary>
         /// <remarks>
         /// The strokes are points in the program's frame. An incremental program (every imported
-        /// drawing's) takes each move as a step from the last, so the moves are written as steps
-        /// from where the program stops.
+        /// drawing's) takes each move, and each arc's center, as a step from where the move starts,
+        /// so the moves are written as steps from where the program stops.
         /// </remarks>
         public static bool AddTo(Program program, Drawing drawing, double partRotation, double grainAngle,
             PartLabelMode mode = PartLabelMode.PartNumberAndBendGroups)
@@ -171,12 +168,23 @@ namespace OpenNest.Labels
 
             foreach (var stroke in strokes)
             {
-                if (stroke.Count < 2)
+                if (stroke.Segments.Count == 0)
                     continue;
 
-                program.Codes.Add(new RapidMove(To(stroke[0])));
-                for (var i = 1; i < stroke.Count; i++)
-                    program.Codes.Add(new LinearMove(To(stroke[i])) { Layer = LayerType.Scribe });
+                program.Codes.Add(new RapidMove(To(stroke.Start)));
+                foreach (var segment in stroke.Segments)
+                {
+                    if (!segment.IsArc)
+                    {
+                        program.Codes.Add(new LinearMove(To(segment.End)) { Layer = LayerType.Scribe });
+                        continue;
+                    }
+                    // An incremental arc's center is a step from where the arc starts, as its end is.
+                    var center = incremental ? segment.Center - position : segment.Center;
+                    program.Codes.Add(new ArcMove(To(segment.End), center,
+                        segment.Clockwise ? RotationType.CW : RotationType.CCW)
+                    { Layer = LayerType.Scribe });
+                }
             }
 
             return true;
