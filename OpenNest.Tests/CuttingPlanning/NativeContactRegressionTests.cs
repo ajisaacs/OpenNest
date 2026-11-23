@@ -8,8 +8,11 @@ namespace OpenNest.Tests.CuttingPlanning;
 
 public class NativeContactRegressionTests
 {
+    // The lead arc's circle and the obstacle's are externally tangent at the witness. Their
+    // supporting-circle query once gave NaN there, which native arc filters would have dropped as
+    // no contact; it now gives the tangent point, so the lead is refused on the contact itself.
     [Fact]
-    public void TangentArcLead_RefusesFilteredSupportingCircleNaNs()
+    public void TangentArcLead_RefusesTheTangentContact()
     {
         var target = LeadMaterialSnapshot.Capture(LeadPathValidationTests.Rectangle(0, -1, 1, 1), Vector.Zero);
         var obstacle = new Program();
@@ -27,7 +30,7 @@ public class NativeContactRegressionTests
         Assert.True(execution.Motions[1].Curve.Contains(witness));
         Assert.True(material.Rings[0][0].Contains(witness));
         var result = LeadPathValidator.Check(execution, target, [material]);
-        Assert.False(result.IsComplete);
+        Assert.True(result.IsComplete);
         Assert.False(result.IsClear);
     }
 

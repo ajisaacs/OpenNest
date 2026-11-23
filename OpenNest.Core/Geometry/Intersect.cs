@@ -156,7 +156,9 @@ namespace OpenNest.Geometry
                     - circle2.Radius * circle2.Radius
                     + distance * distance
                 ) / (2.0 * distance);
-            var h = System.Math.Sqrt(circle1.Radius * circle1.Radius - a * a);
+            // The checks above make r^2 - a^2 nonnegative in exact arithmetic. For tangent circles
+            // roundoff can leave it a hair below zero: that is the tangent point, not NaN.
+            var h = System.Math.Sqrt(System.Math.Max(circle1.Radius * circle1.Radius - a * a, 0));
 
             var pt = new Vector(
                 circle1.Center.X + (a * d.X) / distance,
