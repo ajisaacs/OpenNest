@@ -10,6 +10,9 @@ namespace OpenNest.WinForms.Tests.Forms;
 /// programmer goes on, removes them (one undoable edit) or cancels; a ledger that cannot be
 /// read never blocks.
 /// </summary>
+// Undo reads Application.OpenForms for the busy guard, so it must not overlap fill-lifetime
+// tests that transiently open NestProgressForm.
+[Collection("Fill operation lifetime")]
 public class LedgerCodeRecheckTests
 {
     [Fact]
