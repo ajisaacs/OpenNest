@@ -42,6 +42,26 @@ namespace OpenNest.Labels
 
         public LabelBox Clone() => new(Center, Width, Height, Rotation);
 
+        /// <summary>
+        /// The same box turned by <paramref name="rotation"/> instead, kept readable: a half turn
+        /// covers the same rectangle, so text is never turned past a quarter (upside down).
+        /// </summary>
+        public LabelBox WithRotation(double rotation) => new(Center, Width, Height, ReadableRotation(rotation));
+
+        /// <summary>
+        /// <paramref name="rotation"/> brought into (-π/2, π/2] by half turns, so text along it reads
+        /// left to right or bottom to top; a nonfinite value is returned as is.
+        /// </summary>
+        public static double ReadableRotation(double rotation)
+        {
+            if (!double.IsFinite(rotation))
+                return rotation;
+            var turned = System.Math.IEEERemainder(rotation, System.Math.PI);
+            if (turned <= -Angle.HalfPI + Tolerance.Epsilon)
+                turned += System.Math.PI;
+            return System.Math.Abs(turned) < Tolerance.Epsilon ? 0 : turned;
+        }
+
         /// <summary>The corners counterclockwise from the text's lower left.</summary>
         public Vector[] Corners()
         {

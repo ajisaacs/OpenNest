@@ -6,10 +6,18 @@ placement; Plan Cutting etches the text when **Etch part label** is not Off (see
 [Etching the label](#etching-the-label)).
 
 In the CAD Converter, **Label Box...** (bottom bar) finds the best spot for the shown part.
-The box is drawn as a dashed rectangle. Drag its body to move it and a corner to resize it
-(the opposite corner stays put); the box keeps its angle. Once a box exists the button
-offers **Find Best Location** again and **Remove**. When nothing fits, the button says so and
-leaves any existing box alone.
+The box is drawn as a dashed rectangle. Drag its body to move it, a corner to resize it
+(the opposite corner stays put) and the round handle above its top side to turn it about its
+center, in 5° steps or freely with Shift held. Once a box exists the button offers **Find Best
+Location** again, **Rotate 90°**, **Make Horizontal** and **Remove**. However it is turned, the
+angle is kept within a quarter turn either way of horizontal, so the text never reads upside
+down (a half turn covers the same rectangle).
+
+When the label fits nowhere, the button still places a full-size box for hand placement and
+says so: centered on the roomiest flat spot a smaller label (three quarters, half, then a
+quarter of its size) fits clear of everything, at that spot's angle, or in the middle of the
+part's bounds when even the smallest does not fit. The box may then overlap edges or bend
+lines until it is moved or resized.
 
 ## Contract
 
