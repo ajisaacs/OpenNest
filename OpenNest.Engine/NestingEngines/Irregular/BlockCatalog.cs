@@ -43,6 +43,9 @@ internal sealed class BlockCatalog : IDisposable
     /// <summary>Margin for Fill's boundary rounding in a <see cref="Footprint"/>.</summary>
     private const double FillRoundingMargin = 0.001;
 
+    /// <summary>Relative slack on a rectangle's area capacity, for Fill's boundary rounding.</summary>
+    private const double CapacitySlack = 0.01;
+
     /// <summary>Decimals a certified pose's position is rounded to.</summary>
     private const int PositionDecimals = 8;
 
@@ -66,6 +69,9 @@ internal sealed class BlockCatalog : IDisposable
     private readonly Dictionary<int, List<Orientation>> orientations = new();
 
     private readonly Dictionary<int, Footprint> footprints = new();
+
+    /// <summary>Per type, its material area (holes excluded), which no two copies can share.</summary>
+    private readonly Dictionary<int, double> materialAreas = new();
 
     /// <summary>Per type, the blocks <see cref="Get"/> has prepared.</summary>
     private readonly Dictionary<int, int> preparations = new();
@@ -196,6 +202,9 @@ internal sealed class BlockCatalog : IDisposable
             orientations[type.Index] = WithPairOrientations(type, pairs);
             if (type.Orientations.Count > 0)
                 footprints[type.Index] = Footprint.Of(type.Orientations[0]);
+            if (JobPartGeometry.TryRead(type.Part.Geometry)?.MaterialArea is double area && area > 0
+                && double.IsFinite(area))
+                materialAreas[type.Index] = area;
         }
     }
 
@@ -207,6 +216,24 @@ internal sealed class BlockCatalog : IDisposable
         if (pairs.TryGetValue(type.Index, out var found))
             poses.AddRange(found.SelectMany(p => new[] { p.A, p.B }));
         return poses.Distinct().ToList();
+    }
+
+    /// <summary>
+    /// The request for up to <paramref name="quantity"/> copies in the rectangle, the copies held to
+    /// as many as the rectangle's area could hold of the type's material. A Fill stops at the copies
+    /// asked only when it could place more, so asking for more than can fit proposes the same
+    /// pattern; capped, one pattern serves every sheet that wants at least that many, rather than
+    /// a new Fill, charged by the square of the copies, for each remaining demand.
+    /// </summary>
+    private Request RequestFor(PartType type, int quantity, Box rectangle)
+    {
+        if (materialAreas.TryGetValue(type.Index, out var area) && rectangle.Length > 0 && rectangle.Width > 0)
+        {
+            var capacity = rectangle.Area() * (1 + CapacitySlack) / area + 1;
+            if (capacity < quantity)
+                quantity = (int)capacity;
+        }
+        return new Request(type, quantity, rectangle);
     }
 
     /// <summary>Blocks prepared so far, over all types.</summary>
@@ -253,7 +280,7 @@ internal sealed class BlockCatalog : IDisposable
     public IReadOnlyList<Placed> Get(PartType type, int quantity, Box rectangle, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
-        var request = new Request(type, quantity, rectangle);
+        var request = RequestFor(type, quantity, rectangle);
         if (request.IsEmpty)
             return Array.Empty<Placed>();
         var key = request.Key;
@@ -323,7 +350,7 @@ internal sealed class BlockCatalog : IDisposable
         Drawing? prefetch = null)
     {
         token.ThrowIfCancellationRequested();
-        var request = new Request(type, quantity, rectangle);
+        var request = RequestFor(type, quantity, rectangle);
         if (request.IsEmpty)
             return Array.Empty<Placed>();
         var entry = BandFor(request, token, prefetch);
@@ -356,7 +383,7 @@ internal sealed class BlockCatalog : IDisposable
     public double RejectedBandLength(PartType type, int quantity, Box rectangle)
     {
         lock (bands)
-            return bands.TryGetValue(new Request(type, quantity, rectangle).Key, out var entry) ? entry.Rejected : 0;
+            return bands.TryGetValue(RequestFor(type, quantity, rectangle).Key, out var entry) ? entry.Rejected : 0;
     }
 
     /// <summary>The band's entry, its pattern proposed here when the catalog has none; charges

@@ -44,6 +44,26 @@ public class IrregularBlockTests
         Assert.Same(block, catalog.Get(types[0], 7, new Box(0, 0, 60, 40), CancellationToken.None));
     }
 
+    [Fact]
+    public void DemandBeyondTheRectanglesCapacityReusesOneFill()
+    {
+        // A 20 x 20 box holds at most 400 / 39 copies of the ell's material, so wanting 40 or 60
+        // asks for the same Fill: one preparation, charged as for the capped copies.
+        var job = Job(new[] { Part("ell", LShape(9, 7, 3), 60, RotationPolicy.Automatic) },
+            new[] { Stock("sheet", 40, 60, spacing: 0.25) });
+        var types = PartCatalog.Build(job);
+        var counter = new WorkCounter();
+        using var catalog = new BlockCatalog(0.25, types, NoPairs, counter, long.MaxValue);
+        var box = new Box(0, 0, 20, 20);
+        var block = catalog.Get(types[0], 60, box, CancellationToken.None);
+        var charged = counter.Value;
+        Assert.NotEmpty(block);
+        Assert.Same(block, catalog.Get(types[0], 40, box, CancellationToken.None));
+        Assert.Equal(1, catalog.PreparationCount);
+        Assert.Equal(charged, counter.Value);
+        Assert.True(charged < 60L * 60 * types[0].Orientations[0].Outline.Count);
+    }
+
     [Theory]
     [InlineData(0)]
     [InlineData(2.1)]
@@ -115,9 +135,10 @@ public class IrregularBlockTests
         using var blocks = new BlockCatalog(0.25, types, NoPairs, counter, long.MaxValue);
         var strip = new Box(0, 0, 200, 2.5);
         Assert.Empty(blocks.Get(types[0], 20, strip, CancellationToken.None));
-        // Counted and charged as the Fill would have been, so later decisions do not change.
+        // Counted and charged as the Fill would have been, so later decisions do not change: for
+        // the 13 copies the strip's 500 square inches could hold of the ell's 39, not all 20.
         Assert.Equal(1, blocks.PreparationCount);
-        Assert.Equal(20L * 20 * types[0].Orientations[0].Outline.Count, counter.Value);
+        Assert.Equal(13L * 13 * types[0].Orientations[0].Outline.Count, counter.Value);
         Assert.Empty(blocks.Band(types[0], 20, strip, CancellationToken.None));
     }
 
