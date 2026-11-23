@@ -76,8 +76,9 @@ internal sealed class CuttingInspectionPanel : UserControl
     private readonly ToolTip toolTip = new();
     private readonly Button settingsButton = new() { Text = "Leads && Tabs…", AutoSize = true };
     private readonly Button applyButton = new() { Text = "Apply", AutoSize = true, Enabled = false };
-    private readonly Button previousButton = new() { Text = "Previous", AutoSize = true };
-    private readonly Button nextButton = new() { Text = "Next", AutoSize = true };
+    // Pager arrows on the plate result line, so they read as moving between plates, not acting on the plan.
+    private readonly Button previousButton = PagerButton("◀", "Previous plate");
+    private readonly Button nextButton = PagerButton("▶", "Next plate");
     private readonly CheckBox keepOrderCheckBox = new() { Text = "Keep current part order", AutoSize = true };
     private readonly CheckBox autoCutOffsCheckBox = new() { Text = "Add scrap cut-offs", AutoSize = true, Anchor = AnchorStyles.Left };
     private readonly StatusBanner existingWorkBanner = new() { Margin = new Padding(3, 3, 3, 8) };
@@ -123,7 +124,7 @@ internal sealed class CuttingInspectionPanel : UserControl
         ForeColor = SystemColors.GrayText,
         Anchor = AnchorStyles.Left,
     };
-    private readonly Label previewLabel = new() { AutoSize = true, MaximumSize = new Size(440, 0) };
+    private readonly Label previewLabel = new() { AutoSize = true, MaximumSize = new Size(370, 0), Margin = new Padding(3, 5, 3, 0) };
     private readonly Label validationScopeLabel = new()
     {
         AutoSize = true,
@@ -179,10 +180,25 @@ internal sealed class CuttingInspectionPanel : UserControl
         partCuttingContent.FlowDirection = FlowDirection.TopDown;
         partCuttingContent.Controls.AddRange([settingsRow, keepOrderCheckBox]);
         partCuttingGroup.Controls.Add(partCuttingContent);
-        var buttons = new FlowLayoutPanel { AutoSize = true, Margin = new Padding(0, 6, 0, 0) };
-        buttons.Controls.AddRange([planButton, applyButton, cancelButton]);
-        var navigation = new FlowLayoutPanel { AutoSize = true, Margin = Padding.Empty };
-        navigation.Controls.AddRange([previousButton, nextButton]);
+        // Replan reruns the chosen scope, so it sits beside the scope selector.
+        var scopeRow = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Margin = Padding.Empty };
+        scopeRow.Controls.AddRange([scopeSelector, planButton]);
+        planButton.Margin = new Padding(3, 2, 3, 3);
+        var navigation = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Margin = new Padding(0, 6, 0, 0) };
+        navigation.Controls.AddRange([previousButton, nextButton, previewLabel]);
+        // Commit actions live in a footer at the bottom-right, the same place however tall the grid grows.
+        var footer = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            AutoSize = true,
+            FlowDirection = FlowDirection.RightToLeft,
+            WrapContents = false,
+            Margin = new Padding(0, 8, 0, 0)
+        };
+        acceptWarningsCheckBox.Margin = new Padding(3, 7, 6, 3);
+        footer.Controls.AddRange([cancelButton, applyButton, acceptWarningsCheckBox]);
+        applyButton.Font = new Font(Font, FontStyle.Bold);
+        applyButton.MinimumSize = cancelButton.MinimumSize = new Size(80, 0);
         statusLabel.Font = new Font(Font.FontFamily, Font.Size + 1, FontStyle.Bold);
         toolTip.SetToolTip(acceptWarningsCheckBox, "Some checks did not pass. Posting still runs its own checks and asks separately.");
         toolTip.SetToolTip(keepOrderCheckBox, "Plan lead-ins and cut direction without changing which part is cut first.");
@@ -207,13 +223,14 @@ internal sealed class CuttingInspectionPanel : UserControl
         existingWorkLabel.Font = new Font(Font, FontStyle.Bold);
         existingWorkBanner.Controls.AddRange([existingWorkLabel, clearExistingButton]);
         existingWorkBanner.SetTone(Tone.Bad);
-        header.Controls.AddRange([modeSelector, scopeSelector, existingWorkBanner, partCuttingGroup, cutOffGroup,
-            validationScopeLabel, buttons, acceptWarningsCheckBox, navigation, previewLabel, detailLabel]);
+        header.Controls.AddRange([modeSelector, scopeRow, existingWorkBanner, partCuttingGroup, cutOffGroup,
+            validationScopeLabel, navigation, detailLabel]);
         statusBanner.Controls.Add(statusLabel);
-        var layout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3 };
+        var layout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 4 };
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         layout.Controls.Add(statusBanner, 0, 0);
         layout.Controls.Add(header, 0, 1);
         var issuesTab = new TabPage("Issues");
@@ -222,6 +239,9 @@ internal sealed class CuttingInspectionPanel : UserControl
         partsTab.Controls.Add(partsGrid);
         resultTabs.TabPages.AddRange([issuesTab, partsTab]);
         layout.Controls.Add(resultTabs, 0, 2);
+        layout.Controls.Add(footer, 0, 3);
+        toolTip.SetToolTip(previousButton, previousButton.AccessibleName);
+        toolTip.SetToolTip(nextButton, nextButton.AccessibleName);
         Controls.Add(layout);
         foreach (var name in new[] { "Plate", "Part", "With", "Issue" })
             warningGrid.Columns.Add(new DataGridViewTextBoxColumn
@@ -331,6 +351,14 @@ internal sealed class CuttingInspectionPanel : UserControl
         MinimumSize = new Size(440, 0),
         Padding = new Padding(6, 3, 6, 3),
         Margin = new Padding(3, 3, 3, 6),
+    };
+
+    private static Button PagerButton(string arrow, string name) => new()
+    {
+        Text = arrow,
+        AccessibleName = name,
+        Size = new Size(28, 23),
+        Margin = new Padding(0, 0, 3, 0),
     };
 
     private static FlowLayoutPanel GroupContent() => new()
