@@ -17,21 +17,7 @@ namespace OpenNest.Geometry
                 return false;
             }
 
-            pts = pts.Where(pt =>
-                    Angle.IsBetweenRad(
-                        arc1.Center.AngleTo(pt),
-                        arc1.StartAngle,
-                        arc1.EndAngle,
-                        arc1.IsReversed
-                    )
-                    && Angle.IsBetweenRad(
-                        arc2.Center.AngleTo(pt),
-                        arc2.StartAngle,
-                        arc2.EndAngle,
-                        arc2.IsReversed
-                    )
-                )
-                .ToList();
+            pts = pts.Where(pt => OnArc(arc1, pt) && OnArc(arc2, pt)).ToList();
 
             return pts.Count > 0;
         }
@@ -46,15 +32,7 @@ namespace OpenNest.Geometry
                 return false;
             }
 
-            pts = pts.Where(pt =>
-                    Angle.IsBetweenRad(
-                        arc.Center.AngleTo(pt),
-                        arc.StartAngle,
-                        arc.EndAngle,
-                        arc.IsReversed
-                    )
-                )
-                .ToList();
+            pts = PointsOnArc(arc, pts);
 
             return pts.Count > 0;
         }
@@ -69,15 +47,7 @@ namespace OpenNest.Geometry
                 return false;
             }
 
-            pts = pts.Where(pt =>
-                    Angle.IsBetweenRad(
-                        arc.Center.AngleTo(pt),
-                        arc.StartAngle,
-                        arc.EndAngle,
-                        arc.IsReversed
-                    )
-                )
-                .ToList();
+            pts = PointsOnArc(arc, pts);
 
             return pts.Count > 0;
         }
@@ -93,15 +63,7 @@ namespace OpenNest.Geometry
                 pts2.AddRange(pts3);
             }
 
-            pts = pts2.Where(pt =>
-                    Angle.IsBetweenRad(
-                        arc.Center.AngleTo(pt),
-                        arc.StartAngle,
-                        arc.EndAngle,
-                        arc.IsReversed
-                    )
-                )
-                .ToList();
+            pts = PointsOnArc(arc, pts2);
 
             return pts.Count > 0;
         }
@@ -118,18 +80,18 @@ namespace OpenNest.Geometry
                 pts2.AddRange(pts3);
             }
 
-            pts = pts2.Where(pt =>
-                    Angle.IsBetweenRad(
-                        arc.Center.AngleTo(pt),
-                        arc.StartAngle,
-                        arc.EndAngle,
-                        arc.IsReversed
-                    )
-                )
-                .ToList();
+            pts = PointsOnArc(arc, pts2);
 
             return pts.Count > 0;
         }
+
+        /// <summary>The points that lie within the arc's sweep, in their original order.</summary>
+        private static List<Vector> PointsOnArc(Arc arc, List<Vector> pts) =>
+            pts.Where(pt => OnArc(arc, pt)).ToList();
+
+        /// <summary>Whether a point on the arc's full circle lies within the arc's start and end angles.</summary>
+        private static bool OnArc(Arc arc, Vector pt) =>
+            Angle.IsBetweenRad(arc.Center.AngleTo(pt), arc.StartAngle, arc.EndAngle, arc.IsReversed);
 
         internal static bool Intersects(Circle circle1, Circle circle2, out List<Vector> pts)
         {
