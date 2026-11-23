@@ -80,18 +80,58 @@ namespace OpenNest.Labels
             if (drawing == null || mode == PartLabelMode.Off)
                 return string.Empty;
 
-            var name = new StringBuilder();
-            foreach (var character in drawing.Name ?? string.Empty)
-                if (StrokeFont.Has(character) && !char.IsWhiteSpace(character))
-                    name.Append(char.ToUpperInvariant(character));
-
             var groups = mode == PartLabelMode.PartNumberAndBendGroups
                 ? GroupLetters(drawing.Bends, partRotation, grainAngle)
                 : string.Empty;
-            if (groups.Length == 0)
-                return name.ToString();
+            return Join(EtchableName(drawing.Name), groups);
+        }
 
-            return name.Length == 0 ? groups : name + "-" + groups;
+        /// <summary>
+        /// The label as the CAD Converter previews it before the part is placed: the full
+        /// <see cref="PartLabelMode.PartNumberAndBendGroups"/> text for the part unrotated on a sheet
+        /// whose grain runs along X. It is the longest the label gets for that placement, so a box
+        /// that fits it fits the part number alone; other placements may change the letters.
+        /// </summary>
+        public static string PreviewText(string name, IEnumerable<Bend> bends) =>
+            Join(EtchableName(name), GroupLetters(bends, 0, 0));
+
+        // The name in capitals with characters the stroke font lacks, and spaces, dropped.
+        private static string EtchableName(string name)
+        {
+            var etchable = new StringBuilder();
+            foreach (var character in name ?? string.Empty)
+                if (StrokeFont.Has(character) && !char.IsWhiteSpace(character))
+                    etchable.Append(char.ToUpperInvariant(character));
+            return etchable.ToString();
+        }
+
+        private static string Join(string name, string groups) =>
+            groups.Length == 0 ? name : name.Length == 0 ? groups : name + "-" + groups;
+
+        /// <summary>
+        /// Lays <paramref name="text"/> out in <paramref name="box"/>, in the box's own frame (the
+        /// drawing's source frame): centered, reading along the box at its height, or shrunk to fit
+        /// its width. <paramref name="fits"/> is false when the text had to shrink below
+        /// <see cref="MinimumHeightShare"/> of the box height, so Plan Cutting would not etch it;
+        /// the shrunk strokes are still returned, for previewing. Null for an invalid box or no text.
+        /// </summary>
+        public static List<Stroke> Layout(LabelBox box, string text, out bool fits)
+        {
+            fits = false;
+            if (box == null || !box.IsValid || string.IsNullOrEmpty(text))
+                return null;
+
+            var height = box.Height;
+            var width = StrokeFont.Measure(text) * height;
+            if (width > box.Width)
+            {
+                height *= box.Width / width;
+                width = box.Width;
+            }
+
+            fits = height >= box.Height * MinimumHeightShare - Tolerance.Epsilon;
+            return StrokeFont.Strokes(text, height).ConvertAll(stroke =>
+                stroke.Map(point => box.ToWorld(new Vector(point.X - width / 2, point.Y - height / 2))));
         }
 
         /// <summary>
@@ -116,26 +156,17 @@ namespace OpenNest.Labels
             if (text.Length == 0)
                 return null;
 
-            var height = box.Height;
-            var width = StrokeFont.Measure(text) * height;
-            if (width > box.Width)
-            {
-                height *= box.Width / width;
-                width = box.Width;
-            }
-
-            if (height < box.Height * MinimumHeightShare - Tolerance.Epsilon)
+            var laidOut = Layout(box, text, out var fits);
+            if (!fits)
                 return null;
 
             var offset = drawing.Source?.Offset ?? Vector.Zero;
             // The source frame loses the program's offset, then turns with the part, as bends do.
-            var strokes = StrokeFont.Strokes(text, height).ConvertAll(stroke => stroke.Map(point =>
+            return laidOut.ConvertAll(stroke => stroke.Map(point =>
             {
-                var world = box.ToWorld(new Vector(point.X - width / 2, point.Y - height / 2)) - offset;
+                var world = point - offset;
                 return partRotation == 0 ? world : world.Rotate(partRotation);
             }));
-
-            return strokes;
         }
 
         /// <summary>

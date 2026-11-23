@@ -16,6 +16,7 @@ using OpenNest.Dimensions;
 using OpenNest.Geometry;
 using OpenNest.IO;
 using OpenNest.IO.Bending;
+using OpenNest.Labels;
 using OpenNest.TabbedCutouts;
 
 namespace OpenNest.Forms
@@ -72,6 +73,7 @@ namespace OpenNest.Forms
             filterPanel.DimensionRemoved += OnDimensionRemoved;
             entityView1.DimensionDragged += OnDimensionDragged;
             entityView1.LabelBoxChanged += OnLabelBoxChanged;
+            entityView1.LabelPreviewText = () => CurrentItem is { } item ? PartLabels.PreviewText(item.Name, item.Bends) : null;
             entityView1.TextConvertRequested += OnTextConvertRequested;
             entityView1.EntityActionRequested += OnEntityActionRequested;
             btnSplit.Click += OnSplitClicked;

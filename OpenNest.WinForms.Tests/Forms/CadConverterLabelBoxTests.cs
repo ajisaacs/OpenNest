@@ -193,6 +193,28 @@ public class CadConverterLabelBoxTests
         form.Close();
     });
 
+    [Fact]
+    public void TheBoxPreviewsTheLabelText_AndPaintsWhenTooSmallToEtch() => ArchUnitsTests.RunSta(() =>
+    {
+        using var form = new LabelTestForm();
+        Show(form);
+        form.LoadDrawings([Part(10, 6)]);
+        var view = Field<EntityView>(form, "entityView1");
+        var item = Field<FileListControl>(form, "fileList").SelectedItem!;
+        Invoke(form, "OnLabelBoxClick", null, EventArgs.Empty);
+
+        Assert.Equal("LABELLED", view.LabelPreviewText!());
+
+        // Tall and skinny: the text would shrink past legibility; painting still works.
+        item.LabelBox = new LabelBox(item.LabelBox!.Center, 0.1, 2, 0);
+        Invoke(form, "RefreshLabelBox", item);
+        Assert.False(PartLabels.Layout(view.LabelBox, view.LabelPreviewText!(), out var fits) == null);
+        Assert.False(fits);
+        using var bitmap = new System.Drawing.Bitmap(view.Width, view.Height);
+        view.DrawToBitmap(bitmap, new System.Drawing.Rectangle(0, 0, view.Width, view.Height));
+        form.Close();
+    });
+
     private static Drawing Part(double width, double height, List<Bend>? bends = null)
     {
         var entities = new List<Entity>

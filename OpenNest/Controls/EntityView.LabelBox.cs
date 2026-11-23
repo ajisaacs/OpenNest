@@ -16,6 +16,7 @@ namespace OpenNest.Controls
         private const int RotateHandlePart = 4;
         private static readonly double RotateSnap = Angle.ToRadians(5);
         private static readonly Color LabelBoxColor = Color.FromArgb(230, 90, 200);
+        private static readonly Color LabelBoxTooSmallColor = Color.FromArgb(230, 60, 40);
 
         // The grabbed corner (0-3, as Labels.LabelBox.Corners orders them), 4 for the rotate
         // handle or -1 for the body; null when nothing is being dragged.
@@ -28,6 +29,12 @@ namespace OpenNest.Controls
         /// rectangle the user can move, resize and turn; null draws nothing.
         /// </summary>
         public Labels.LabelBox LabelBox { get; set; }
+
+        /// <summary>
+        /// The text previewed inside <see cref="LabelBox"/>, read at each paint so it follows renames
+        /// and bend edits; null or empty previews nothing.
+        /// </summary>
+        public Func<string> LabelPreviewText { get; set; }
 
         /// <summary>The label box was moved, resized or turned; the argument is its new placement.</summary>
         public event EventHandler<Labels.LabelBox> LabelBoxChanged;
@@ -114,6 +121,16 @@ namespace OpenNest.Controls
                 width, height, labelBoxAtPress.Rotation));
         }
 
+        // A short note under the box's lowest corner.
+        private void DrawLabelBoxWarning(Graphics g, PointF[] corners, Color color)
+        {
+            var below = corners.OrderByDescending(p => p.Y).First();
+            var left = corners.Min(p => p.X);
+            using var font = new Font(Font.FontFamily, 8f);
+            using var textBrush = new SolidBrush(color);
+            g.DrawString("Too small to etch", font, textBrush, left, below.Y + LabelBoxHandlePixels + 2);
+        }
+
         private Cursor LabelBoxCursor(int part) => part switch
         {
             < 0 => Cursors.SizeAll,
@@ -126,11 +143,36 @@ namespace OpenNest.Controls
             if (LabelBox is not { IsValid: true } box)
                 return;
 
+            // The text as Plan Cutting would etch it. A box that would shrink it past legibility
+            // turns red and shows the shrunk text faintly, since nothing would be etched.
+            var text = LabelPreviewText?.Invoke();
+            var strokes = Labels.PartLabels.Layout(box, text, out var fits);
+            var color = strokes == null || fits ? LabelBoxColor : LabelBoxTooSmallColor;
+
             var points = box.Corners().Select(PointWorldToGraph).ToArray();
-            using var pen = new Pen(LabelBoxColor) { DashStyle = DashStyle.Dash };
-            using var brush = new SolidBrush(Color.FromArgb(30, LabelBoxColor));
+            using var pen = new Pen(color) { DashStyle = DashStyle.Dash };
+            using var brush = new SolidBrush(Color.FromArgb(30, color));
             g.FillPolygon(brush, points);
             g.DrawPolygon(pen, points);
+
+            if (strokes != null)
+            {
+                using var textPen = new Pen(Color.FromArgb(fits ? 255 : 110, color), 1.5f)
+                {
+                    StartCap = LineCap.Round,
+                    EndCap = LineCap.Round,
+                    LineJoin = LineJoin.Round,
+                };
+                foreach (var stroke in strokes)
+                {
+                    var path = stroke.Points().Select(PointWorldToGraph).ToArray();
+                    if (path.Length > 1)
+                        g.DrawLines(textPen, path);
+                }
+
+                if (!fits)
+                    DrawLabelBoxWarning(g, points, color);
+            }
 
             using var handleBrush = new SolidBrush(LabelBoxColor);
             foreach (var point in points)

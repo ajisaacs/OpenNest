@@ -13,6 +13,15 @@ Location** again, **Rotate 90°**, **Make Horizontal** and **Remove**. However i
 angle is kept within a quarter turn either way of horizontal, so the text never reads upside
 down (a half turn covers the same rectangle).
 
+The box previews the label inside it as Plan Cutting would etch it, laid out by the same code
+(`PartLabels.Layout`): the drawing name with its bend groups for the part unrotated on a sheet
+whose grain runs along X (`PartLabels.PreviewText`), the longest the label gets there, so a box
+that fits it also fits the part number alone. The text always reads along the box's width and
+never turns by itself: a box made tall and narrow shrinks the text to fit its width, and when that
+leaves it under half the box height, the box turns red, the shrunk text is drawn faintly and
+**Too small to etch** shows under it, because Plan Cutting would etch nothing there. To run the
+text up the part, turn the box first (**Rotate 90°**) and then resize it.
+
 When the label fits nowhere, the button still places a full-size box for hand placement and
 says so: centered on the roomiest flat spot a smaller label (three quarters, half, then a
 quarter of its size) fits clear of everything, at that spot's angle, or in the middle of the
