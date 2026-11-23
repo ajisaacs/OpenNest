@@ -13,6 +13,9 @@ namespace OpenNest.Engine.CuttingPlanning;
 /// rapid and lead along it. A part may be left from somewhere other than where it is reached (a
 /// cut-off is entered at its start and left at its far end): each leg then runs from one part's
 /// exit to the next part's center, and a reversed run is costed along its own directed legs.
+/// A slender part may instead carry visit points: the tool reaches it at one of them and leaves
+/// from the same one, whichever suits the parts on either side, so a long strip beside a row is
+/// costed from its near end rather than from a center far from where it is cut.
 /// </summary>
 internal static class CuttingPartOrder
 {
@@ -21,6 +24,9 @@ internal static class CuttingPartOrder
     /// <summary>Upper bound on improvement passes, so a large plate cannot loop for long.</summary>
     internal const int MaxPasses = 50;
 
+    /// <summary>Upper bound on rounds of placing slender parts at their visit points.</summary>
+    internal const int MaxVisitRounds = 8;
+
     /// <param name="parts">The part ordinals to order; prerequisites outside this set count as done.</param>
     /// <param name="centers">One representative point per part ordinal.</param>
     /// <param name="start">The modeled tool position before the first of these parts.</param>
@@ -28,9 +34,10 @@ internal static class CuttingPartOrder
     /// <param name="endpoint">Optional fixed final position after the last of these parts.</param>
     /// <param name="exits">Optional point each part is left from, per part ordinal; null when every
     /// part is left from its center.</param>
+    /// <param name="visits">Optional visit points per part ordinal; see the other overload.</param>
     internal static int[] Plan(IReadOnlyList<int> parts, IReadOnlyList<Vector> centers, Vector start,
         IReadOnlyList<IReadOnlyCollection<int>> prerequisites, CancellationToken token, Vector? endpoint = null,
-        IReadOnlyList<Vector> exits = null)
+        IReadOnlyList<Vector> exits = null, IReadOnlyList<IReadOnlyList<Vector>> visits = null)
     {
         var local = new Dictionary<int, int>();
         for (var i = 0; i < parts.Count; i++)
@@ -40,7 +47,9 @@ internal static class CuttingPartOrder
             .Select(p => (IReadOnlyCollection<int>)prerequisites[p].Where(local.ContainsKey).Select(q => local[q]).ToArray())
             .ToArray();
         var localExits = exits == null ? null : parts.Select(p => exits[p]).ToArray();
-        return Plan(localCenters, start, localPrerequisites, token, endpoint, localExits).Select(i => parts[i]).ToArray();
+        var localVisits = visits == null ? null : parts.Select(p => visits[p]).ToArray();
+        return Plan(localCenters, start, localPrerequisites, token, endpoint, localExits, localVisits)
+            .Select(i => parts[i]).ToArray();
     }
 
     /// <param name="centers">One representative point per part ordinal.</param>
@@ -55,13 +64,41 @@ internal static class CuttingPartOrder
     /// Optional point each part is left from; null (every part left from its center) keeps the
     /// symmetric route exactly.
     /// </param>
+    /// <param name="visits">
+    /// Optional points per part ordinal where a slender part may be reached and left; null or empty
+    /// for an ordinary part, which keeps its center and exit. Such a part is entered and left at the
+    /// same point. After the center tour, each is put at its best visit point for its neighbors and
+    /// moved to the gap where that detour is shortest, and the tour is improved again with those
+    /// points. Null keeps the center tour exactly.
+    /// </param>
     internal static int[] Plan(IReadOnlyList<Vector> centers, Vector start,
         IReadOnlyList<IReadOnlyCollection<int>> prerequisites, CancellationToken token, Vector? endpoint = null,
-        IReadOnlyList<Vector> exits = null)
+        IReadOnlyList<Vector> exits = null, IReadOnlyList<IReadOnlyList<Vector>> visits = null)
     {
         var count = centers.Count;
         var order = NearestNeighbor(centers, exits ?? centers, start, prerequisites, token);
         var position = new int[count];
+        Improve(order, centers, exits, start, prerequisites, position, token, endpoint);
+        if (visits == null || !visits.Any(points => points is { Count: > 0 }))
+            return order;
+
+        var arrive = centers.ToArray();
+        var leave = (exits ?? centers).ToArray();
+        for (var round = 0; round < MaxVisitRounds; round++)
+        {
+            token.ThrowIfCancellationRequested();
+            var changed = Settle(order, arrive, leave, visits, start, endpoint);
+            changed |= Relocate(order, arrive, leave, visits, start, prerequisites, position, token, endpoint);
+            if (!changed)
+                break;
+            Improve(order, arrive, leave, start, prerequisites, position, token, endpoint);
+        }
+        return order;
+    }
+
+    private static void Improve(int[] order, IReadOnlyList<Vector> centers, IReadOnlyList<Vector> exits, Vector start,
+        IReadOnlyList<IReadOnlyCollection<int>> prerequisites, int[] position, CancellationToken token, Vector? endpoint)
+    {
         for (var pass = 0; pass < MaxPasses; pass++)
         {
             token.ThrowIfCancellationRequested();
@@ -70,7 +107,90 @@ internal static class CuttingPartOrder
             if (!improved)
                 break;
         }
-        return order;
+    }
+
+    // The visit point cheapest between where the tool comes from and where it goes next (null at
+    // the open end), with the length of that detour.
+    private static (Vector Point, double Cost) BestVisit(IReadOnlyList<Vector> points, Vector from, Vector? to)
+    {
+        var best = points[0];
+        var bestCost = double.MaxValue;
+        foreach (var point in points)
+        {
+            var cost = from.DistanceTo(point) + (to is { } next ? point.DistanceTo(next) : 0);
+            if (cost < bestCost - Epsilon)
+            {
+                best = point;
+                bestCost = cost;
+            }
+        }
+        return (best, bestCost);
+    }
+
+    // Puts each slender part at its best visit point for the parts now on either side of it.
+    private static bool Settle(int[] order, Vector[] arrive, Vector[] leave,
+        IReadOnlyList<IReadOnlyList<Vector>> visits, Vector start, Vector? endpoint)
+    {
+        var changed = false;
+        for (var k = 0; k < order.Length; k++)
+        {
+            var part = order[k];
+            if (visits[part] is not { Count: > 0 } points)
+                continue;
+            var from = k == 0 ? start : leave[order[k - 1]];
+            var to = k + 1 < order.Length ? arrive[order[k + 1]] : endpoint;
+            var current = from.DistanceTo(arrive[part]) + (to is { } next ? arrive[part].DistanceTo(next) : 0);
+            var (point, cost) = BestVisit(points, from, to);
+            if (cost >= current - Epsilon)
+                continue;
+            arrive[part] = leave[part] = point;
+            changed = true;
+        }
+        return changed;
+    }
+
+    // Moves each slender part, at its best visit point, to the gap where its detour is shortest,
+    // when that beats its detour where it is and keeps every prerequisite earlier.
+    private static bool Relocate(int[] order, Vector[] arrive, Vector[] leave,
+        IReadOnlyList<IReadOnlyList<Vector>> visits, Vector start, IReadOnlyList<IReadOnlyCollection<int>> prerequisites,
+        int[] position, CancellationToken token, Vector? endpoint)
+    {
+        var changed = false;
+        var count = order.Length;
+        for (var part = 0; part < count; part++)
+        {
+            if (visits[part] is not { Count: > 0 } points)
+                continue;
+            token.ThrowIfCancellationRequested();
+            var at = Array.IndexOf(order, part);
+            var rest = order.Where(p => p != part).ToArray();
+            var current = Detour(points, rest, at).Cost;
+            var gaps = Enumerable.Range(0, count).Where(gap => gap != at)
+                .Select(gap => (Gap: gap, Detour: Detour(points, rest, gap)))
+                .Where(g => g.Detour.Cost < current - Epsilon)
+                .OrderBy(g => g.Detour.Cost).ThenBy(g => g.Gap);
+            foreach (var (gap, detour) in gaps)
+            {
+                var candidate = rest.Take(gap).Append(part).Concat(rest.Skip(gap)).ToArray();
+                if (!Valid(candidate, prerequisites, position))
+                    continue;
+                Array.Copy(candidate, order, count);
+                arrive[part] = leave[part] = detour.Point;
+                changed = true;
+                break;
+            }
+        }
+        return changed;
+
+        // The detour through the part inserted before rest[gap] (after the last at the end), net
+        // of the leg it replaces.
+        (Vector Point, double Cost) Detour(IReadOnlyList<Vector> points, int[] rest, int gap)
+        {
+            var from = gap == 0 ? start : leave[rest[gap - 1]];
+            Vector? to = gap < rest.Length ? arrive[rest[gap]] : endpoint;
+            var (point, cost) = BestVisit(points, from, to);
+            return (point, cost - (to is { } next ? from.DistanceTo(next) : 0));
+        }
     }
 
     private static int[] NearestNeighbor(IReadOnlyList<Vector> centers, IReadOnlyList<Vector> exits, Vector start,

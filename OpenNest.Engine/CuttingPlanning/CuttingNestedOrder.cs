@@ -22,9 +22,12 @@ internal static class CuttingNestedOrder
     /// <param name="HostEntry">The point on a host's contours nearest a tool position.</param>
     /// <param name="Exits">Optional point each part is left from (a cut-off's far end); null when
     /// every part is left from its center.</param>
+    /// <param name="Visits">Optional points per part ordinal where a slender part may be reached and
+    /// left (see <see cref="CuttingPartOrder"/>); null when every part keeps its center.</param>
     internal sealed record Context(IReadOnlyList<Vector> Centers,
         IReadOnlyList<IReadOnlyCollection<int>> Prerequisites, IReadOnlyList<IReadOnlyCollection<int>> Inside,
-        Func<int, Vector, Vector> HostEntry, CancellationToken Token, IReadOnlyList<Vector> Exits = null);
+        Func<int, Vector, Vector> HostEntry, CancellationToken Token, IReadOnlyList<Vector> Exits = null,
+        IReadOnlyList<IReadOnlyList<Vector>> Visits = null);
 
     /// <param name="parts">The part ordinals to order; prerequisites outside this set count as done.</param>
     /// <param name="start">The modeled tool position before the first of these parts.</param>
@@ -65,14 +68,15 @@ internal static class CuttingNestedOrder
         int[] rootOrder;
         try
         {
-            rootOrder = CuttingPartOrder.Plan(roots, context.Centers, start, hostsLast, context.Token, endpoint, context.Exits);
+            rootOrder = CuttingPartOrder.Plan(roots, context.Centers, start, hostsLast, context.Token, endpoint, context.Exits,
+                context.Visits);
         }
         catch (InvalidOperationException)
         {
             try
             {
                 rootOrder = CuttingPartOrder.Plan(roots, context.Centers, start, groupRules, context.Token, endpoint,
-                    context.Exits);
+                    context.Exits, context.Visits);
             }
             catch (InvalidOperationException)
             {
@@ -99,6 +103,6 @@ internal static class CuttingNestedOrder
         return order.ToArray();
 
         int[] Flat() => CuttingPartOrder.Plan(parts, context.Centers, start, context.Prerequisites, context.Token, endpoint,
-            context.Exits);
+            context.Exits, context.Visits);
     }
 }

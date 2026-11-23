@@ -122,6 +122,32 @@ public class CuttingPartOrderTests
             CancellationToken.None, exits: exits));
     }
 
+    // Rows 0-9 stand at (0, 1) to (0, 10); part 10 is a strip whose center (3, 5) is beside the
+    // middle rows but which is only reached at its top end, (1, 9.5).
+    [Fact]
+    public void Plan_ReachesASlenderPartAtItsVisitPoint()
+    {
+        var centers = Enumerable.Range(1, 10).Select(y => new Vector(0, y)).Append(new Vector(3, 5)).ToArray();
+        var visits = new IReadOnlyList<Vector>[11];
+        visits[10] = [new Vector(1, 9.5)];
+
+        var byCenter = Plan(centers, NoPrerequisites(11));
+        var byVisit = CuttingPartOrder.Plan(centers, Vector.Zero, NoPrerequisites(11), CancellationToken.None,
+            visits: visits);
+
+        Assert.InRange(Array.IndexOf(byCenter, 10), 1, 9);
+        Assert.Equal(Enumerable.Range(0, 11), byVisit);
+    }
+
+    [Fact]
+    public void Plan_WithoutVisitPoints_KeepsTheCenterTour()
+    {
+        Vector[] centers = [new(-2, -1), new(0, -2), new(-4, 3), new(2, -4), new(0, -1)];
+
+        Assert.Equal(Plan(centers, NoPrerequisites(5)), CuttingPartOrder.Plan(centers, Vector.Zero,
+            NoPrerequisites(5), CancellationToken.None, visits: new IReadOnlyList<Vector>[5]));
+    }
+
     private static int[] Plan(Vector[] centers, IReadOnlyCollection<int>[] prerequisites) =>
         CuttingPartOrder.Plan(centers, Vector.Zero, prerequisites, CancellationToken.None);
 

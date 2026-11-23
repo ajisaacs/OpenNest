@@ -231,10 +231,17 @@ strip lines were added, and the segments are placed into that plan afterwards (s
 [cutoff segments](#cutoff-segments) below). The order is an open
 traveling-salesman path over part centers from the start point: nearest neighbor,
 then 2-opt reversals and Or-opt moves of one to three parts, never placing a part
-before a cutoff or nested-part prerequisite. A cutoff is not a center: the path reaches
-it where its cut starts and leaves from where it ends (read from its program as given;
-the search may still reverse a head-locked far-edge segment), and a reversed run is
-costed along its own legs from each part's exit. The parts
+before a cutoff or nested-part prerequisite. A cutoff, or any program kept as given (a
+locked part), is not a center: the path reaches it where its cut starts and leaves from
+where it ends (read from its program as given; the search may still reverse a
+head-locked far-edge segment), and a reversed run is costed along its own legs from each
+part's exit. A slender regenerated part with holes (its cut extent at least three times
+longer than wide) is not a center either: its holes are cut first and its outside entry
+leaves beside them, so after the center tour the path reaches and leaves it at whichever
+hole center suits the parts on either side, moves it to the gap where that detour is
+shortest, and improves the tour again with those points. A long strip standing beside a
+row of parts is then cut beside the rows at its holed end, not beside its middle, where
+its center is. A hole-less part keeps its center: its entry faces whatever comes next. The parts
 before a line that splits the sheet therefore finish beside its start, and the part cut
 just before it faces that start. A part with other parts nested in its
 cutouts (a host) is cut after all of them, so the tool reaches it from whichever was

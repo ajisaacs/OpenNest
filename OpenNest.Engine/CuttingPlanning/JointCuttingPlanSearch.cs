@@ -127,7 +127,7 @@ internal static class JointCuttingPlanSearch
                 return kept.Order != null ? walk.Ready(kept.Order) : walk.Exhausted();
             }
 
-            var centers = snapshot.Placements.Select(Center).ToArray();
+            var centers = snapshot.Placements.Select(Arrival).ToArray();
             var prerequisites = Enumerable.Range(0, count)
                 .Select(i => new HashSet<int>(snapshot.Dependencies.PrerequisitesOf(i).Except(excluded))).ToArray();
 
@@ -250,7 +250,8 @@ internal static class JointCuttingPlanSearch
     private static CuttingNestedOrder.Context NestedOrder(CuttingPlanSnapshot snapshot, Vector[] centers,
         HashSet<int>[] prerequisites, CancellationToken token)
     {
-        var exits = snapshot.Placements.Any(p => p.IsCutOff) ? snapshot.Placements.Select(Exit).ToArray() : null;
+        var exits = snapshot.Placements.Any(IsFixed) ? snapshot.Placements.Select(Exit).ToArray() : null;
+        var visits = snapshot.Placements.Select(p => Visits(p, token)).ToArray();
         var inside = snapshot.Placements.Select((placement, host) => placement.IsCutOff ? []
             : snapshot.Dependencies.PrerequisitesOf(host).Where(p => !snapshot.Placements[p].IsCutOff).ToArray()).ToArray();
         var contours = new Dictionary<int, Entity[]>();
@@ -262,7 +263,7 @@ internal static class JointCuttingPlanSearch
                     .Select(m => m.Curve.ToEntity()).ToArray();
             return entities.Length == 0 ? centers[host]
                 : entities.Select(e => e.ClosestPointTo(position)).MinBy(point => point.DistanceTo(position));
-        }, token, exits);
+        }, token, exits, visits.Any(v => v != null) ? visits : null);
     }
 
     // Whether the pass stopped at a part whose approach crossed a tabbed part the capture still
@@ -369,9 +370,47 @@ internal static class JointCuttingPlanSearch
             ? start
             : CutExtent(placement)?.Center ?? placement.Execution.DeparturePoint;
 
-    // Where the tool leaves a part, for ordering only: a cut-off's far end, otherwise its center.
+    // A program the planner keeps as given (a locked part or a cut-off): its pierce and departure
+    // are known, so the order is costed from them rather than from its center.
+    private static bool IsFixed(FixedProgramPlacement placement) =>
+        placement.Prepared == null && placement.Execution.Motions.Any(m => !m.Rapid);
+
+    // Where the tool reaches a part, for ordering only: a fixed program's first cut, otherwise its center.
+    private static Vector Arrival(FixedProgramPlacement placement) =>
+        IsFixed(placement) && placement.Execution.Motions.First(m => !m.Rapid) is { Start: { } start }
+            ? start
+            : Center(placement);
+
+    // Where the tool leaves a part, for ordering only: a fixed program's departure, otherwise its center.
     private static Vector Exit(FixedProgramPlacement placement) =>
-        placement.IsCutOff ? placement.Execution.DeparturePoint : Center(placement);
+        IsFixed(placement) ? placement.Execution.DeparturePoint : Center(placement);
+
+    /// <summary>Cut extents at least this many times longer than wide make a part slender.</summary>
+    internal const double SlenderAspect = 3;
+
+    // Where the order may reach and leave a slender regenerated part with holes: its holes are cut
+    // first and its outside entry then leaves beside them toward the next part, so the tool is at a
+    // hole, possibly at one end of a long strip. Null for any other part, which keeps its center: a
+    // hole-less part's entry faces whatever comes next, so no point of it is likelier than another.
+    private static Vector[] Visits(FixedProgramPlacement placement, CancellationToken token)
+    {
+        if (placement.Prepared is not { HasCutPerimeter: true, PerimeterOrdinal: > 0 } prepared
+            || CutExtent(placement) is not { } box)
+            return null;
+        var across = box.Right - box.Left;
+        var up = box.Top - box.Bottom;
+        if (System.Math.Min(across, up) <= 0 || System.Math.Max(across, up) < SlenderAspect * System.Math.Min(across, up))
+            return null;
+        var holes = prepared.HoleCenters(token).Take(prepared.PerimeterOrdinal)
+            .Where(c => c != null).Select(c => c!.Value + placement.Location).ToArray();
+        if (holes.Length <= MaxVisitPoints)
+            return holes.Length == 0 ? null : holes;
+        // Evenly spread, the first and last included.
+        return Enumerable.Range(0, MaxVisitPoints)
+            .Select(i => holes[(int)System.Math.Round(i * (holes.Length - 1) / (double)(MaxVisitPoints - 1))]).ToArray();
+    }
+
+    private const int MaxVisitPoints = 12;
 
     // The extent of the part's placed cut material, or null when it has none.
     private static Box CutExtent(FixedProgramPlacement placement)
