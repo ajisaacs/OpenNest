@@ -18,7 +18,8 @@ namespace OpenNest.Forms
             ShowInTaskbar = false;
             StartPosition = FormStartPosition.CenterParent;
 
-            cuttingPanel = new CuttingPanel { Dock = DockStyle.Fill };
+            // The leads beside the other settings, so the dialog stays short.
+            cuttingPanel = new CuttingPanel(showLeads: true, sideBySide: true) { Dock = DockStyle.Fill };
 
             var btnOk = new Button
             {

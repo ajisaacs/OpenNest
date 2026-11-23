@@ -10,9 +10,8 @@ using OpenNest.Tests.CuttingPlanning;
 namespace OpenNest.Tests.Support;
 
 /// <summary>
-/// Support tabs on a bed for parts short enough for their tab alone to hold
-/// (<see cref="CuttingParameters.TabHeldMaxLength"/>): a part the bed cannot hold level is still
-/// tabbed, but any tab clear of inside corners steadies it, so it is not reported.
+/// Support tabs on a bed: a part the bed cannot hold level is tabbed and held by its tab, however
+/// long it is, so any tab clear of inside corners steadies it and it is not reported.
 /// </summary>
 public class TabHeldSupportTabTests
 {
@@ -21,12 +20,11 @@ public class TabHeldSupportTabTests
     // A 2 inch laser grid; a 1.5 inch square rests on one of its points at most.
     private static readonly SupportGrid Bed = new(2, 2, 0, 0, registrationTolerance: 0.125, stabilityMargin: 0.25);
 
-    private static CuttingParameters Parameters(double tabHeldMaxLength)
+    private static CuttingParameters Parameters()
     {
         var parameters = ExplicitContourTests.Parameters();
         parameters.SupportTabs = true;
         parameters.TabConfig = new NormalTab { Size = TabSize };
-        parameters.TabHeldMaxLength = tabHeldMaxLength;
         return parameters;
     }
 
@@ -51,16 +49,6 @@ public class TabHeldSupportTabTests
     }
 
     [Theory]
-    [InlineData(0, false)]      // off
-    [InlineData(1, false)]
-    [InlineData(1.5, true)]     // the bound is inclusive
-    [InlineData(2, true)]
-    public void TheLimitHoldsPartsUpToIt(double max, bool holdsALengthOfOneAndAHalf)
-    {
-        Assert.Equal(holdsALengthOfOneAndAHalf, new CuttingParameters { TabHeldMaxLength = max }.TabHoldsAt(1.5));
-    }
-
-    [Theory]
     [InlineData(0)]
     [InlineData(45)]
     [InlineData(90)]
@@ -68,7 +56,7 @@ public class TabHeldSupportTabTests
     [InlineData(180)]
     [InlineData(270)]
     [InlineData(315)]
-    public void LengthOfATriangleWithTwoLeastBoxes_DoesNotDependOnItsRotation(double degrees)
+    public void WidthOfATriangleWithTwoLeastBoxes_DoesNotDependOnItsRotation(double degrees)
     {
         // A 5 x 5 right triangle fits its legs' square and its hypotenuse's 7.07 x 3.54 box, both
         // of area 25: the squarer box is the one measured, whatever way the part is turned.
@@ -78,27 +66,18 @@ public class TabHeldSupportTabTests
         part.Rotate(degrees * System.Math.PI / 180);
         var material = SupportMaterial.FromPart(part);
 
-        Assert.Equal(5, SupportAnalyzer.Length(material), 6);
         Assert.Equal(5, SupportAnalyzer.Width(material), 6);
     }
 
     [Fact]
-    public void NewSettingsHoldPartsUpToSixLong()
+    public void Analyze_HoldsAPartTheBedCannotByAnyClearTab()
     {
-        Assert.Equal(6, new CuttingParameters().TabHeldMaxLength);
-        Assert.True(new CuttingParameters().TabHoldsAt(5));
-    }
-
-    [Fact]
-    public void Analyze_HoldsAShortPartTheBedCannotByAnyClearTab()
-    {
-        var (_, _, part) = Square(Parameters(2));
+        var (_, _, part) = Square(Parameters());
         var material = SupportMaterial.FromPart(part);
 
-        var held = SupportTabSettings.Analyze(Parameters(2), Bed, 1, material);
-        var bedOnly = SupportTabSettings.Analyze(Parameters(0), Bed, 1, material);
+        var held = SupportTabSettings.Analyze(Parameters(), Bed, 1, material);
+        var bedOnly = SupportAnalyzer.Analyze(Bed, 1, material);
 
-        Assert.Equal(1.5, SupportAnalyzer.Length(material), 6);
         Assert.False(bedOnly.IsHeldByTab);
         Assert.False(bedOnly.TabCanSupport);
         Assert.True(held.IsHeldByTab);
@@ -108,41 +87,45 @@ public class TabHeldSupportTabTests
         Assert.True(held.TabCanSupport);
         Assert.True(held.AcceptsTabAt(new Vector(3, 3.75)));
         Assert.True(held.IsSteadiedByTabAt(new Vector(4.5, 3.75)));
-        Assert.False(SupportTabSettings.Analyze(Parameters(1), Bed, 1, material).IsHeldByTab);
+    }
+
+    [Fact]
+    public void Analyze_HoldsALongStripTheBedCannotByItsTab()
+    {
+        // A 12 x 0.5 strip between grid rows rests on no contact at all.
+        var nest = new Nest("strip");
+        var plate = new Plate(20, 20) { CuttingParameters = Parameters() };
+        nest.Plates.Add(plate);
+        nest.SetSupportBed(Bed);
+        var part = new Part(new Drawing("strip", LeadPathValidationTests.Rectangle(0, 0, 12, 0.5)), new Vector(1, 2.75));
+        plate.Parts.Add(part);
+
+        var support = SupportTabSettings.Analyze(Parameters(), Bed, 1, SupportMaterial.FromPart(part));
+
+        Assert.False(support.IsSupported);
+        Assert.True(support.IsHeldByTab);
+        Assert.True(support.TabCanSupport);
     }
 
     [Fact]
     public void Analyze_LeavesAPartTheBedHoldsAlone()
     {
         // A 5 inch square rests on a 2 x 2 block of grid points around its center.
-        var (_, _, part) = Square(Parameters(6), 5);
+        var (_, _, part) = Square(Parameters(), 5);
 
-        var support = SupportTabSettings.Analyze(Parameters(6), Bed, 1, SupportMaterial.FromPart(part));
+        var support = SupportTabSettings.Analyze(Parameters(), Bed, 1, SupportMaterial.FromPart(part));
 
         Assert.True(support.IsSupported);
         Assert.False(support.IsHeldByTab);
     }
 
     [Fact]
-    public void PlanCutting_TabsAShortPartNoTabCanSteady_WithoutTheLimit_AndDoesNotWarn()
+    public void PlanCutting_TabsAPartWithoutAWarning()
     {
-        var (_, plate, _) = Square(Parameters(0));
+        var (_, plate, _) = Square(Parameters());
 
         var result = CuttingPlanService.Plan(CuttingPlanRequest.ForPlate(plate, Vector.Zero,
-            confirmedParameters: Parameters(0)));
-
-        // Tabbed, a part counts as steady wherever its tab is.
-        Assert.True(result.Status == CuttingPlanStatus.Ready, string.Join("\n", result.Findings.Select(f => f.Message)));
-        Assert.Empty(result.Findings);
-    }
-
-    [Fact]
-    public void PlanCutting_TabsAShortPartWithoutAWarning()
-    {
-        var (_, plate, _) = Square(Parameters(2));
-
-        var result = CuttingPlanService.Plan(CuttingPlanRequest.ForPlate(plate, Vector.Zero,
-            confirmedParameters: Parameters(2)));
+            confirmedParameters: Parameters()));
 
         Assert.True(result.Status == CuttingPlanStatus.Ready, string.Join("\n", result.Findings.Select(f => f.Message)));
         Assert.Equal(TabSize, TabGap(Assert.Single(result.ProposedOrder)), 6);
@@ -158,12 +141,12 @@ public class TabHeldSupportTabTests
         disc.MoveTo(2, 1);
         disc.ArcTo(2, 1, 1, 1, RotationType.CCW);
         var nest = new Nest("round");
-        var plate = new Plate(20, 20) { CuttingParameters = Parameters(2) };
+        var plate = new Plate(20, 20) { CuttingParameters = Parameters() };
         nest.Plates.Add(plate);
         nest.SetSupportBed(Bed);
         plate.Parts.Add(new Part(new Drawing("disc", disc), new Vector(3, 3)));
 
-        var proposal = CuttingPlanBatch.Capture([plate], Parameters(2), preservePartOrder: false).Plan();
+        var proposal = CuttingPlanBatch.Capture([plate], Parameters(), preservePartOrder: false).Plan();
 
         Assert.True(proposal.CanApply, string.Join("\n", proposal.Describe("in")));
         Assert.Equal(TabSize, TabGap(Assert.Single(proposal.Plates[0].Result.ProposedOrder)), 6);
@@ -173,19 +156,19 @@ public class TabHeldSupportTabTests
     }
 
     [Fact]
-    public void PrePost_WarnsOnlyAboutAnUntabbedShortPart()
+    public void PrePost_WarnsOnlyAboutAnUntabbedPart()
     {
         var lead = new Line(new Vector(0, 0), new Vector(0, 1.5));
-        var (untabbed, _, bare) = Square(Parameters(2));
-        bare.ApplySingleLeadIn(Parameters(2), new Vector(0, 0.75), lead, ContourType.External);
-        var (tabbed, _, held) = Square(Parameters(2));
-        var withTabs = Parameters(2);
+        var (untabbed, _, bare) = Square(Parameters());
+        bare.ApplySingleLeadIn(Parameters(), new Vector(0, 0.75), lead, ContourType.External);
+        var (tabbed, _, held) = Square(Parameters());
+        var withTabs = Parameters();
         withTabs.TabsEnabled = true;
         held.ApplySingleLeadIn(withTabs, new Vector(0, 0.75), lead, ContourType.External);
 
         var finding = Assert.Single(PostVerificationAnalyzer.Analyze(untabbed).Findings,
             f => f.Kind == PostVerificationKind.PartSupport);
-        Assert.Contains("short enough for its tab alone to hold", finding.Message);
+        Assert.Contains("support contact", finding.Message);
         Assert.Contains("no tab", finding.Message);
         Assert.DoesNotContain(PostVerificationAnalyzer.Analyze(tabbed).Findings,
             f => f.Kind == PostVerificationKind.PartSupport);

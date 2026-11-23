@@ -128,24 +128,23 @@ once cut, while a detour to the steadiest point lengthens the way for every part
 steadiest instead, a long strip resting on one line of contacts started mid-length, or on its
 side away from the next cut, so the head left it back over the strip. Lead checks are unchanged.
 
-## Parts the tab alone holds
+## Tabbed parts are held by their tab
 
-A tabbed part stays in the sheet on its tab, and a part short enough does not need the bed at
-all: the tab holds it wherever it goes. Cutting Parameters > Tabs > "Tab alone holds parts up to"
-sets `CuttingParameters.TabHeldMaxLength`: on a plate with a support bed, a part the bed cannot
-hold level whose length (the long side of its outline's minimum-area bounding rectangle,
-`SupportAnalyzer.Length`) is at most that, bound included, is still tabbed, but
+A tabbed part stays in the sheet on its tab, however long it is. On a plate with a support bed,
+`SupportTabSettings.Analyze` tabs every part the bed cannot hold level and
 `SupportAnalyzer.HeldByTab` marks its analysis `IsHeldByTab`: it keeps its contacts and margin,
 every tab clear of inside corners steadies it, and its best tab point is chosen as for a part
-tabbed by size (below). A part the bed holds is not tabbed. 0 turns the rule off; new settings
-start at 6, while settings saved without the field read as 0, so saved settings keep their
-meaning. Some outlines have two minimum-area rectangles (a right isosceles triangle fits both
-its legs' square and its hypotenuse's 2:1 box), and which one rounding finds depends on how the
-part is turned; of rectangles tied for area, `SupportAnalyzer` measures the one with the shorter
-long side, so a drawing's length and width are the same at every rotation.
-`SupportTabSettings.Analyze` applies it for Plan Cutting, hand-placed lead-ins and the pre-post
-review alike, so such a part warns only when it is cut with no tab at all. View > Draw Support
-does not read cutting settings and still shows it red, since it would tip without its tab.
+tabbed by size (below). A part the bed holds is not tabbed. The former length limit ("Tab alone
+holds parts up to", `TabHeldMaxLength`) is gone; settings and nests saved with it read
+unchanged and ignore it. `SupportTabSettings.Analyze` applies this for Plan Cutting,
+hand-placed lead-ins and the pre-post review alike, so such a part warns only when it is cut
+with no tab at all. View > Draw Support does not read cutting settings and still shows it red,
+since it would tip without its tab.
+
+Some outlines have two minimum-area rectangles (a right isosceles triangle fits both its legs'
+square and its hypotenuse's 2:1 box), and which one rounding finds depends on how the part is
+turned; of rectangles tied for area, `SupportAnalyzer` measures the one with the shorter long
+side, so a drawing's width is the same at every rotation.
 
 ## Tabbing by size
 
@@ -178,9 +177,9 @@ settings and the cutting panel): a plate's recorded parameters and drawing pins 
 `TabsEnabled` and replay as planned.
 
 If none of those entries has a lead-in that fits, the part is still tabbed. The search falls
-back to every entry (`SupportEntries.Any`), ordered by how well the tab steadies the part; of
-the entries whose lead-in fits, it keeps every one that holds the part level, or else only the
-steadiest. The open-scrap pierce fallback then tries that catalog.
+back to every entry (`SupportEntries.Any`), inside corners included; since every tab holds a
+tabbed part, the route decides among those whose lead-in fits. The open-scrap pierce fallback
+then tries that catalog.
 
 A tabbed part counts as steady wherever its tab is: where its tab lands is never a warning. No message says a tab cannot steady its part, and once cut a tabbed part stays
 crossable, as its retained material allows, whether or not its tab holds it level. Plan Cutting

@@ -45,7 +45,6 @@ internal static class OwnedCuttingParameters
             TabBySize = source.TabBySize,
             TabSizeMinWidth = Dimension(source.TabSizeMinWidth),
             TabSizeMaxWidth = Dimension(source.TabSizeMaxWidth),
-            TabHeldMaxLength = Dimension(source.TabHeldMaxLength),
             SliceTippingSlugs = source.SliceTippingSlugs,
             LabelMode = source.LabelMode,
             Sequencing = new SequenceParameters

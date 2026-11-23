@@ -39,7 +39,6 @@ public class TutorialNestPlanningTests
             "test-data", "help-tutorial", "first-nest.nest")).Read();
         var parameters = CuttingParametersSerializer.Deserialize(Settings);
         parameters.SupportTabs = supportTabs;
-        parameters.TabHeldMaxLength = new CuttingParameters().TabHeldMaxLength;
         var plate = nest.Plates[0];
         Assert.NotNull(plate.SupportBed);
 

@@ -12,7 +12,6 @@ public class ThicknessCuttingSettingsTests
         Tabs = true,
         TabBySize = true,
         TabSize = 0.03,
-        TabHeldMaxLength = 4,
         TabSizeMinWidth = 0.5,
         TabSizeMaxWidth = 3,
         PierceClearance = 0.05,
@@ -88,7 +87,6 @@ public class ThicknessCuttingSettingsTests
         Assert.True(thin.SupportTabs);
         Assert.True(thin.TabBySize);
         Assert.Equal(0.03, thin.TabConfig.Size);
-        Assert.Equal(4, thin.TabHeldMaxLength);
         Assert.Equal(0.5, thin.TabSizeMinWidth);
         Assert.Equal(3, thin.TabSizeMaxWidth);
         Assert.Equal(0.05, thin.PierceClearance);

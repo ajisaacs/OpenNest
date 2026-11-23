@@ -22,9 +22,6 @@ public class ThicknessCuttingConfig
 
     public double TabSize { get; set; } = 0.03;
 
-    /// <summary>The longest part its tab alone holds; 0 turns the rule off.</summary>
-    public double TabHeldMaxLength { get; set; } = 6;
-
     public double TabSizeMinWidth { get; set; }
 
     /// <summary>The widest part tabbed by size; 0 tabs nothing by size.</summary>

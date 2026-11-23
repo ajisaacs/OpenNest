@@ -128,7 +128,6 @@ public static class MachineCuttingDefaults
             Tabs = parameters.SupportTabs,
             TabBySize = parameters.TabBySize,
             TabSize = (parameters.TabConfig?.Size ?? previous?.TabSize ?? new ThicknessCuttingConfig().TabSize) * scale,
-            TabHeldMaxLength = parameters.TabHeldMaxLength * scale,
             TabSizeMinWidth = parameters.TabSizeMinWidth * scale,
             TabSizeMaxWidth = parameters.TabSizeMaxWidth * scale,
             SliceTippingSlugs = parameters.SliceTippingSlugs,
@@ -147,7 +146,6 @@ public static class MachineCuttingDefaults
         // The thickness's tabs replace any retired "Tab every part" the fallback still carries.
         parameters.TabsEnabled = false;
         parameters.TabConfig = new NormalTab { Size = cutting.TabSize * scale };
-        parameters.TabHeldMaxLength = cutting.TabHeldMaxLength * scale;
         parameters.TabSizeMinWidth = cutting.TabSizeMinWidth * scale;
         parameters.TabSizeMaxWidth = cutting.TabSizeMaxWidth * scale;
         parameters.SliceTippingSlugs = cutting.SliceTippingSlugs;

@@ -12,10 +12,16 @@ namespace OpenNest.Controls
         // Every field label shares this column so inputs line up across sections.
         private const int FieldIndent = 16;
         private const int InputWidth = 100;
+        // The leads column's width when the panel lays out side by side.
+        private const int LeadsColumnWidth = 360;
 
         private static readonly Color HintColor = SystemColors.GrayText;
 
+        // The whole panel: the source line above one column, or above the leads and option
+        // columns side by side.
         private readonly TableLayoutPanel layout;
+        // The column sections are being added to while the panel is built.
+        private TableLayoutPanel column;
         private readonly ToolTip toolTip = new ToolTip { AutoPopDelay = 15000 };
 
         private readonly TabControl tabControl;
@@ -27,10 +33,8 @@ namespace OpenNest.Controls
         private readonly NumericUpDown nudTabWidth;
         private readonly RadioButton rbSupportTab;
         private readonly RadioButton rbTabBySize;
-        private readonly TableLayoutPanel supportTabOptions;
         private readonly NumericUpDown nudTabSizeMin;
         private readonly NumericUpDown nudTabSizeMax;
-        private readonly NumericUpDown nudTabHeldMax;
         private readonly CheckBox chkSliceSlugs;
         private readonly ComboBox cboLabelMode;
         private readonly NumericUpDown nudPierceClearance;
@@ -84,7 +88,11 @@ namespace OpenNest.Controls
         /// False leaves out the lead-in and lead-out editors (Machine Configuration edits a
         /// thickness's leads on their own tabs); lead-in angle rounding stays.
         /// </param>
-        public CuttingPanel(bool showLeads)
+        /// <param name="sideBySide">
+        /// True puts the leads in a column of their own beside the other settings, for a dialog;
+        /// false stacks everything in one column, for a narrow side panel.
+        /// </param>
+        public CuttingPanel(bool showLeads, bool sideBySide = false)
         {
             AutoScroll = true;
             BackColor = Color.White;
@@ -94,10 +102,23 @@ namespace OpenNest.Controls
                 Dock = DockStyle.Top,
                 AutoSize = true,
                 AutoSizeMode = AutoSizeMode.GrowAndShrink,
-                ColumnCount = 1,
+                ColumnCount = sideBySide ? 2 : 1,
                 Padding = new Padding(10, 2, 10, 10),
             };
-            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            var leadsColumn = layout;
+            var optionsColumn = layout;
+            if (sideBySide)
+            {
+                layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, LeadsColumnWidth));
+                layout.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+                leadsColumn = CreateColumn(new Padding(0));
+                optionsColumn = CreateColumn(new Padding(20, 0, 0, 0));
+            }
+            else
+            {
+                layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            }
+            column = layout;
 
             // Where these settings are saved: the nest's machine thickness, or this PC.
             sourceLabel = new Label
@@ -108,8 +129,15 @@ namespace OpenNest.Controls
                 Visible = false,
             };
             layout.Controls.Add(sourceLabel);
+            if (sideBySide)
+            {
+                layout.SetColumnSpan(sourceLabel, 2);
+                layout.Controls.Add(leadsColumn, 0, 1);
+                layout.Controls.Add(optionsColumn, 1, 1);
+            }
 
             // Leads: one tab per contour type, sized for the type with the most fields.
+            column = leadsColumn;
             if (showLeads)
                 AddSection("Leads");
 
@@ -134,7 +162,7 @@ namespace OpenNest.Controls
             tabControl.Controls.Add(tabExternal);
             tabControl.Controls.Add(tabInternal);
             if (showLeads)
-                layout.Controls.Add(tabControl);
+                column.Controls.Add(tabControl);
 
             chkRoundLeadInAngles = new CheckBox
             {
@@ -150,7 +178,7 @@ namespace OpenNest.Controls
             nudLeadInAngleIncrement.Width = 56;
             nudLeadInAngleIncrement.Enabled = false;
             toolTip.SetToolTip(chkRoundLeadInAngles, "Snaps each lead-in's angle to a multiple of this many degrees.");
-            layout.Controls.Add(CreateInline(chkRoundLeadInAngles, nudLeadInAngleIncrement, CreateHint("°")));
+            column.Controls.Add(CreateInline(chkRoundLeadInAngles, nudLeadInAngleIncrement, CreateHint("°")));
 
             chkRoundLeadInAngles.CheckedChanged += (s, e) =>
             {
@@ -160,6 +188,7 @@ namespace OpenNest.Controls
             nudLeadInAngleIncrement.ValueChanged += (s, e) => OnParametersChanged();
 
             // Tabs
+            column = optionsColumn;
             AddSection("Tabs");
 
             chkTabsEnabled = new CheckBox
@@ -168,7 +197,9 @@ namespace OpenNest.Controls
                 AutoSize = true,
                 Margin = new Padding(0, 3, 0, 3),
             };
-            layout.Controls.Add(chkTabsEnabled);
+            toolTip.SetToolTip(chkTabsEnabled,
+                "Plan Cutting tabs the parts chosen below; a tabbed part stays in the sheet on its tab.");
+            column.Controls.Add(chkTabsEnabled);
 
             tabOptions = ControlFactory.SettingsGrid(FieldIndent);
             tabOptions.Enabled = false;
@@ -179,42 +210,22 @@ namespace OpenNest.Controls
             // Plan Cutting tabs only the parts the plate's support grid cannot hold level.
             rbSupportTab = new RadioButton
             {
-                Text = "Only tab parts the support grid can't hold level",
+                Text = "Tab parts the support grid can't hold level",
                 AutoSize = true,
                 Checked = true,
                 Margin = new Padding(0, 4, 0, 0),
             };
             toolTip.SetToolTip(rbSupportTab,
-                "Plan Cutting tabs each part that would tip once cut free, where it best keeps the part level.");
+                "Plan Cutting tabs each part that would tip once cut free, and its tab holds it wherever the tab goes. "
+                + "A plate with no support bed tabs by the size range instead.");
             AddSpanningRow(tabOptions, rbSupportTab);
-
-            // A part up to this long is held by its tab alone, wherever the tab goes. 0 turns it off.
-            supportTabOptions = new TableLayoutPanel
-            {
-                AutoSize = true,
-                AutoSizeMode = AutoSizeMode.GrowAndShrink,
-                ColumnCount = 1,
-                Margin = new Padding(FieldIndent + 2, 0, 0, 0),
-            };
-            nudTabHeldMax = CreateNumeric(0, 0.25);
-            nudTabHeldMax.Width = 80;
-            toolTip.SetToolTip(nudTabHeldMax,
-                "Parts this short stay in the sheet on their tab, so a tab anywhere holds them without the grid.");
-            supportTabOptions.Controls.Add(
-                CreateInline(
-                    CreateHint("Tab alone holds parts up to", new Padding(0, 0, 4, 0)),
-                    nudTabHeldMax,
-                    CreateHint("long (0 = off)", new Padding(6, 0, 0, 0))
-                )
-            );
-            AddSpanningRow(tabOptions, supportTabOptions);
 
             // Tabs the parts whose narrow side is in the range below, whatever the support grid.
             rbTabBySize = new RadioButton
             {
                 Text = "Tab parts by size",
                 AutoSize = true,
-                Margin = new Padding(0, 2, 0, 0),
+                Margin = new Padding(0, 2, 0, 2),
             };
             toolTip.SetToolTip(rbTabBySize,
                 "Ignores the support grid: tabs every part whose narrow side is in the range below.");
@@ -223,51 +234,36 @@ namespace OpenNest.Controls
             // The size range: the narrow side of each part's smallest bounding box, at any angle.
             // Tabs by size use it, and so do support grid tabs on a plate with no support bed. A
             // maximum of 0 tabs nothing.
-            var sizeRange = new TableLayoutPanel
-            {
-                AutoSize = true,
-                AutoSizeMode = AutoSizeMode.GrowAndShrink,
-                ColumnCount = 1,
-                Margin = new Padding(FieldIndent + 2, 0, 0, 0),
-            };
-            sizeRange.Controls.Add(
-                CreateHint("By size, or with no support bed, tab parts whose narrow side is:", new Padding(0, 4, 0, 2))
-            );
             nudTabSizeMin = CreateNumeric(0, 0.25);
             nudTabSizeMin.Width = 80;
             nudTabSizeMax = CreateNumeric(0, 0.25);
             nudTabSizeMax.Width = 80;
             nudTabSizeMax.Maximum = (decimal)SupportTabSettings.TabEveryPartMaxWidth;
-            toolTip.SetToolTip(nudTabSizeMax,
-                "The narrow side of the part's smallest bounding box, at any angle, so a part's rotation does not matter.");
-            sizeRange.Controls.Add(
-                CreateInline(
-                    nudTabSizeMin,
-                    CreateHint("to", new Padding(4, 0, 4, 0)),
-                    nudTabSizeMax,
-                    CreateHint("(0 = none)", new Padding(6, 0, 0, 0))
-                )
+            const string sizeRangeTip =
+                "By size, or on a plate with no support bed, parts whose narrow side is in this range are tabbed. "
+                + "The narrow side of the part's smallest bounding box, at any angle, so its rotation does not matter. "
+                + "A maximum of 0 tabs none.";
+            toolTip.SetToolTip(nudTabSizeMin, sizeRangeTip);
+            toolTip.SetToolTip(nudTabSizeMax, sizeRangeTip);
+            var sizeRange = CreateInline(
+                nudTabSizeMin,
+                CreateHint("to", new Padding(4, 0, 4, 0)),
+                nudTabSizeMax
             );
-            AddSpanningRow(tabOptions, sizeRange);
-            layout.Controls.Add(tabOptions);
+            AddRow(tabOptions, "Narrow side from:", sizeRange, FieldIndent);
+            column.Controls.Add(tabOptions);
 
             chkTabsEnabled.CheckedChanged += (s, e) =>
             {
                 tabOptions.Enabled = chkTabsEnabled.Checked;
-                UpdateSupportTabOptions();
                 OnParametersChanged();
             };
 
             // The two choices toggle together, so one handler sees every change.
-            rbSupportTab.CheckedChanged += (s, e) =>
-            {
-                UpdateSupportTabOptions();
-                OnParametersChanged();
-            };
+            rbSupportTab.CheckedChanged += (s, e) => OnParametersChanged();
             nudTabWidth.ValueChanged += (s, e) => OnParametersChanged();
             nudTabSizeMin.ValueChanged += (s, e) => OnParametersChanged();
             nudTabSizeMax.ValueChanged += (s, e) => OnParametersChanged();
-            nudTabHeldMax.ValueChanged += (s, e) => OnParametersChanged();
 
             // Cutouts: slugs that would tip are cut in pieces that drop between the supports.
             AddSection("Cutouts");
@@ -281,7 +277,7 @@ namespace OpenNest.Controls
             toolTip.SetToolTip(chkSliceSlugs,
                 "Plan Cutting first cuts each cutout slug that would tip along the support grid's lines, "
                 + "stopping a kerf short of the cutout, so its pieces drop between the supports.");
-            layout.Controls.Add(chkSliceSlugs);
+            column.Controls.Add(chkSliceSlugs);
             chkSliceSlugs.CheckedChanged += (s, e) => OnParametersChanged();
 
             // Marks: the part number and bend groups etched in each drawing's label box.
@@ -301,7 +297,7 @@ namespace OpenNest.Controls
                 "Plan Cutting etches each part's number in the label box set in the CAD Converter, "
                 + "alone or with its bend groups (A across the grain, B with it, then C and on). "
                 + "Parts with no label box get none.");
-            layout.Controls.Add(marksGrid);
+            column.Controls.Add(marksGrid);
             cboLabelMode.SelectedIndexChanged += (s, e) => OnParametersChanged();
 
             // Pierce
@@ -317,7 +313,7 @@ namespace OpenNest.Controls
             AddRow(pierceGrid, "Pierce zone diameter:", nudPierceDiameter, 0, "0 = off");
             toolTip.SetToolTip(nudPierceDiameter,
                 "Diameter of the crater a pierce blows through the plate. Each pierce keeps half of it from all part material.");
-            layout.Controls.Add(pierceGrid);
+            column.Controls.Add(pierceGrid);
 
             nudPierceClearance.ValueChanged += (s, e) => OnParametersChanged();
             nudPierceDiameter.ValueChanged += (s, e) => OnParametersChanged();
@@ -392,7 +388,6 @@ namespace OpenNest.Controls
             parameters.TabBySize = rbTabBySize.Checked;
             parameters.TabSizeMinWidth = (double)nudTabSizeMin.Value;
             parameters.TabSizeMaxWidth = (double)nudTabSizeMax.Value;
-            parameters.TabHeldMaxLength = (double)nudTabHeldMax.Value;
             parameters.SliceTippingSlugs = chkSliceSlugs.Checked;
             parameters.LabelMode = (PartLabelMode)System.Math.Max(0, cboLabelMode.SelectedIndex);
             return parameters;
@@ -418,9 +413,7 @@ namespace OpenNest.Controls
                 nudTabWidth.Value = Clamp(nudTabWidth, p.TabConfig.Size);
             nudTabSizeMin.Value = Clamp(nudTabSizeMin, p.TabSizeMinWidth);
             nudTabSizeMax.Value = Clamp(nudTabSizeMax, p.TabSizeMaxWidth);
-            nudTabHeldMax.Value = Clamp(nudTabHeldMax, p.TabHeldMaxLength);
             tabOptions.Enabled = chkTabsEnabled.Checked;
-            UpdateSupportTabOptions();
             chkSliceSlugs.Checked = p.SliceTippingSlugs;
             // A mode the list does not offer (set in code; files load it as Off) shows as Off.
             cboLabelMode.SelectedIndex = System.Enum.IsDefined(p.LabelMode) ? (int)p.LabelMode : (int)PartLabelMode.Off;
@@ -439,11 +432,6 @@ namespace OpenNest.Controls
             var parameters = BuildParameters();
             externalLeads.PreviewParameters = parameters;
             internalLeads.PreviewParameters = parameters;
-        }
-
-        private void UpdateSupportTabOptions()
-        {
-            supportTabOptions.Enabled = chkTabsEnabled.Checked && rbSupportTab.Checked;
         }
 
         private static decimal Clamp(NumericUpDown control, double value) =>
@@ -469,12 +457,27 @@ namespace OpenNest.Controls
                 Anchor = AnchorStyles.Left | AnchorStyles.Right,
                 TextAlign = ContentAlignment.BottomLeft,
                 Font = new Font(Font, FontStyle.Bold),
-                Margin = new Padding(0, layout.Controls.Count == 0 ? 4 : 12, 0, 4),
+                Margin = new Padding(0, column.Controls.Count == (column == layout ? 1 : 0) ? 4 : 12, 0, 4),
                 Padding = new Padding(0, 0, 0, 3),
             };
             header.Paint += (s, e) =>
                 e.Graphics.DrawLine(SystemPens.ControlLight, 0, header.Height - 1, header.Width, header.Height - 1);
-            layout.Controls.Add(header);
+            column.Controls.Add(header);
+        }
+
+        // One column of sections, in a cell of the side-by-side layout.
+        private static TableLayoutPanel CreateColumn(Padding margin)
+        {
+            var result = new TableLayoutPanel
+            {
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                ColumnCount = 1,
+                Dock = DockStyle.Fill,
+                Margin = margin,
+            };
+            result.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            return result;
         }
 
         private static void AddRow(

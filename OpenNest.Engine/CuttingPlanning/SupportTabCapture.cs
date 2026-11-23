@@ -81,15 +81,13 @@ internal static class SupportTabCapture
         var part = source.SourceOrdinal + 1;
         var held = !support.HasBed
             ? FormattableString.Invariant($"is {support.Width:0.####} wide, in the width range tabbed by size,")
-            : support.IsHeldByTab
-            ? FormattableString.Invariant($"is {support.Length:0.####} long, short enough for its tab alone to hold,")
             : support.Margin == double.NegativeInfinity
             ? "rests on no support contact"
             : support.Margin < 0
                 ? FormattableString.Invariant($"has its center of gravity {-support.Margin:0.####} outside its support contacts")
                 : FormattableString.Invariant($"has its center of gravity only {support.Margin:0.####} inside its support contacts");
         var why = $"drawing pin {prepared.PinNumberOf(prepared.PerimeterOrdinal)} cuts its outside without a tab";
-        var needs = support.HasBed && !support.IsHeldByTab ? FormattableString.Invariant($" (needs {support.RequiredMargin:0.####})") : "";
+        var needs = support.HasBed ? FormattableString.Invariant($" (needs {support.RequiredMargin:0.####})") : "";
         return new CuttingPlanFinding(source.SourceOrdinal, source.SourcePart, null, null,
             PostVerificationKind.PartSupport, $"Part {part} {held}{needs} and {why}; it may tip once cut free.");
     }

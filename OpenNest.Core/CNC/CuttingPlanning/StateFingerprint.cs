@@ -93,7 +93,6 @@ internal static class StateFingerprint
             Flag(p.TabBySize);
             Number(p.TabSizeMinWidth);
             Number(p.TabSizeMaxWidth);
-            Number(p.TabHeldMaxLength);
             // Only when on, so fingerprints taken before the setting existed still match.
             if (p.SliceTippingSlugs)
                 text.Append("slugSlices;");

@@ -40,9 +40,8 @@ var result = CuttingPlanService.Plan(snapshot, cancellationToken);
   tabbed perimeter whose automatic entries are ranked by the route, clear of inside corners,
   not by how well the tab steadies it. A tabbed
   part counts as steady wherever its tab is: it is never warned about and stays crossable once
-  cut, though the plan [goes around it where it can](#tabbed-parts-are-avoided-first). A tab in an inside corner is noted on the plan without changing its status. A part no
-  longer than `TabHeldMaxLength` is held by its tab
-  alone, so any tab clear of inside corners steadies it. Without a bed, or with
+  cut, though the plan [goes around it where it can](#tabbed-parts-are-avoided-first). A tab in an inside corner is noted on the plan without changing its status. Every such
+  part is held by its tab, so any tab clear of inside corners steadies it. Without a bed, or with
   `CuttingParameters.TabBySize`, the parts whose width is in `TabSizeMinWidth`..`TabSizeMaxWidth`
   are tabbed instead, and with no range set the plan notes that nothing was tabbed; see
   [support tabs](support-tabs.md).

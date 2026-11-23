@@ -37,7 +37,6 @@ public class CuttingParametersDto
     // The size range's JSON keys keep their names from when only plates with no support bed used it.
     public double NoBedTabMinWidth { get; set; }
     public double NoBedTabMaxWidth { get; set; }
-    public double TabHeldMaxLength { get; set; }
     // Written only when on, so files and settings saved without it are unchanged.
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
     public bool SliceTippingSlugs { get; set; }

@@ -104,14 +104,12 @@ internal static class PartSupportReview
     {
         var held = !support.HasBed
             ? FormattableString.Invariant($"is {support.Width:0.####} wide, in the width range tabbed by size,")
-            : support.IsHeldByTab
-            ? FormattableString.Invariant($"is {support.Length:0.####} long, short enough for its tab alone to hold,")
             : support.Margin == double.NegativeInfinity
             ? "rests on no support contact"
             : support.Margin < 0
                 ? FormattableString.Invariant($"has its center of gravity {-support.Margin:0.####} outside its support contacts")
                 : FormattableString.Invariant($"has its center of gravity only {support.Margin:0.####} inside its support contacts");
-        var needs = support.HasBed && !support.IsHeldByTab
+        var needs = support.HasBed
             ? FormattableString.Invariant($" (needs {support.RequiredMargin:0.####})") : "";
         return $"The part {held}{needs} and it has no tab; it may tip once cut free."
             + (support.BestTabPoint is { } suggested

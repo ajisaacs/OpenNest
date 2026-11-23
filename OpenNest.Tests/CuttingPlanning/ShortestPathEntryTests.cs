@@ -89,7 +89,6 @@ public class ShortestPathEntryTests
         var bed = new SupportGrid(2, 2, offsetX: 0.7, stabilityMargin: stabilityMargin);
         var parameters = Parameters();
         parameters.SupportTabs = true;
-        parameters.TabHeldMaxLength = 0;
         var parts = Strips(3);
         var snapshot = CuttingPlanService.Capture(new CuttingPlanRequest(parts, Start, confirmedParameters: parameters,
             preservePartOrder: true)

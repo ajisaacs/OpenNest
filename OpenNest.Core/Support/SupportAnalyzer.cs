@@ -106,23 +106,8 @@ namespace OpenNest.Support
         }
 
         /// <summary>
-        /// The part's length: the long side of its outline's minimum-area bounding rectangle, or
-        /// NaN when its material could not be read.
-        /// </summary>
-        public static double Length(SupportMaterial material)
-        {
-            ArgumentNullException.ThrowIfNull(material);
-            if (!material.IsComplete || material.Outline.Count < 3)
-                return double.NaN;
-            var box = BoundingRectangle(material.Outline);
-            return System.Math.Max(box.Width, box.Height);
-        }
-
-        /// <summary>
-        /// <paramref name="support"/>, a bed analysis of a part the bed cannot hold level, for a
-        /// part short enough for its tab alone to hold
-        /// (<see cref="CNC.CuttingStrategy.CuttingParameters.TabHoldsAt"/>): its contacts and
-        /// margin are kept, any tab clear of inside corners steadies it, and the best tab point is
+        /// <paramref name="support"/>, a bed analysis of a part the bed cannot hold level, for the
+        /// part held by its support tab: its contacts and margin are kept, any tab clear of inside corners steadies it, and the best tab point is
         /// chosen as without a bed (<see cref="AnalyzeWithoutBed"/>).
         /// </summary>
         public static PartSupport HeldByTab(PartSupport support, SupportMaterial material)
@@ -133,7 +118,7 @@ namespace OpenNest.Support
                 return support;
             var best = BestTabPoint(material.Outline, support.CenterOfGravity, support.InsideCorners,
                 support.InsideCornerClearance, _ => double.PositiveInfinity, out _);
-            return support.WithTabHold(best, Length(material));
+            return support.WithTabHold(best);
         }
 
         // The outline point a tab steadies the part most from, by `score`, clear of every inside
@@ -447,9 +432,9 @@ namespace OpenNest.Support
 
         // A part on a plate with no bed, tabbed for its width: it rests on nothing modeled, and a
         // tab anywhere clear of inside corners is as good as any other.
-        // A copy of `source` held by its tab alone: it keeps its contacts and margin, and any tab
+        // A copy of `source` held by its support tab: it keeps its contacts and margin, and any tab
         // clear of inside corners steadies it.
-        private PartSupport(PartSupport source, Vector? bestTabPoint, double length)
+        private PartSupport(PartSupport source, Vector? bestTabPoint)
         {
             CenterOfGravity = source.CenterOfGravity;
             Contacts = source.Contacts;
@@ -461,10 +446,9 @@ namespace OpenNest.Support
             BestTabPoint = bestTabPoint;
             BestTabMargin = double.PositiveInfinity;
             IsHeldByTab = true;
-            Length = length;
         }
 
-        internal PartSupport WithTabHold(Vector? bestTabPoint, double length) => new(this, bestTabPoint, length);
+        internal PartSupport WithTabHold(Vector? bestTabPoint) => new(this, bestTabPoint);
 
         internal PartSupport(Vector centerOfGravity, Vector? bestTabPoint, IReadOnlyList<Vector> insideCorners,
             double insideCornerClearance, double width)
@@ -487,14 +471,10 @@ namespace OpenNest.Support
         public bool HasBed { get; } = true;
 
         /// <summary>
-        /// True for a part on a bed that cannot hold it level but short enough for its tab alone
-        /// to hold (<see cref="SupportAnalyzer.HeldByTab"/>): any tab clear of inside corners
-        /// steadies it.
+        /// True for a part on a bed that cannot hold it level, held by its support tab instead
+        /// (<see cref="SupportAnalyzer.HeldByTab"/>): any tab clear of inside corners steadies it.
         /// </summary>
         public bool IsHeldByTab { get; }
-
-        /// <summary>The part's length when <see cref="IsHeldByTab"/> (see <see cref="SupportAnalyzer.Length"/>); NaN otherwise.</summary>
-        public double Length { get; } = double.NaN;
 
         /// <summary>The part's width when analyzed without a bed (see <see cref="SupportAnalyzer.Width"/>); NaN otherwise.</summary>
         public double Width { get; } = double.NaN;
