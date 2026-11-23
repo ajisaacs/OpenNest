@@ -480,6 +480,8 @@ namespace OpenNest.Geometry
             if (vertices.Length < 3)
                 return null;
 
+            // Measure relative to a vertex to avoid cancellation of world-coordinate
+            // products when a small clipped fragment is far from the origin.
             var twiceArea = 0.0;
             for (var i = 1; i + 1 < vertices.Length; i++)
                 twiceArea += Cross(vertices[0], vertices[i], vertices[i + 1]);
@@ -489,6 +491,8 @@ namespace OpenNest.Geometry
             var polygon = new Polygon();
             foreach (var vertex in vertices)
                 polygon.Vertices.Add(vertex);
+            // Polygon.Close uses fuzzy Vector equality; clipping needs an exact
+            // closing vertex even when the last edge is shorter than Epsilon.
             polygon.Vertices.Add(vertices[0]);
             polygon.UpdateBounds();
             return polygon;
@@ -764,26 +768,7 @@ namespace OpenNest.Geometry
             return vertices;
         }
 
-        private static Polygon PositiveAreaPolygon(List<Vector> vertices)
-        {
-            if (vertices.Count < 3)
-                return null;
-
-            // Measure relative to a vertex to avoid cancellation of world-coordinate
-            // products when a small clipped fragment is far from the origin.
-            var twiceArea = 0.0;
-            for (var i = 1; i + 1 < vertices.Count; i++)
-                twiceArea += Cross(vertices[0], vertices[i], vertices[i + 1]);
-            if (System.Math.Abs(twiceArea) <= 2 * Tolerance.Epsilon)
-                return null;
-
-            var polygon = new Polygon();
-            polygon.Vertices.AddRange(vertices);
-            // Polygon.Close uses fuzzy Vector equality; clipping needs an exact
-            // closing vertex even when the last edge is shorter than Epsilon.
-            polygon.Vertices.Add(vertices[0]);
-            polygon.UpdateBounds();
-            return polygon;
-        }
+        private static Polygon PositiveAreaPolygon(List<Vector> vertices) =>
+            PositiveAreaPolygon(CollectionsMarshal.AsSpan(vertices));
     }
 }
