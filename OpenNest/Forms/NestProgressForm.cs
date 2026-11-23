@@ -218,6 +218,10 @@ namespace OpenNest.Forms
         /// <summary>The layout the user chose to use; null when none was chosen.</summary>
         internal NestLayoutChoice ChosenLayout { get; private set; }
 
+        /// <summary>True when the user used a layout here (Use This Layout or a double-click),
+        /// rather than the run's result being taken for them.</summary>
+        internal bool LayoutPickedByUser { get; private set; }
+
         /// <summary>
         /// Adds a layout from the running solve to the cards added by <see cref="ShowPlanStrip"/>;
         /// <paramref name="best"/> marks the engine's best so far.
@@ -340,6 +344,7 @@ namespace OpenNest.Forms
                 return;
             StopChoiceCountdown();
             ChosenLayout = layoutList.Selected;
+            LayoutPickedByUser = true;
             layoutList.AllowSelection = false;
             useLayoutButton.Enabled = false;
             stopButton.Enabled = false;

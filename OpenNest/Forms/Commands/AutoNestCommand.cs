@@ -15,7 +15,8 @@ namespace OpenNest.Forms.Commands
     /// <summary>
     /// Auto Nest from the confirmed dialog to the committed plates: owned modal progress with
     /// the best plan so far as a sheet strip, whole-job solve, validation review, a Keep/Discard
-    /// review of the final sheets, commit to empty plates and the result notices. The plate view
+    /// review of the final sheets (skipped when the user picked the layout in the progress
+    /// window), commit to empty plates and the result notices. The plate view
     /// never shows Auto Nest parts before they are kept: the result is a set of sheets, not
     /// parts on the current plate.
     /// The caller owns the busy guard, the nesting lockout and the cancellation source.
@@ -120,6 +121,7 @@ namespace OpenNest.Forms.Commands
                     });
                 NestPipelineResult result;
                 ServerNestDecision server = null;
+                var picked = false;
                 if (nestOnServer)
                 {
                     var solved = await ServerAutoNest.SolveAsync(owner, target, request, cts);
@@ -128,7 +130,7 @@ namespace OpenNest.Forms.Commands
                 }
                 else
                 {
-                    result = await SolveAsync(owner, target, request, cts, chooseLayout: true);
+                    (result, picked) = await SolveAndPickAsync(owner, target, request, cts, chooseLayout: true);
                 }
                 cts.Token.ThrowIfCancellationRequested();
 
@@ -145,7 +147,7 @@ namespace OpenNest.Forms.Commands
                         target.Nest.SalvageRate = salvageRate;
                         target.Nest.MinimumRemnantDimension = minRemnantSize;
                     }
-                }, cts.Token);
+                }, cts.Token, layoutPicked: picked);
             }
             catch (OperationCanceledException) when (cts.IsCancellationRequested)
             {
@@ -166,8 +168,12 @@ namespace OpenNest.Forms.Commands
         /// too. <paramref name="applying"/> runs inside the commit's undo record. Returns the plates
         /// committed, or null when nothing was kept.
         /// </summary>
+        /// <param name="layoutPicked">The user already chose this layout in the progress window:
+        /// the Keep/Discard review is skipped, and any unplaced parts are named after the commit
+        /// instead. The validation review still runs when the layout broke rules.</param>
         internal static async Task<IReadOnlyList<Plate>> ReviewAndCommitAsync(IWin32Window owner, EditNestForm target,
-            NestPipelineResult result, ServerNestDecision server, Action<IReadOnlyList<Plate>> applying, CancellationToken token)
+            NestPipelineResult result, ServerNestDecision server, Action<IReadOnlyList<Plate>> applying, CancellationToken token,
+            bool layoutPicked = false)
         {
             var allowInvalid = false;
             if (!result.IsValid)
@@ -181,12 +187,13 @@ namespace OpenNest.Forms.Commands
                 allowInvalid = true;
             }
 
-            var costs = result.IsValid && result.CanKeep ? NestCostSummary.FromAccepted(result) : null;
-            var costText = costs?.Basis == "supplied-cost"
-                ? $"Gross sheet cost: {costs.GrossTotal:G}; estimated salvage credit: {costs.SalvageCredit:G}; net score: {costs.NetScore:G}"
-                : null;
-            using (var review = new NestReviewForm(result, target.PlateView.ColorScheme, costText))
+            if (!layoutPicked)
             {
+                var costs = result.IsValid && result.CanKeep ? NestCostSummary.FromAccepted(result) : null;
+                var costText = costs?.Basis == "supplied-cost"
+                    ? $"Gross sheet cost: {costs.GrossTotal:G}; estimated salvage credit: {costs.SalvageCredit:G}; net score: {costs.NetScore:G}"
+                    : null;
+                using var review = new NestReviewForm(result, target.PlateView.ColorScheme, costText);
                 if (review.ShowDialog(owner) != DialogResult.OK)
                 {
                     await (server?.DiscardAsync() ?? Task.CompletedTask);
@@ -216,9 +223,16 @@ namespace OpenNest.Forms.Commands
                 target.OverlapDisplay = OverlapDisplayMode.Both;
                 await target.CheckOverlapsAsync();
             }
+            // Never drop demand silently: without the review, name what was left out here.
+            if (layoutPicked && result.Unplaced.Count > 0)
+                MessageBox.Show(owner, UnplacedNotice(result), Caption, MessageBoxButtons.OK, MessageBoxIcon.Information);
             ShowResultNotices(owner, target, applied);
             return applied;
         }
+
+        internal static string UnplacedNotice(NestPipelineResult result) =>
+            $"Not placed ({result.Unplaced.Sum(u => u.Count)}):\n\n"
+                + string.Join("\n", result.Unplaced.Select(u => u.Describe()));
 
         /// <summary>
         /// Solves <paramref name="request"/> off the UI thread behind the owned modal progress
@@ -236,6 +250,15 @@ namespace OpenNest.Forms.Commands
         /// until the user picks or discards.</param>
         internal static async Task<NestPipelineResult> SolveAsync(IWin32Window owner, EditNestForm target,
             NestPipelineRequest request, CancellationTokenSource cts, bool chooseLayout = false,
+            TimeSpan? choiceTimeout = null) =>
+            (await SolveAndPickAsync(owner, target, request, cts, chooseLayout, choiceTimeout)).Result;
+
+        /// <summary>
+        /// <see cref="SolveAsync"/>, also telling whether the user picked the layout in the
+        /// progress window (Picked) rather than having the run's result taken for them.
+        /// </summary>
+        internal static async Task<(NestPipelineResult Result, bool Picked)> SolveAndPickAsync(IWin32Window owner,
+            EditNestForm target, NestPipelineRequest request, CancellationTokenSource cts, bool chooseLayout = false,
             TimeSpan? choiceTimeout = null)
         {
             using var progressForm = new NestProgressForm(cts, showPlateRow: true)
@@ -260,7 +283,7 @@ namespace OpenNest.Forms.Commands
             });
             var jobProgress = JobEngineNest.CreateLayoutProgress(request.EngineName, progress, layouts);
 
-            async Task<NestPipelineResult> RunSolveAsync()
+            async Task<(NestPipelineResult, bool)> RunSolveAsync()
             {
                 try
                 {
@@ -283,7 +306,9 @@ namespace OpenNest.Forms.Commands
                         throw new OperationCanceledException(cts.Token);
                     }
                     var chosen = progressForm.ChosenLayout;
-                    return chosen == null ? result : await Task.Run(() => chosen.Accept(cts.Token));
+                    return chosen == null
+                        ? (result, false)
+                        : (await Task.Run(() => chosen.Accept(cts.Token)), progressForm.LayoutPickedByUser);
                 }
                 finally
                 {

@@ -104,6 +104,7 @@ public class NestProgressFormLayoutsTests
         Assert.True(stopped());
         Assert.False(cts.IsCancellationRequested);
         Assert.Same(row, form.ChosenLayout);
+        Assert.True(form.LayoutPickedByUser);
         // Already chosen: the finished search does not ask again.
         Assert.True(form.ChooseLayoutAsync(Columns()).Result);
         Assert.Same(row, form.ChosenLayout);
@@ -124,6 +125,7 @@ public class NestProgressFormLayoutsTests
         Button(form, "useLayoutButton").PerformClick();
         Assert.True(pick.Result);
         Assert.Same(final, form.ChosenLayout);
+        Assert.True(form.LayoutPickedByUser);
         Assert.False(stopped());
         Assert.False(cts.IsCancellationRequested);
     });
@@ -171,6 +173,8 @@ public class NestProgressFormLayoutsTests
         Assert.True(pick.IsCompleted);
         Assert.True(pick.Result);
         Assert.Same(final, form.ChosenLayout);
+        // Taken for the user, not picked: the Keep/Discard review still asks.
+        Assert.False(form.LayoutPickedByUser);
         Assert.False(stopped());
         Assert.False(cts.IsCancellationRequested);
     });
@@ -217,5 +221,6 @@ public class NestProgressFormLayoutsTests
 
         Assert.True(form.ChooseLayoutAsync(final).Result);
         Assert.Same(final, form.ChosenLayout);
+        Assert.False(form.LayoutPickedByUser);
     });
 }
