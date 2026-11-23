@@ -35,18 +35,19 @@ namespace OpenNest.Labels
         // Each glyph is a list of strokes on the grid: polylines (P, x,y pairs) or paths of lines and arcs (S).
         private static readonly Dictionary<char, GlyphStroke[]> Glyphs = new()
         {
-            // The round digits are drawn on circles of radius 2 centered at (2, 2) and (2, 6).
+            // The round digits' bowls are circles of radius 2 centered at (2, 2) and (2, 6); the 6 and
+            // 9 reach them on a long arc of radius 6.5 that meets the bowl's side tangentially.
             ['0'] = new[] { S(0, 2).L(0, 6).Arc(2, 6, 0, Cw).L(4, 2).Arc(2, 2, 180, Cw),
                 S(2 - Root2, 2 - Root2).L(2 + Root2, 6 + Root2) },
             ['1'] = new[] { P(1, 6, 2, 8, 2, 0), P(1, 0, 3, 0) },
             ['2'] = new[] { S(2 - Root3, 7).Arc(2, 6, -30, Cw).L(0, 0).L(4, 0) },
             ['3'] = new[] { S(2 - Root3, 7).Arc(2, 6, -90, Cw).Arc(2, 2, -150, Cw) },
             ['4'] = new[] { P(3, 0, 3, 8, 0, 3, 4, 3) },
-            ['5'] = new[] { S(4, 8).L(0, 8).L(0, 4).L(2, 4).Arc(2, 2, -150, Cw) },
-            ['6'] = new[] { S(2 + Root2, 6 + Root2).Arc(2, 6, 180, Ccw).L(0, 2).Arc(2, 2, 0, Ccw).Arc(2, 2, 180, Ccw) },
+            ['5'] = new[] { S(4, 8).L(2 - Root2, 8).L(2 - Root2, 2 + Root2).Arc(2, 2, -150, Cw) },
+            ['6'] = new[] { S(3.2, 7.6).Arc(6.5, 2, 180, Ccw).Arc(2, 2, 0, Ccw).Arc(2, 2, 180, Ccw) },
             ['7'] = new[] { P(0, 8, 4, 8, 1, 0) },
             ['8'] = new[] { S(2, 4).Arc(2, 6, 90, Ccw).Arc(2, 6, -90, Ccw).Arc(2, 2, -90, Cw).Arc(2, 2, 90, Cw) },
-            ['9'] = new[] { S(2 - Root2, 2 - Root2).Arc(2, 2, 0, Ccw).L(4, 6).Arc(2, 6, 180, Ccw).Arc(2, 6, 0, Ccw) },
+            ['9'] = new[] { S(0.8, 0.4).Arc(-2.5, 6, 0, Ccw).Arc(2, 6, 180, Ccw).Arc(2, 6, 0, Ccw) },
             ['-'] = new[] { P(0, 4, 4, 4) },
             ['_'] = new[] { P(0, 0, 4, 0) },
             ['.'] = new[] { P(1.5, 0, 2.5, 0) },
