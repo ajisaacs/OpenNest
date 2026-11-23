@@ -185,7 +185,7 @@ namespace OpenNest.Engine.Fill
                 for (var i = 0; i <= samples; i++)
                 {
                     var across = lo + (hi - lo) * i / samples;
-                    var copy = StartBeyond(template, workArea, spacing, slide, across, vertical);
+                    var copy = SlideStart.Beyond(template, workArea, spacing, slide, across, vertical);
                     moving.Clear();
                     moving.Add(copy);
                     var travel = Compactor.Push(moving, workArea, direction, obstacleSet);
@@ -206,42 +206,6 @@ namespace OpenNest.Engine.Fill
             }
 
             return best;
-        }
-
-        /// <summary>
-        /// A copy of <paramref name="template"/> just beyond the work-area edge the slide
-        /// starts from, its inner bound at <paramref name="across"/> across the row.
-        /// </summary>
-        private static Part StartBeyond(
-            Part template,
-            Box workArea,
-            double spacing,
-            PushDirection slide,
-            double across,
-            bool vertical
-        )
-        {
-            var box = template.BoundingBox;
-            var gap = spacing + 1.0;
-            double dx, dy;
-            if (vertical)
-            {
-                dy = across - box.Bottom;
-                dx = slide == PushDirection.Left
-                    ? workArea.Right + gap - box.Left
-                    : workArea.Left - gap - box.Right;
-            }
-            else
-            {
-                dx = across - box.Left;
-                dy = slide == PushDirection.Down
-                    ? workArea.Top + gap - box.Bottom
-                    : workArea.Bottom - gap - box.Top;
-            }
-
-            var copy = template.CloneAtOffset(new Vector(dx, dy));
-            copy.UpdateBounds();
-            return copy;
         }
 
         /// <summary>How far the copy got: smaller is deeper along the slide.</summary>
