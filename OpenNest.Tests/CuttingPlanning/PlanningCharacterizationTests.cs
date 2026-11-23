@@ -93,7 +93,8 @@ public class PlanningCharacterizationTests
         var clean = new Program();
         clean.MoveTo(5, 5); clean.LineTo(15, 5); clean.LineTo(15, 15); clean.LineTo(5, 15); clean.LineTo(5, 5);
         clean.MoveTo(0, 0); clean.LineTo(0, 20); clean.LineTo(20, 20); clean.LineTo(20, 0); clean.LineTo(0, 0);
-        var host = new Part(new Drawing("host", clean), new Vector(0, 0));
+        // One in from the sheet corner, so the locked perimeter lead stays on the sheet.
+        var host = new Part(new Drawing("host", clean), new Vector(1, 1));
         var locked = new Program();
         locked.MoveTo(9, 10);
         locked.Codes.Add(new LinearMove(5, 10) { Layer = LayerType.Leadin });
@@ -102,7 +103,7 @@ public class PlanningCharacterizationTests
         locked.Codes.Add(new LinearMove(0, 10) { Layer = LayerType.Leadin });
         locked.LineTo(0, 20); locked.LineTo(20, 20); locked.LineTo(20, 0); locked.LineTo(0, 0); locked.LineTo(0, 10);
         Assert.True(host.RestoreLeadInProgram(locked, true));
-        var nested = new Part(new Drawing("nested", LeadPathValidationTests.Rectangle(0, 0, 2, 2)), new Vector(6, 9));
+        var nested = new Part(new Drawing("nested", LeadPathValidationTests.Rectangle(0, 0, 2, 2)), new Vector(7, 10));
         var nest = new Nest();
         return (Plate(nest, nested, host), host, nested, nest);
     }

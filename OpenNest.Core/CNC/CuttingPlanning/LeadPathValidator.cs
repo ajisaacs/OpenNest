@@ -12,10 +12,11 @@ public sealed record LeadPathValidationResult(bool IsComplete, bool IsClear, str
 
 /// <summary>
 /// One lead motion of a fixed emission that failed validation. <see cref="Obstacle"/> indexes the
-/// other materials passed to the check, or is null when the lead meets its own part's material
-/// or could not be checked.
+/// other materials passed to the check, or is null when the lead meets its own part's material,
+/// runs off the sheet (<see cref="OffSheet"/>) or could not be checked.
 /// </summary>
-internal sealed record FixedLeadFailure(int Motion, LeadPathValidationResult Result, int? Obstacle);
+internal sealed record FixedLeadFailure(int Motion, LeadPathValidationResult Result, int? Obstacle,
+    bool OffSheet = false);
 
 /// <summary>Certifies actual emitted native lead paths against owned nominal material.</summary>
 public static class LeadPathValidator
@@ -79,6 +80,13 @@ public static class LeadPathValidator
                 if (move.Layer is not (LayerType.Leadin or LayerType.Leadout))
                     continue;
                 var (failure, obstacle) = CheckMotion(i);
+                if (failure == null && target.Sheet is { } sheet && OffSheet(execution.Motions[i], sheet) is { } off)
+                {
+                    if (isFixed?.Invoke(i) != true || fixedFailures == null)
+                        return off;
+                    fixedFailures.Add(new(i, off, null, OffSheet: true));
+                    continue;
+                }
                 if (failure == null)
                     continue;
                 if (isFixed?.Invoke(i) != true || fixedFailures == null)
@@ -299,6 +307,39 @@ public static class LeadPathValidator
         catch (Exception ex) when (ex is ArgumentException or NotSupportedException)
         {
             return new(false, false, ex.Message);
+        }
+    }
+
+    private const string OffSheetPhrase = " past the plate's ";
+
+    /// <summary>Whether <paramref name="reason"/> is an <see cref="OffSheet"/> refusal.</summary>
+    internal static bool IsOffSheet(string reason) =>
+        reason?.StartsWith("Lead-", StringComparison.Ordinal) == true
+        && reason.Contains(OffSheetPhrase, StringComparison.Ordinal);
+
+    /// <summary>
+    /// A complete refusal when the lead's native curve runs past <paramref name="sheet"/> by more
+    /// than the slack the pre-post plate edge check allows (docs/post-verification.md), else null.
+    /// </summary>
+    internal static LeadPathValidationResult OffSheet(ExecutionMotion move, Box sheet)
+    {
+        var bounds = move.Curve.ToEntity().BoundingBox;
+        var (edge, past) = ("left", sheet.Left - bounds.Left);
+        Furthest("bottom", sheet.Bottom - bounds.Bottom);
+        Furthest("right", bounds.Right - sheet.Right);
+        Furthest("top", bounds.Top - sheet.Top);
+        if (!double.IsFinite(past))
+            return new(false, false, "Lead geometry or the sheet is not finite.");
+        return past > SpacingOutline.SpacingSlack
+            ? new(true, false, FormattableString.Invariant(
+                $"{(move.Layer == LayerType.Leadin ? "Lead-in" : "Lead-out")} runs {past:F3}{OffSheetPhrase}{edge} edge. ")
+                + "Move the part farther from the edge or shorten the lead, then replan.")
+            : null;
+
+        void Furthest(string side, double distance)
+        {
+            if (!double.IsFinite(distance) || distance > past)
+                (edge, past) = (side, distance);
         }
     }
 

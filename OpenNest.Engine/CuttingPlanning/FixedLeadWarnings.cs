@@ -44,6 +44,7 @@ internal static class FixedLeadWarnings
         var obstacle = failure.Obstacle is int index ? materialOwners[index] : null;
         var what = !failure.Result.IsComplete
             ? $"could not be checked ({failure.Result.Reason})"
+            : failure.OffSheet ? $"runs off the plate ({failure.Result.Reason})"
             : obstacle != null ? "contacts or enters another part's material"
             : $"contacts or enters its own part's material ({failure.Result.Reason})";
         var motion = execution.Motions[failure.Motion];

@@ -360,7 +360,8 @@ public class CommonLinePlanningTests
     [Fact]
     public void LeadInLongerThanASharedSpan_Refuses()
     {
-        var result = Plan(Row(2), Parameters(leadIn: 12));
+        // Far enough from the edges that the long lead stays on the sheet.
+        var result = Plan(Row(2, x: 20, y: 20), Parameters(leadIn: 12));
 
         Assert.Equal(CuttingPlanStatus.UnsupportedGeometry, result.Status);
         Assert.Contains(result.Findings, f => f.Message.Contains("shorter than the 12 external lead-in"));

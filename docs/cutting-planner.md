@@ -411,7 +411,13 @@ contact query still counts it as touched (for a very small arc up to 0.0001 beyo
 its radius). Nothing is skipped when either extent has a nonfinite bound or reaches
 beyond 1e6, where rounding of large supports can exceed any fixed margin. Actual
 lead-in and lead-out line/arc paths must stay in target scrap and avoid other
-placed material; holes in other parts remain scrap. Tangent/coincident contacts
+placed material; holes in other parts remain scrap. On a plate-scoped plan they
+must also stay on the sheet: a lead whose native curve runs past the plate's box by
+more than the pre-post plate edge check's slack is refused like a contact, so the
+search enters from a side with room, and a contour with none fails naming the edge.
+A part whose own material is already off the sheet keeps the old checks: no lead can
+fix it, and the plate edge check reports it.
+Tangent/coincident contacts
 outside the genuine target contour joint and numerically uncertain queries refuse.
 Material capture supports a simple closed perimeter minus disjoint, non-nested
 holes; unsupported topology is not a bounding-box approximation. A line meeting a
@@ -604,7 +610,8 @@ parts) is a fixed emission: everything it does after the planner's rapid into it
 accepted as given. So is each drawing-pinned contour of a
 regenerated part (see [drawing pins](#drawing-pins)). Their violations are not refusals:
 
-- Its lead-ins and lead-outs meeting another part's material or its own, a rapid inside
+- Its lead-ins and lead-outs meeting another part's material or its own or running off
+  the plate, a rapid inside
   it crossing a completed contour, a lead-out after its own open contour, and coverage
   that cannot be certified (a tab gap, a partial, reversed or retraced cut) each become a
   `PostVerificationKind.FixedLead` finding naming the part, the cutting contour where

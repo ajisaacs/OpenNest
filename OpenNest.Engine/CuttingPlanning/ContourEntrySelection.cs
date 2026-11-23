@@ -97,6 +97,8 @@ internal static class ContourEntrySelection
         var uncertain = new List<ContourEntryCandidate>();
         var sawIncomplete = false;
         string? incompleteReason = null;
+        // The first entry refused for a lead off the sheet: named when nothing fits.
+        string? offSheetReason = null;
         var index = 0;
 
         ContourFeasibilityVerdict Verdict(ContourEntryCandidate candidate)
@@ -106,6 +108,8 @@ internal static class ContourEntrySelection
             {
                 known = evaluate(candidate);
                 verdicts[candidate.GeometryKey] = known;
+                if (known.Status == ContourFeasibilityStatus.Blocked && LeadPathValidator.IsOffSheet(known.Reason))
+                    offSheetReason ??= known.Reason;
                 evaluated.Add(candidate);
             }
             return known;
@@ -177,7 +181,7 @@ internal static class ContourEntrySelection
         {
             shortfall = ContourSelectionShortfall.Exhausted;
             reason = selected.Count == 0
-                ? "No tested lead-in fits on this contour."
+                ? "No tested lead-in fits on this contour." + (offSheetReason == null ? "" : " " + offSheetReason)
                 : null;
         }
         else

@@ -48,6 +48,14 @@ public sealed class LeadMaterialSnapshot
     /// </summary>
     internal bool HasDisplayPerimeter { get; }
 
+    /// <summary>
+    /// The sheet this material is placed on (the plate's box, in the same frame), or null when
+    /// the check has no plate. Lead motions checked against this material as their own part's
+    /// must stay on it (<see cref="LeadPathValidator"/>): a pierce or lead off the sheet cuts air,
+    /// or the table. Set once by the planner's capture, before any check reads it.
+    /// </summary>
+    internal Box Sheet { get; set; }
+
     /// <summary>Capture a stable, clean, rotation-baked program, applying location once.
     /// Unsupported or malformed geometry produces an incomplete snapshot; cancellation throws.</summary>
     public static LeadMaterialSnapshot Capture(Program cleanProgram, Vector location,

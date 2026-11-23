@@ -71,6 +71,12 @@ public static class CuttingPlanService
             var identities = new HashSet<Part>(ReferenceEqualityComparer.Instance);
             // Every part's box, read once, for slug slices to keep clear of parts nested in a cutout.
             Box[] partBoxes = null;
+            // The sheet every planned lead must stay on; none for a detached part list or a plate
+            // with no usable size, which the pre-post plate edge check reports instead.
+            var plateSize = request.Plate?.Size;
+            var sheetBox = plateSize is { } size && size.Length > 0 && size.Width > 0
+                && double.IsFinite(size.Length) && double.IsFinite(size.Width)
+                    ? request.Plate.BoundingBox(includeParts: false) : null;
             for (var index = 0; index < request.Parts.Count; index++)
             {
                 token.ThrowIfCancellationRequested();
@@ -168,6 +174,10 @@ public static class CuttingPlanService
                 if (request.ConfirmedParameters != null)
                 {
                     material = LeadMaterialSnapshot.Capture(ownedClean, location, token, sharedSpans: member);
+                    // Leads must stay on the sheet, as the pre-post plate edge check requires. A part
+                    // whose own material is already off it is past fixing by its leads: that check
+                    // reports it, and the planner plans it as before.
+                    material.Sheet = sheetBox != null && OnSheet(cleanBounds, sheetBox) ? sheetBox : null;
                     if (!material.IsComplete)
                     {
                         if (!bestEffort)
@@ -256,6 +266,14 @@ public static class CuttingPlanService
     // A common-line member regenerates from its marked clean program: holes as usual, then its
     // whole perimeter from its common line, or its remainder, from one fixed entry. Its leads are checked here, so a lead that
     // fits nowhere refuses with the span named rather than as a search that ran out.
+    // Whether clean material bounds lie on the sheet, with the plate edge check's slack.
+    private static bool OnSheet(Box material, Box sheet)
+    {
+        const double slack = SpacingOutline.SpacingSlack;
+        return material != null && material.Left >= sheet.Left - slack && material.Bottom >= sheet.Bottom - slack
+            && material.Right <= sheet.Right + slack && material.Top <= sheet.Top + slack;
+    }
+
     private static FixedProgramPlacement CaptureMember(FixedProgramPlacement placed, Program clean,
         CommonLineCapture commonLines, CuttingPlanRequest request, IReadOnlyList<LeadMaterialSnapshot> materials,
         List<CuttingPlanFinding> warnings, bool bestEffort, CancellationToken token)
