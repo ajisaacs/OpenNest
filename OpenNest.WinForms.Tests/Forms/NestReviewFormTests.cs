@@ -73,6 +73,24 @@ public class NestReviewFormTests
         Assert.Equal(200.0 / outline.Area, strip.Utilization, 6);
     }, TimeSpan.FromMinutes(1), "The STA test did not complete.");
 
+    [Fact]
+    public void SheetsKeepFullHeightWhenTheCaptionsAloneOverflowTheWidth() => StaTestThread.Run(() =>
+    {
+        var stock = new NestPlateStock("sheet", new Size(48, 96), quantity: null, partSpacing: 0.25);
+        using var strip = new OpenNest.Controls.SheetStripControl { Size = new System.Drawing.Size(600, 300), ShowRemnant = true };
+
+        strip.SetSheets(new[] { new ProposedPlate(0, stock, Array.Empty<Part>()) });
+        var one = strip.PixelsPerUnit;
+        // Twelve captions cannot fit 600 pixels at any scale.
+        strip.SetSheets(Enumerable.Range(0, 12)
+            .Select(i => new ProposedPlate(i, stock, Array.Empty<Part>()))
+            .ToArray());
+
+        Assert.True(one > 0);
+        Assert.Equal(one, strip.PixelsPerUnit, 3);
+        Assert.True(strip.AutoScrollMinSize.Width > strip.ClientSize.Width);
+    }, TimeSpan.FromMinutes(1), "The STA test did not complete.");
+
     private static int SheetPixels(OpenNest.Controls.SheetStripControl strip)
     {
         using var bitmap = new System.Drawing.Bitmap(strip.Width, strip.Height);

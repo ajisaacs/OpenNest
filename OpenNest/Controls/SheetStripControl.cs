@@ -115,9 +115,11 @@ namespace OpenNest.Controls
 
         /// <summary>
         /// Pixels per world unit, shared by every sheet. All sheets fit the width when they can;
-        /// otherwise they shrink to a third of full height and the strip scrolls.
+        /// otherwise they shrink to a third of full height and the strip scrolls. When the
+        /// captions alone are wider than the strip, shrinking cannot avoid the scroll, so the
+        /// sheets keep full height and the strip scrolls.
         /// </summary>
-        private float PixelsPerUnit
+        internal float PixelsPerUnit
         {
             get
             {
@@ -128,8 +130,10 @@ namespace OpenNest.Controls
                 if (tallest <= 0 || height <= 0)
                     return 0;
                 var full = (float)(height / tallest);
-                // Largest scale whose tiles, captions included, fit the width (tile widths grow with scale).
                 var width = ClientSize.Width - Edge * 2 - Gap * (tiles.Count - 1);
+                if (tiles.Sum(t => TileWidth(t, 0)) > width)
+                    return full;
+                // Largest scale whose tiles, captions included, fit the width (tile widths grow with scale).
                 float low = 0, high = full;
                 for (var i = 0; i < 24; i++)
                 {
