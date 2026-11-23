@@ -85,8 +85,10 @@ A `labelMode` number that names no choice (the reader accepts numbers) loads as 
 - **Bend groups.** A bend's group is its line's direction against the sheet grain in 15° steps
   (`BendGrain.Bucket`, bend line plus the part's rotation against `Plate.GrainAngle`), named by a
   fixed letter so a group means the same thing on every part and sheet: **A** across the grain,
-  **B** with it, then **C** to **L** for the steps between, in bucket order from the grain. Bends
-  with the same letter can be formed in one setup. The letters depend on how the part is
+  **B** with it, then **C** to **L** for the steps between, in bucket order from the grain. The
+  letter does not say which way a part bends. It says how the grain runs against its bends, which
+  changes springback and so the angle correction at the press brake: bends with the same letter
+  take the same correction and can be formed together. The letters depend on how the part is
   rotated on the sheet, which is why the text is made when cutting is planned, not stored with the
   box.
 - **Font.** `StrokeFont` is a small built-in single-stroke font (digits, capitals, `- _ . /`), so

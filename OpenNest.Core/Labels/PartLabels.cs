@@ -18,7 +18,8 @@ namespace OpenNest.Labels
     /// A bend group is the bend line's direction relative to the grain (<see cref="BendGrain.Bucket"/>),
     /// named by a fixed letter so a group has the same letter on every part and sheet of a nest:
     /// A across the grain, B with it, then C and on for the 15° steps between, in bucket order.
-    /// Bends sharing a letter can be formed in one setup. Like a dimension, the box only stores
+    /// The grain changes springback, so bends sharing a letter take the same press brake angle
+    /// correction and can be formed together. Like a dimension, the box only stores
     /// placement; the text is made when the part is planned, because the letters depend on how the
     /// part was rotated.
     /// </remarks>
