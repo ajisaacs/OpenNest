@@ -114,7 +114,27 @@ namespace OpenNest.Forms
             statusBar.UpdatePlate(); // Material and thickness may have changed.
         }
 
-        private void Clamps_Click(object sender, EventArgs e)
+        private void Clamps_Click(object sender, EventArgs e) =>
+            EditNestSetup("Clamps",
+                (nest, machine) => new ClampsForm(nest.PlateDefaults.ClampRail, nest.Units,
+                    MachineSettings.LoadClampSettings(machine), machine?.Name ?? nest.Machine?.Name,
+                    machine == null ? null : settings => MachineSettings.SaveClampSettings(machine.Id, settings)),
+                (nest, form) => form.Editor.ApplyTo(nest));
+
+        private void SupportGrid_Click(object sender, EventArgs e) =>
+            EditNestSetup("Support Bed",
+                (nest, machine) => new SupportGridForm(nest.SupportBed, nest.Units,
+                    MachineSettings.LoadSupportGridSettings(machine), machine?.Name ?? nest.Machine?.Name,
+                    machine == null ? null : settings => MachineSettings.SaveSupportGridSettings(machine.Id, settings)),
+                (nest, form) => nest.SetSupportBed(form.Bed));
+
+        /// <summary>
+        /// Shows a nest setup dialog for the active nest, made with the nest's machine (null when
+        /// it has none) so the dialog can save that machine's defaults, and records applying it as
+        /// one nest edit named <paramref name="label"/>.
+        /// </summary>
+        private void EditNestSetup<TForm>(string label, Func<Nest, MachineConfig, TForm> createForm, Action<Nest, TForm> apply)
+            where TForm : Form
         {
             var editForm = activeForm;
             if (editForm == null)
@@ -122,45 +142,15 @@ namespace OpenNest.Forms
 
             var nest = editForm.Nest;
             var views = ViewsOf(nest);
-            if (WarnIfPlateWorkBusy(views, "Clamps"))
+            if (WarnIfPlateWorkBusy(views, label))
                 return;
 
-            var machine = MachineSettings.FindMachine(nest.Machine);
-            Action<ClampSettings> save = machine == null
-                ? null
-                : settings => MachineSettings.SaveClampSettings(machine.Id, settings);
-            using var form = new ClampsForm(nest.PlateDefaults.ClampRail, nest.Units, MachineSettings.LoadClampSettings(machine),
-                machine?.Name ?? nest.Machine?.Name, save);
+            using var form = createForm(nest, MachineSettings.FindMachine(nest.Machine));
             if (form.ShowDialog(this) != DialogResult.OK)
                 return;
 
             // Saving as machine defaults inside the dialog is not a nest edit; applying is.
-            editForm.RecordChange("Clamps", () => form.Editor.ApplyTo(nest));
-            foreach (var view in views)
-                view.Invalidate();
-        }
-
-        private void SupportGrid_Click(object sender, EventArgs e)
-        {
-            var editForm = activeForm;
-            if (editForm == null)
-                return;
-
-            var nest = editForm.Nest;
-            var views = ViewsOf(nest);
-            if (WarnIfPlateWorkBusy(views, "Support Bed"))
-                return;
-
-            var machine = MachineSettings.FindMachine(nest.Machine);
-            Action<SupportGridSettings> save = machine == null
-                ? null
-                : settings => MachineSettings.SaveSupportGridSettings(machine.Id, settings);
-            using var form = new SupportGridForm(nest.SupportBed, nest.Units, MachineSettings.LoadSupportGridSettings(machine),
-                machine?.Name ?? nest.Machine?.Name, save);
-            if (form.ShowDialog(this) != DialogResult.OK)
-                return;
-
-            editForm.RecordChange("Support Bed", () => nest.SetSupportBed(form.Bed));
+            editForm.RecordChange(label, () => apply(nest, form));
             foreach (var view in views)
                 view.Invalidate();
         }
