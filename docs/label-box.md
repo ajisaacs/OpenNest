@@ -30,13 +30,18 @@ nesting geometry, cut time or posts, and it does not appear in DXF, DWG or SVG e
   eroded by the clearance with the same Clipper inward offset the pierce search uses, a band
   of the clearance is cut out either side of each bend line, and a breakoff's scrap is cut
   out grown by the clearance, because it is snapped off after forming.
-- For each orientation tried, the largest empty rectangles of the rotated region
-  (`MaximalRectangles`) are searched and the label-sized box is centered in the one with the
-  most room around it. Orientations are the axes, each bend's direction and the longest
-  straight edge's, plus the quarter turn of each; text is never turned past a quarter so it
-  never reads upside down. A later orientation replaces an earlier one only with 5% more
-  room, which favors horizontal text. Rectangles are staircased against slanted and curved
-  edges, so they stay inside the clearance and may fall a little short of the true best.
+- For each orientation tried, the label gets the widest margin it can have on every side beyond
+  the clearance: the largest m for which some empty rectangle of the rotated region
+  (`MaximalRectangles`) holds the label grown by m all round, found by bisection. The box is
+  centered in that rectangle, so it lands where it has the most room rather than halfway along
+  a long, narrow strip (such as the gap between a hole and a slanted edge). Orientations are the
+  axes, each bend's direction and the longest straight edge's, plus the quarter turn of each;
+  text is never turned past a quarter so it never reads upside down. Horizontal is tried first.
+  A later orientation replaces the best so far only with 5% more margin, and a turn off the axes
+  replaces horizontal or vertical text only with half again its margin plus half the label
+  height, so level text wins unless a slanted spot is clearly roomier. Rectangles are
+  staircased against slanted and curved edges, so they stay inside the clearance and may fall a
+  little short of the true best.
 - No box when no orientation fits. The finder throws for a non-positive size or a negative
   clearance.
 - Split pieces start with no label box, like dimensions, breakoffs and tabbed cutouts.

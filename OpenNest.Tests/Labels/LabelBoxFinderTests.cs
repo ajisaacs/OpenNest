@@ -84,6 +84,32 @@ public class LabelBoxFinderTests
     }
 
     [Fact]
+    public void Gusset_GetsAHorizontalBoxInTheOpenPocket_NotBesideTheSlant()
+    {
+        // The hole and the slanted edge leave a long, narrow diagonal strip between them, and a
+        // roomier pocket at the bottom right: the label belongs in the pocket, reading level.
+        List<Entity> gusset =
+        [
+            new Line(0, 0, 8, 0), new Line(8, 0, 8, 1), new Line(8, 1, 1, 8),
+            new Line(1, 8, 0, 8), new Line(0, 8, 0, 0), new Circle(2.6, 2.6, 1.1),
+        ];
+
+        var box = LabelBoxFinder.Find(gusset, [], LabelBoxOptions.Default(Units.Inches));
+
+        Assert.NotNull(box);
+        Assert.Equal(0, box.Rotation, 9);
+        Assert.InRange(box.Center.X, 4.6, 6.5);
+        Assert.InRange(box.Center.Y, 1.1, 1.7);
+        foreach (var corner in box.Corners())
+        {
+            Assert.True(corner.DistanceTo(new Vector(2.6, 2.6)) >= 1.1 + 0.125 - 1e-3, $"{corner} is too close to the hole");
+            Assert.True((9 - corner.X - corner.Y) / System.Math.Sqrt(2) >= 0.125 - 1e-3, $"{corner} is too close to the slant");
+            Assert.InRange(corner.X, 0.125 - 1e-3, 7.875 + 1e-3);
+            Assert.InRange(corner.Y, 0.125 - 1e-3, 7.875 + 1e-3);
+        }
+    }
+
+    [Fact]
     public void KeepOutOutline_IsAvoided_WithTheClearance()
     {
         // The left half is breakoff scrap: the box must stay in the right half, clear of the joint.

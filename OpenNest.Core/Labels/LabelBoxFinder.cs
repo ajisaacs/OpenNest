@@ -52,22 +52,31 @@ namespace OpenNest.Labels
     /// <remarks>
     /// The material is eroded by the etch clearance (the same Clipper inward offset the pierce
     /// search uses on a cutout), and a band either side of each bend line is cut out of what is
-    /// left. For each orientation tried, the largest empty rectangles of the rotated region are
-    /// searched (<see cref="MaximalRectangles"/>) and the one with the most room around the label
-    /// wins; the label-sized box is centered in it. Orientations are the axes and the direction of
-    /// each bend and of the longest straight edge, plus the quarter turn of each, with text turned
-    /// at most a quarter so it never reads upside down. Earlier orientations win unless a later
-    /// one has a clearly roomier rectangle, so the result is deterministic and favors the
-    /// horizontal. Rectangles are staircased against slanted and curved edges, so they never cross
-    /// the clearance.
+    /// left. For each orientation tried, the label gets the widest margin it can have on every side
+    /// beyond that clearance: the largest m for which some empty rectangle of the rotated region
+    /// (<see cref="MaximalRectangles"/>) holds the label grown by m all round, found by bisection.
+    /// The box is centered in that rectangle, so it sits where it has the most room, not halfway
+    /// along a long, narrow strip. Orientations are the axes and the direction of each bend and of
+    /// the longest straight edge, plus the quarter turn of each, with text turned at most a
+    /// quarter so it never reads upside down. Horizontal is tried first; a later orientation wins
+    /// only with a clearly wider margin, and a turn off the axes only with half again the margin
+    /// plus half the label height, so the result is deterministic and favors level text.
+    /// Rectangles are staircased against slanted and curved edges, so they never cross the
+    /// clearance.
     /// </remarks>
     public static class LabelBoxFinder
     {
-        // A later orientation must have this much more room than the best so far to replace it.
+        // A later orientation must give this much more margin than the best so far to replace it.
         private const double ImprovementFactor = 1.05;
 
+        // An off-axis orientation (a bend's or an edge's direction) replaces horizontal or
+        // vertical text only with this much more margin, plus this share of the label height.
+        private const double OffAxisFactor = 1.5;
+        private const double OffAxisSlack = 0.5;
+
         private const int Divisions = 128;
-        private const int RectanglesPerOrientation = 8;
+        private const int RectanglesPerStep = 16;
+        private const int MaxBisections = 24;
         private static readonly double AngleMerge = Angle.ToRadians(0.5);
 
         /// <summary>
@@ -137,42 +146,94 @@ namespace OpenNest.Labels
                 return null;
 
             LabelBox best = null;
-            var bestRoom = 0.0;
-            foreach (var angle in Orientations(bendList, shapes))
+            var bestMargin = 0.0;
+            var bestOnAxis = false;
+            var precision = System.Math.Max(tolerance, options.Height / 100);
+            foreach (var (angle, onAxis) in Orientations(bendList, shapes))
             {
-                var room = Best(Rotate(free, -angle), options, out var center);
-                if (room < 1 - Tolerance.Epsilon || !(room > bestRoom * ImprovementFactor))
+                var margin = Roomiest(Rotate(free, -angle), options, precision, out var center);
+                if (margin < 0)
                     continue;
 
-                bestRoom = room;
+                if (best != null)
+                {
+                    // Text on a turn the part has no reason for (the axes) reads best; an
+                    // off-axis turn must give clearly more room, not just a little.
+                    var required = bestOnAxis && !onAxis
+                        ? bestMargin * OffAxisFactor + options.Height * OffAxisSlack
+                        : bestMargin * ImprovementFactor;
+                    if (!(margin > required + Tolerance.Epsilon))
+                        continue;
+                }
+
+                bestMargin = margin;
+                bestOnAxis = onAxis;
                 best = new LabelBox(Turn(center, angle), options.Width, options.Height, angle);
             }
             return best;
         }
 
-        // The most room any large rectangle has around the label: how many times the label fits in
-        // its tighter side. Under 1 means the label does not fit.
-        private static double Best(PathsD region, LabelBoxOptions options, out Vector center)
+        // The widest margin the label can have on every side, beyond the clearance already taken
+        // out of the region, with the label upright in the region's frame; negative when it does
+        // not fit at all. The label sits in the middle of the rectangle that gives it that margin.
+        // A box of the label grown by m on each side fits for every m up to the answer, so the
+        // largest is found by bisection; each step asks only for rectangles at least that thick,
+        // so long thin strips are never what holds the answer back.
+        private static double Roomiest(PathsD region, LabelBoxOptions options, double precision, out Vector center)
         {
             center = default;
-            var best = 0.0;
-            foreach (var rect in MaximalRectangles.InRegion(region, 0, Divisions, RectanglesPerOrientation))
+            if (!Fits(region, options, 0, out var rect))
+                return -1;
+
+            var lo = Margin(rect, options);
+            center = rect.Center;
+
+            var bounds = Clipper.GetBounds(region);
+            var hi = System.Math.Min(bounds.Width - options.Width, bounds.Height - options.Height) / 2;
+            for (var i = 0; i < MaxBisections && hi - lo > precision; i++)
             {
-                // A Box's Length runs along X and its Width along Y.
-                var room = System.Math.Min(rect.Length / options.Width, rect.Width / options.Height);
-                if (room > best)
+                var mid = (lo + hi) / 2;
+                if (Fits(region, options, mid, out rect))
                 {
-                    best = room;
+                    lo = System.Math.Max(mid, Margin(rect, options));
                     center = rect.Center;
                 }
+                else
+                {
+                    hi = mid;
+                }
             }
-            return best;
+            return lo;
         }
+
+        // The largest-margin rectangle that holds the label grown by margin on each side.
+        private static bool Fits(PathsD region, LabelBoxOptions options, double margin, out Box best)
+        {
+            best = null;
+            var bestMargin = double.NegativeInfinity;
+            var thickness = options.Height + 2 * margin;
+            foreach (var rect in MaximalRectangles.InRegion(region, thickness, Divisions, RectanglesPerStep))
+            {
+                // A Box's Length runs along X and its Width along Y.
+                if (rect.Length < options.Width + 2 * margin || rect.Width < thickness)
+                    continue;
+                var room = Margin(rect, options);
+                if (room > bestMargin)
+                {
+                    bestMargin = room;
+                    best = rect;
+                }
+            }
+            return best != null;
+        }
+
+        private static double Margin(Box rect, LabelBoxOptions options) =>
+            System.Math.Min(rect.Length - options.Width, rect.Width - options.Height) / 2;
 
         // Axes first (text horizontal reads best on the sheet), then the longest bend, the other
         // bends, and the longest straight edge, each with its quarter turn. Text is never turned
         // past a quarter: angles are taken in (-π/2, π/2].
-        private static List<double> Orientations(List<Bend> bends, List<Shape> shapes)
+        private static List<(double Angle, bool OnAxis)> Orientations(List<Bend> bends, List<Shape> shapes)
         {
             var raw = new List<double> { 0, System.Math.PI / 2 };
             foreach (var bend in bends.OrderByDescending(b => b.Length))
@@ -184,14 +245,14 @@ namespace OpenNest.Labels
             if (edge != null)
                 raw.Add(edge.StartPoint.AngleTo(edge.EndPoint));
 
-            var angles = new List<double>();
+            var angles = new List<(double Angle, bool OnAxis)>();
             foreach (var value in raw)
             {
                 foreach (var turn in new[] { 0.0, System.Math.PI / 2 })
                 {
                     var angle = Quarter(value + turn);
-                    if (!angles.Any(a => System.Math.Abs(a - angle) < AngleMerge))
-                        angles.Add(angle);
+                    if (!angles.Any(a => System.Math.Abs(a.Angle - angle) < AngleMerge))
+                        angles.Add((angle, angles.Count < 2));
                 }
             }
             return angles;
