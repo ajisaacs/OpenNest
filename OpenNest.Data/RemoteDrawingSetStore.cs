@@ -37,19 +37,10 @@ public sealed class RemoteDrawingSetStore : NestServerClient, IDrawingSetStore
     public async Task<DrawingSetPage> QueryAsync(DrawingSetQuery query, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(query);
-        var error = query.GetValidationError();
-        if (error is not null)
-            throw new ArgumentException(error, nameof(query));
-
-        using var response = await _httpClient.GetAsync(Url("api/sets/query?" + BuildQueryString(query)), cancellationToken);
-        if (response.StatusCode == HttpStatusCode.NotFound)
-            throw new ServerTooOldException(Feature);
-        await NestServerHttp.EnsureSuccessAsync(response, "browse drawing sets", cancellationToken);
-        var page = await response.Content.ReadFromJsonAsync<DrawingSetPage>(NestServerHttp.JsonOptions, cancellationToken)
-            ?? throw new IOException("Nest server returned an empty drawing set page.");
-        if (page.Items is null || page.Items.Count > query.Limit || page.Total < 0 || page.Items.Any(item => item is null))
-            throw new IOException($"Nest server returned an invalid drawing set page for a page limited to {query.Limit}.");
-        return page;
+        ThrowIfInvalidQuery(query.GetValidationError());
+        return await QueryPageAsync<DrawingSetPage, DrawingSetRecord>("api/sets/query?" + BuildQueryString(query),
+            query.Limit, "browse drawing sets", "drawing set", () => new ServerTooOldException(Feature), page => page.Items,
+            cancellationToken);
     }
 
     public async Task<DrawingSetRecord?> GetAsync(Guid id, CancellationToken cancellationToken = default)
@@ -279,30 +270,13 @@ public sealed class RemoteDrawingSetStore : NestServerClient, IDrawingSetStore
         return changed;
     }
 
-    private HttpRequestMessage Guarded(HttpMethod method, string relative, int expectedRevision)
-    {
-        var request = new HttpRequestMessage(method, Url(relative));
-        NestServerHttp.AddIfMatch(request, expectedRevision);
-        return request;
-    }
-
-    private async Task<DrawingSetRecord> SendGuarded(HttpRequestMessage request, Guid id, int expectedRevision,
-        string action, CancellationToken cancellationToken)
-    {
-        using var response = await _httpClient.SendAsync(request, cancellationToken);
-        if (response.StatusCode == HttpStatusCode.NotFound)
-        {
-            await ThrowIfServerTooOld(cancellationToken);
-            throw new IOException($"Drawing set {id} no longer exists on the nest server.");
-        }
-        if (response.StatusCode == HttpStatusCode.Conflict)
-            throw new DrawingSetSaveConflictException(await ReadSet(response, cancellationToken));
-        await NestServerHttp.EnsureSuccessAsync(response, action, cancellationToken);
-        var saved = await ReadSet(response, cancellationToken);
-        if (saved.Id != id || saved.Revision < expectedRevision)
-            throw new IOException("Nest server returned an invalid drawing set revision. Reload the set before saving again.");
-        return saved;
-    }
+    private Task<DrawingSetRecord> SendGuarded(HttpRequestMessage request, Guid id, int expectedRevision,
+        string action, CancellationToken cancellationToken) =>
+        SendGuardedAsync(request, id, expectedRevision, action,
+            $"Drawing set {id} no longer exists on the nest server.",
+            "Nest server returned an invalid drawing set revision. Reload the set before saving again.",
+            ReadSet, current => new DrawingSetSaveConflictException(current), saved => (saved.Id, saved.Revision),
+            ThrowIfServerTooOld, cancellationToken);
 
     private async Task<DrawingSetRecord?> GetRecordAsync(string relative, string action, CancellationToken cancellationToken)
     {
@@ -337,19 +311,11 @@ public sealed class RemoteDrawingSetStore : NestServerClient, IDrawingSetStore
 
     // A 404 for one set or nest is ambiguous; the query route exists on every set-aware server.
     // A server from before v9 has no /api/releases at all, so a 404 there is not "unknown release".
-    private async Task ThrowIfReleasesUnsupported(CancellationToken cancellationToken)
-    {
-        using var probe = await _httpClient.GetAsync(Url("api/releases/query?limit=1"), cancellationToken);
-        if (probe.StatusCode == HttpStatusCode.NotFound)
-            throw new ServerTooOldException(ReleaseFeature);
-    }
+    private Task ThrowIfReleasesUnsupported(CancellationToken cancellationToken) =>
+        ThrowIfRouteMissing("api/releases/query?limit=1", () => new ServerTooOldException(ReleaseFeature), cancellationToken);
 
-    private async Task ThrowIfServerTooOld(CancellationToken cancellationToken)
-    {
-        using var probe = await _httpClient.GetAsync(Url("api/sets/query?limit=1"), cancellationToken);
-        if (probe.StatusCode == HttpStatusCode.NotFound)
-            throw new ServerTooOldException(Feature);
-    }
+    private Task ThrowIfServerTooOld(CancellationToken cancellationToken) =>
+        ThrowIfRouteMissing("api/sets/query?limit=1", () => new ServerTooOldException(Feature), cancellationToken);
 
     private static bool HasJoinedMembers(DrawingSetRecord record) =>
         record.Members is not null

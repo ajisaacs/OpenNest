@@ -63,11 +63,8 @@ public sealed class RemoteSharedSettings : NestServerClient
         CancellationToken cancellationToken = default)
     {
         Validate(kind, key, write);
-        using var request = new HttpRequestMessage(HttpMethod.Put, Url(Path(kind, key)))
-        {
-            Content = JsonContent.Create(write, options: NestServerHttp.JsonOptions),
-        };
-        NestServerHttp.AddIfMatch(request, expectedRevision);
+        using var request = Guarded(HttpMethod.Put, Path(kind, key), expectedRevision);
+        request.Content = JsonContent.Create(write, options: NestServerHttp.JsonOptions);
         using var response = await _httpClient.SendAsync(request, cancellationToken);
         if (response.StatusCode == HttpStatusCode.NotFound)
             throw new SharedSettingMissingException(kind, key);
@@ -80,9 +77,8 @@ public sealed class RemoteSharedSettings : NestServerClient
     {
         if (SharedSettingRules.NormalizeKey(kind, key) is null)
             throw new ArgumentException($"Invalid {kind} settings key.", nameof(key));
-        using var request = new HttpRequestMessage(HttpMethod.Delete,
-            Url(Path(kind, key) + "?savedBy=" + Uri.EscapeDataString(savedBy ?? "")));
-        NestServerHttp.AddIfMatch(request, expectedRevision);
+        using var request = Guarded(HttpMethod.Delete,
+            Path(kind, key) + "?savedBy=" + Uri.EscapeDataString(savedBy ?? ""), expectedRevision);
         using var response = await _httpClient.SendAsync(request, cancellationToken);
         if (response.StatusCode == HttpStatusCode.NotFound)
             return;

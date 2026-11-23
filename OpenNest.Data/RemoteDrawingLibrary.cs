@@ -56,19 +56,10 @@ public sealed class RemoteDrawingLibrary : NestServerClient, IDrawingLibraryStor
     public async Task<DrawingLibraryPage> QueryAsync(DrawingLibraryQuery query, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(query);
-        var error = query.GetValidationError();
-        if (error is not null)
-            throw new ArgumentException(error, nameof(query));
-
-        using var response = await _httpClient.GetAsync(Url("api/drawings/query?" + BuildQueryString(query)), cancellationToken);
-        if (response.StatusCode == HttpStatusCode.NotFound)
-            throw new ServerTooOldException();
-        await NestServerHttp.EnsureSuccessAsync(response, "browse the drawing library", cancellationToken);
-        var page = await response.Content.ReadFromJsonAsync<DrawingLibraryPage>(NestServerHttp.JsonOptions, cancellationToken)
-            ?? throw new IOException("Nest server returned an empty drawing page.");
-        if (page.Items is null || page.Items.Count > query.Limit || page.Total < 0 || page.Items.Any(item => item is null))
-            throw new IOException($"Nest server returned an invalid drawing page for a page limited to {query.Limit}.");
-        return page;
+        ThrowIfInvalidQuery(query.GetValidationError());
+        return await QueryPageAsync<DrawingLibraryPage, DrawingLibraryRecord>("api/drawings/query?" + BuildQueryString(query),
+            query.Limit, "browse the drawing library", "drawing", () => new ServerTooOldException(), page => page.Items,
+            cancellationToken);
     }
 
     /// <summary>The current record, including an archived one, or null for an unknown id.</summary>
@@ -173,30 +164,13 @@ public sealed class RemoteDrawingLibrary : NestServerClient, IDrawingLibraryStor
         return changed;
     }
 
-    private HttpRequestMessage Guarded(HttpMethod method, string relative, int expectedRevision)
-    {
-        var request = new HttpRequestMessage(method, Url(relative));
-        NestServerHttp.AddIfMatch(request, expectedRevision);
-        return request;
-    }
-
-    private async Task<DrawingLibraryRecord> SendGuarded(HttpRequestMessage request, Guid id, int expectedRevision,
-        string action, CancellationToken cancellationToken)
-    {
-        using var response = await _httpClient.SendAsync(request, cancellationToken);
-        if (response.StatusCode == HttpStatusCode.NotFound)
-        {
-            await ThrowIfServerTooOld(cancellationToken);
-            throw new IOException($"Library drawing {id} no longer exists on the nest server.");
-        }
-        if (response.StatusCode == HttpStatusCode.Conflict)
-            throw new DrawingLibraryConflictException(await ReadRecord(response, cancellationToken));
-        await NestServerHttp.EnsureSuccessAsync(response, action, cancellationToken);
-        var saved = await ReadRecord(response, cancellationToken);
-        if (saved.Id != id || saved.Revision < expectedRevision)
-            throw new IOException("Nest server returned an invalid library drawing revision. Reload the library before saving again.");
-        return saved;
-    }
+    private Task<DrawingLibraryRecord> SendGuarded(HttpRequestMessage request, Guid id, int expectedRevision,
+        string action, CancellationToken cancellationToken) =>
+        SendGuardedAsync(request, id, expectedRevision, action,
+            $"Library drawing {id} no longer exists on the nest server.",
+            "Nest server returned an invalid library drawing revision. Reload the library before saving again.",
+            ReadRecord, current => new DrawingLibraryConflictException(current), saved => (saved.Id, saved.Revision),
+            ThrowIfServerTooOld, cancellationToken);
 
     private async Task<byte[]?> GetBytesAsync(string relative, string action, CancellationToken cancellationToken)
     {
@@ -211,12 +185,8 @@ public sealed class RemoteDrawingLibrary : NestServerClient, IDrawingLibraryStor
     }
 
     // A 404 for one drawing is ambiguous; the query route exists on every library-aware server.
-    private async Task ThrowIfServerTooOld(CancellationToken cancellationToken)
-    {
-        using var probe = await _httpClient.GetAsync(Url("api/drawings/query?limit=1"), cancellationToken);
-        if (probe.StatusCode == HttpStatusCode.NotFound)
-            throw new ServerTooOldException();
-    }
+    private Task ThrowIfServerTooOld(CancellationToken cancellationToken) =>
+        ThrowIfRouteMissing("api/drawings/query?limit=1", () => new ServerTooOldException(), cancellationToken);
 
     private static void ValidateUpload(DrawingLibraryRecord record, byte[] package)
     {

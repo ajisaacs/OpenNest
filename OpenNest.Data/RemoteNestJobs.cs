@@ -100,11 +100,8 @@ public sealed class RemoteNestJobs : NestServerClient
     private async Task<NestJobRecord?> ReviewAsync(NestJobRecord job, string action, string reviewedBy, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(job);
-        using var request = new HttpRequestMessage(HttpMethod.Post, Url($"api/nest-jobs/{job.Id}/{action}"))
-        {
-            Content = JsonContent.Create(new NestJobReviewRequest { ReviewedBy = reviewedBy ?? "" }, options: NestServerHttp.JsonOptions),
-        };
-        NestServerHttp.AddIfMatch(request, checked((int)job.Revision));
+        using var request = Guarded(HttpMethod.Post, $"api/nest-jobs/{job.Id}/{action}", checked((int)job.Revision));
+        request.Content = JsonContent.Create(new NestJobReviewRequest { ReviewedBy = reviewedBy ?? "" }, options: NestServerHttp.JsonOptions);
         using var response = await _httpClient.SendAsync(request, cancellationToken);
         if (response.StatusCode == HttpStatusCode.NotFound)
             return await GetAsync(job.Id, cancellationToken) is null ? null : throw new ServerTooOldException("keeping server nests once");
@@ -121,8 +118,7 @@ public sealed class RemoteNestJobs : NestServerClient
     public async Task<bool> DeleteAsync(NestJobRecord job, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(job);
-        using var request = new HttpRequestMessage(HttpMethod.Delete, Url($"api/nest-jobs/{job.Id}"));
-        NestServerHttp.AddIfMatch(request, checked((int)job.Revision));
+        using var request = Guarded(HttpMethod.Delete, $"api/nest-jobs/{job.Id}", checked((int)job.Revision));
         using var response = await _httpClient.SendAsync(request, cancellationToken);
         if (response.StatusCode == HttpStatusCode.NotFound)
             return false;

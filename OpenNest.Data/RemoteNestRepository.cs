@@ -225,8 +225,7 @@ public sealed class RemoteNestRepository : NestServerClient, INestRepository
         var history = await GetRevisionsAsync(id, limit: 1, cancellationToken: cancellationToken);
         if (history.Items.Count == 0)
             throw new IOException("Nest server returned no revision history. Upgrade the nest server and reload before saving.");
-        using var request = new HttpRequestMessage(HttpMethod.Put, Url($"api/nests/{id}/file"));
-        NestServerHttp.AddIfMatch(request, expectedRevision);
+        using var request = Guarded(HttpMethod.Put, $"api/nests/{id}/file", expectedRevision);
         request.Content = BuildMultipart(nestFile, record);
         using var response = await _httpClient.SendAsync(request, cancellationToken);
         await NestServerHttp.EnsureSuccessAsync(response, $"update nest {id}; reload the current version or Save As after a conflict", cancellationToken);
@@ -242,8 +241,7 @@ public sealed class RemoteNestRepository : NestServerClient, INestRepository
         ValidateId(id);
         ValidateRevision(expectedRevision);
         await GetRevisionsAsync(id, limit: 1, cancellationToken: cancellationToken);
-        using var request = new HttpRequestMessage(HttpMethod.Put, Url($"api/nests/{id}/metadata"));
-        NestServerHttp.AddIfMatch(request, expectedRevision);
+        using var request = Guarded(HttpMethod.Put, $"api/nests/{id}/metadata", expectedRevision);
         request.Content = JsonContent.Create(record, options: NestServerHttp.JsonOptions);
         using var response = await _httpClient.SendAsync(request, cancellationToken);
         await NestServerHttp.EnsureSuccessAsync(response, $"edit nest {id}; reload after a conflict", cancellationToken);
@@ -257,9 +255,8 @@ public sealed class RemoteNestRepository : NestServerClient, INestRepository
         ValidateRevision(sourceRevision);
         ValidateRevision(expectedRevision);
         await GetRevisionsAsync(id, limit: 1, cancellationToken: cancellationToken);
-        using var request = new HttpRequestMessage(HttpMethod.Post,
-            Url($"api/nests/{id}/revisions/{sourceRevision.ToString(CultureInfo.InvariantCulture)}/restore"));
-        NestServerHttp.AddIfMatch(request, expectedRevision);
+        using var request = Guarded(HttpMethod.Post,
+            $"api/nests/{id}/revisions/{sourceRevision.ToString(CultureInfo.InvariantCulture)}/restore", expectedRevision);
         using var response = await _httpClient.SendAsync(request, cancellationToken);
         await NestServerHttp.EnsureSuccessAsync(response, $"restore nest {id}; reload after a conflict", cancellationToken);
         return await ReadRecord(response, cancellationToken);
@@ -278,9 +275,8 @@ public sealed class RemoteNestRepository : NestServerClient, INestRepository
         ValidateRevision(expectedRevision);
         // A legacy server cannot be trusted to preserve history on DELETE.
         await GetHistoryAsync(id, 0, 1, !deleted, cancellationToken);
-        using var request = new HttpRequestMessage(deleted ? HttpMethod.Delete : HttpMethod.Post,
-            Url(deleted ? $"api/nests/{id}" : $"api/nests/deleted/{id}/recover"));
-        NestServerHttp.AddIfMatch(request, expectedRevision);
+        using var request = Guarded(deleted ? HttpMethod.Delete : HttpMethod.Post,
+            deleted ? $"api/nests/{id}" : $"api/nests/deleted/{id}/recover", expectedRevision);
         using var response = await _httpClient.SendAsync(request, cancellationToken);
         await NestServerHttp.EnsureSuccessAsync(response, $"change nest visibility {id}; reload after a conflict", cancellationToken);
         return await ReadRecord(response, cancellationToken);
