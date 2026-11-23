@@ -39,9 +39,9 @@ nesting geometry, cut time or posts, and it does not appear in DXF, DWG or SVG e
 - `LabelBoxFinder` (`OpenNest.Core/Labels`) is a pure, deterministic function of the part as
   it will be cut (visible, roles, breakoffs and tabbed cutouts applied, as the Dimensions
   code reads it), its bends and a `LabelBoxOptions`. The converter uses
-  `LabelBoxOptions.Default(units)`: seven characters (a part number and a few bend group
-  letters such as `1234-AB`) of a quarter inch (6 mm) stroke font, an eighth inch (3 mm)
-  clear of anything else.
+  `LabelBoxOptions.Default(units)`: eight characters (room for a four-digit part number and two
+  circled bend group letters, `1234 AB`) of a quarter inch (6 mm) stroke font, an eighth inch
+  (3 mm) clear of anything else.
 - Material is what nesting reads (`NestingMaterial.ForNesting`, marks excluded), so a tabbed
   cutout's slug counts as part and etch, scribe and break cuts do not. The material is
   eroded by the clearance with the same Clipper inward offset the pierce search uses, a band
@@ -78,7 +78,7 @@ thickness settings). It has three choices:
 |--------|--------|---------|
 | Off | nothing | |
 | Part number | the drawing name | `1234` |
-| Part number and bend groups | the name, then a dash and the bend groups | `1234-AB` |
+| Part number and bend groups | the name, then each bend group letter in a circle | `1234 ⒶⒷ` |
 
 When it is not Off, Plan Cutting adds each part's label to the clean program it
 plans from, so the label is emitted as scribe (etch) moves like any other mark: it shows in the plan,
@@ -95,10 +95,14 @@ label, so `true` loads as **Part number and bend groups** and `false` or a missi
 the old key is read but never written again. When both keys are present, `labelMode` wins.
 A `labelMode` number that names no choice (the reader accepts numbers) loads as if it were absent.
 
-- **Text.** `PartLabels.Text` is the drawing name in capitals (characters the font lacks are
-  dropped), then, in **Part number and bend groups** mode, a dash and the part's bend groups when it
-  has bends: `1234-AB`. **Part number** mode leaves the groups out, so a part with bends still gets
-  `1234`.
+- **Text.** `PartLabels.Text` is the drawing name in capitals (characters the font lacks, and
+  spaces, are dropped), then, in **Part number and bend groups** mode, a space
+  (`PartLabels.GroupSeparator`) and the part's bend groups when it has bends: `1234 AB`. Layout
+  etches each letter after the space inside its own circle, so a group never reads as part of the
+  part number (a trailing `-A` looks like a revision). The circle is the text height across, the
+  letter inside it 0.6 of that, three eighths of the text height clear of the name and an eighth
+  apart (`PartLabels.Measure`). **Part number** mode leaves the groups out, so a part with bends
+  still gets `1234`.
 - **Bend groups.** A bend's group is its line's direction against the sheet grain in 15° steps
   (`BendGrain.Bucket`, bend line plus the part's rotation against `Plate.GrainAngle`), named by a
   fixed letter so a group means the same thing on every part and sheet: **A** across the grain,
@@ -119,8 +123,8 @@ A `labelMode` number that names no choice (the reader accepts numbers) loads as 
   the label needs no font file. Strokes are lines and arcs: the round digits (0, 2, 3, 5, 6, 8, 9)
   are drawn on arcs and etch as arc moves; the zero keeps its slash so it never reads as the letter
   O. The CHR reader (`ChrFont`) loads vendor fonts from disk and is not used.
-- **Fit.** The text is centered in the box and reads along it at the box's height. A name longer
-  than the box is shrunk to fit, to half the box height at the least; a longer one is not etched.
+- **Fit.** The text is centered in the box and reads along it at the box's height, circles
+  included. A name longer than the box is shrunk to fit, to half the box height at the least; a longer one is not etched.
   The text turns with the part, so it can read upside down or sideways on the sheet.
 - **Frames.** The box and the bends are in the source frame: the program's offset
   (`Drawing.Source.Offset`) comes off, then the part's rotation applies, as `BendToWorld` does.

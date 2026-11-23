@@ -94,7 +94,8 @@ public class LabelBoxFinderTests
             new Line(1, 8, 0, 8), new Line(0, 8, 0, 0), new Circle(2.6, 2.6, 1.1),
         ];
 
-        var box = LabelBoxFinder.Find(gusset, [], LabelBoxOptions.Default(Units.Inches));
+        // Seven quarter-inch characters: the pocket holds them level, with room to spare.
+        var box = LabelBoxFinder.Find(gusset, [], LabelBoxOptions.ForText(7, 0.25, 0.125));
 
         Assert.NotNull(box);
         Assert.Equal(0, box.Rotation, 9);

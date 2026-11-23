@@ -9,7 +9,7 @@ namespace OpenNest.CNC.CuttingStrategy
         /// <summary>The drawing name only, for example <c>1234</c>.</summary>
         PartNumber,
 
-        /// <summary>The drawing name and the bend groups of its bends, for example <c>1234-AB</c>.</summary>
+        /// <summary>The drawing name and the bend groups of its bends, each letter etched in a circle, for example <c>1234 AB</c>.</summary>
         PartNumberAndBendGroups,
     }
 }

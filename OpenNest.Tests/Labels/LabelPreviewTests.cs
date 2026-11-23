@@ -15,7 +15,7 @@ public class LabelPreviewTests
             new() { StartPoint = new Vector(0, 2), EndPoint = new Vector(3, 2) },
         };
 
-        Assert.Equal("4980A01PT103-AB", PartLabels.PreviewText("4980 A01 pt103", bends));
+        Assert.Equal("4980A01PT103 AB", PartLabels.PreviewText("4980 A01 pt103", bends));
         Assert.Equal("1234", PartLabels.PreviewText("1234", null));
         Assert.Equal("", PartLabels.PreviewText(null, null));
     }

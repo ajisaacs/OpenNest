@@ -12,8 +12,11 @@ namespace OpenNest.Labels
     /// <summary>What <see cref="LabelBoxFinder"/> must fit, in the drawing's units.</summary>
     public sealed class LabelBoxOptions
     {
-        /// <summary>Characters in the longest label: a part number and a few bend group letters ("1234-AB").</summary>
-        public const int DefaultCharacters = 7;
+        /// <summary>
+        /// Characters in the longest label: a four-digit part number and two circled bend group
+        /// letters ("1234 AB"), which take the room of eight.
+        /// </summary>
+        public const int DefaultCharacters = 8;
 
         /// <summary>Etch stroke advance as a share of the character height.</summary>
         public const double CharacterAdvance = 0.75;
