@@ -102,6 +102,7 @@ namespace OpenNest.Controls
             base.OnPaint(e);
 
             e.Graphics.SmoothingMode = SmoothingMode.HighSpeed;
+            DrawGrid(e.Graphics);
             e.Graphics.DrawLine(gridPen, origin.X, 0, origin.X, Height);
             e.Graphics.DrawLine(gridPen, 0, origin.Y, Width, origin.Y);
 
@@ -196,6 +197,16 @@ namespace OpenNest.Controls
             }
 
             PaintOverlay?.Invoke(e.Graphics);
+
+            e.Graphics.ResetTransform();
+            e.Graphics.SmoothingMode = SmoothingMode.HighSpeed;
+            DrawRulers(e.Graphics);
+        }
+
+        protected override void OnMouseLeave(EventArgs e)
+        {
+            base.OnMouseLeave(e);
+            UpdateRulerCursor(null);
         }
 
         public Action<Graphics> PaintOverlay { get; set; }
@@ -235,6 +246,7 @@ namespace OpenNest.Controls
             }
 
             lastPoint = e.Location;
+            UpdateRulerCursor(e.Location);
 
             base.OnMouseMove(e);
         }
@@ -510,6 +522,7 @@ namespace OpenNest.Controls
             {
                 ClearPenCache();
                 DisposeHolePens();
+                DisposeRulers();
                 gridPen.Dispose();
                 labelFont.Dispose();
                 dimensionFont.Dispose();
