@@ -64,13 +64,13 @@ public sealed class NestMaterialsForm : Form
             AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None,
             ClipboardCopyMode = DataGridViewClipboardCopyMode.EnableAlwaysIncludeHeaderText,
         }, sizeColumns: false);
-        AddColumn("Material", 160, typeof(string));
-        AddColumn("Grade", 90, typeof(string));
-        AddColumn("Thickness", 80, typeof(double), "0.####");
-        AddColumn("Units", 50, typeof(string));
-        AddColumn("Size", 130, typeof(string));
-        AddColumn("Quantity", 70, typeof(int), "N0");
-        var nests = AddColumn("Nests", 500, typeof(string));
+        GridStyle.AddTextColumn(grid, "Material", "Material", 160, typeof(string));
+        GridStyle.AddTextColumn(grid, "Grade", "Grade", 90, typeof(string));
+        GridStyle.AddTextColumn(grid, "Thickness", "Thickness", 80, typeof(double), alignRight: true, format: "0.####");
+        GridStyle.AddTextColumn(grid, "Units", "Units", 50, typeof(string));
+        GridStyle.AddTextColumn(grid, "Size", "Size", 130, typeof(string));
+        GridStyle.AddTextColumn(grid, "Quantity", "Quantity", 70, typeof(int), alignRight: true, format: "N0");
+        var nests = GridStyle.AddTextColumn(grid, "Nests", "Nests", 500, typeof(string));
         nests.AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
         nests.DefaultCellStyle.WrapMode = DataGridViewTriState.True;
         grid.AutoSizeRowsMode = DataGridViewAutoSizeRowsMode.AllCells;
@@ -97,23 +97,6 @@ public sealed class NestMaterialsForm : Form
         Load += (_, _) => DialogBounds.FitToOwnerScreen(this);
         Shown += async (_, _) => await RunAsync();
         FormClosed += (_, _) => cancellation.Cancel();
-    }
-
-    private DataGridViewTextBoxColumn AddColumn(string header, int width, Type valueType, string format = null)
-    {
-        var column = new DataGridViewTextBoxColumn
-        {
-            Name = header,
-            HeaderText = header,
-            Width = width,
-            ValueType = valueType,
-        };
-        if (valueType != typeof(string))
-            column.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
-        if (format != null)
-            column.DefaultCellStyle.Format = format;
-        grid.Columns.Add(column);
-        return column;
     }
 
     private async Task RunAsync()

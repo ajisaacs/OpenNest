@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Drawing;
 using System.Reflection;
 using System.Windows.Forms;
@@ -52,6 +52,31 @@ public static class GridStyle
             SizeColumnsOnceToContent(grid);
         grid.HandleDestroyed += HideToolTipsOnDestroy;
         return grid;
+    }
+
+    /// <summary>Adds a text column to <paramref name="grid"/>, its cells right-aligned when <paramref name="alignRight"/>.</summary>
+    public static DataGridViewTextBoxColumn AddTextColumn(
+        DataGridView grid,
+        string name,
+        string header,
+        int width,
+        Type valueType,
+        bool alignRight = false,
+        string format = null)
+    {
+        var column = new DataGridViewTextBoxColumn
+        {
+            Name = name,
+            HeaderText = header,
+            Width = width,
+            ValueType = valueType,
+        };
+        if (alignRight)
+            column.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
+        if (format != null)
+            column.DefaultCellStyle.Format = format;
+        grid.Columns.Add(column);
+        return column;
     }
 
     private static readonly PropertyInfo KeyboardToolTipProperty = typeof(DataGridView).GetProperty(

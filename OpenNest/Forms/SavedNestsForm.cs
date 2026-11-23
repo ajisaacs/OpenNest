@@ -176,12 +176,12 @@ public sealed class SavedNestsForm : Form
         // Details of the highlighted nest.
         platesGrid = CreateGrid();
         platesGrid.RowHeadersVisible = false;
-        AddColumn(platesGrid, "Number", "#", 50, typeof(int), alignRight: true);
-        AddColumn(platesGrid, "Duplicates", "Duplicates", 90, typeof(int), alignRight: true);
-        AddColumn(platesGrid, PlateSizeColumn, "Plate size", 140, typeof(string));
-        AddColumn(platesGrid, "Parts", "Parts", 70, typeof(int), alignRight: true);
-        AddColumn(platesGrid, "Drawings", "Drawings", 80, typeof(int), alignRight: true);
-        AddColumn(platesGrid, "Utilization", "Utilization", 90, typeof(double), alignRight: true, format: "P1");
+        GridStyle.AddTextColumn(platesGrid, "Number", "#", 50, typeof(int), alignRight: true);
+        GridStyle.AddTextColumn(platesGrid, "Duplicates", "Duplicates", 90, typeof(int), alignRight: true);
+        GridStyle.AddTextColumn(platesGrid, PlateSizeColumn, "Plate size", 140, typeof(string));
+        GridStyle.AddTextColumn(platesGrid, "Parts", "Parts", 70, typeof(int), alignRight: true);
+        GridStyle.AddTextColumn(platesGrid, "Drawings", "Drawings", 80, typeof(int), alignRight: true);
+        GridStyle.AddTextColumn(platesGrid, "Utilization", "Utilization", 90, typeof(double), alignRight: true, format: "P1");
         platesGrid.SelectionChanged += (_, _) =>
         {
             // Read the selected row: while this event runs, CurrentRow still names the
@@ -192,12 +192,12 @@ public sealed class SavedNestsForm : Form
 
         drawingsGrid = CreateGrid();
         drawingsGrid.RowHeadersVisible = false;
-        AddColumn(drawingsGrid, "Drawing", "Drawing", 220, typeof(string));
-        AddColumn(drawingsGrid, "Customer", "Customer", 160, typeof(string));
-        AddColumn(drawingsGrid, "Required", "Required", 80, typeof(int), alignRight: true);
-        AddColumn(drawingsGrid, "Nested", "Nested", 80, typeof(int), alignRight: true);
-        AddColumn(drawingsGrid, "Remaining", "Remaining", 90, typeof(int), alignRight: true);
-        AddColumn(drawingsGrid, AreaColumn, "Area", 100, typeof(double), alignRight: true, format: "0.###");
+        GridStyle.AddTextColumn(drawingsGrid, "Drawing", "Drawing", 220, typeof(string));
+        GridStyle.AddTextColumn(drawingsGrid, "Customer", "Customer", 160, typeof(string));
+        GridStyle.AddTextColumn(drawingsGrid, "Required", "Required", 80, typeof(int), alignRight: true);
+        GridStyle.AddTextColumn(drawingsGrid, "Nested", "Nested", 80, typeof(int), alignRight: true);
+        GridStyle.AddTextColumn(drawingsGrid, "Remaining", "Remaining", 90, typeof(int), alignRight: true);
+        GridStyle.AddTextColumn(drawingsGrid, AreaColumn, "Area", 100, typeof(double), alignRight: true, format: "0.###");
 
         detailsTabs = new TabControl { Dock = DockStyle.Fill };
         detailsTabs.TabPages.Add(ControlFactory.Tab("Plates", platesGrid));
@@ -423,34 +423,10 @@ public sealed class SavedNestsForm : Form
         });
     }
 
-    private static DataGridViewTextBoxColumn AddColumn(
-        DataGridView grid,
-        string name,
-        string header,
-        int width,
-        Type valueType,
-        bool alignRight = false,
-        string format = null)
-    {
-        var column = new DataGridViewTextBoxColumn
-        {
-            Name = name,
-            HeaderText = header,
-            Width = width,
-            ValueType = valueType,
-        };
-        if (alignRight)
-            column.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
-        if (format != null)
-            column.DefaultCellStyle.Format = format;
-        grid.Columns.Add(column);
-        return column;
-    }
-
     private void AddNestColumn(string header, NestSortField sortField, int width, bool alignRight = false)
     {
         // Cells hold display text: the server has already sorted the page.
-        var column = AddColumn(nestGrid, header, header, width, typeof(string), alignRight);
+        var column = GridStyle.AddTextColumn(nestGrid, header, header, width, typeof(string), alignRight);
         column.SortMode = DataGridViewColumnSortMode.Programmatic;
         column.Tag = sortField;
     }
