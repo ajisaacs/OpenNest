@@ -52,7 +52,8 @@ as `Timeout`, so a plate that never finishes cannot hang the run.
 
 Each plate is ranked: `Ready` (replayed with no overlaps) above `BestEffort` above
 `NoSolutionWithinBudget` above every blocked outcome (`UnsupportedGeometry`,
-`ConstraintConflict`, `InvalidInput`, `Overlap`) above `Timeout`. The test fails when a plate ranks below its
+`ConstraintConflict`, `InvalidInput`, `Overlap`, `LeadOffPlate`: a Ready plan with a lead-in or
+lead-out past the plate's box) above `Timeout`. The test fails when a plate ranks below its
 baseline, when a nest has no baseline, or when the baseline's plate numbers differ from the
 nest's. A different outcome at the same or a better rank is only reported. When it is
 intended, update the baseline.

@@ -696,7 +696,7 @@ public partial class ProblemNestRegressionTests(ITestOutputHelper output)
         {
             var planned = CuttingPlanBatch.Capture([plate], plate.CuttingParameters ?? DefaultParameters(),
                 preservePartOrder: false, [number], cancellation.Token).Plan(token: cancellation.Token).Plates[0];
-            return (planned.Result.Status == CuttingPlanStatus.Canceled ? Timeout : Outcome(planned), planned);
+            return (planned.Result.Status == CuttingPlanStatus.Canceled ? Timeout : Outcome(planned, plate), planned);
         }
         catch (OperationCanceledException)
         {
@@ -763,9 +763,24 @@ public partial class ProblemNestRegressionTests(ITestOutputHelper output)
             && result.Status is CuttingPlanStatus.Ready or CuttingPlanStatus.BestEffort
             ? (double)result.Expansions / budget : null;
 
-    // Ready means replayed and overlap-clear; a ready route with overlapping parts is still blocked.
-    internal static string Outcome(CuttingPlanPlateResult planned) =>
-        planned.IsReady ? "Ready" : planned.IsRouteReady ? "Overlap" : planned.Result.Status.ToString();
+    // Ready means replayed and overlap-clear; a ready route with overlapping parts is still blocked,
+    // and so is one with a lead off the plate (given the plate), which cuts air or the table.
+    internal static string Outcome(CuttingPlanPlateResult planned, Plate plate = null) =>
+        planned.IsReady ? (plate != null && LeadsOffPlate(planned, plate) ? LeadOffPlate : "Ready")
+        : planned.IsRouteReady ? "Overlap" : planned.Result.Status.ToString();
+
+    internal const string LeadOffPlate = "LeadOffPlate";
+
+    // Whether any planned lead-in or lead-out of a part runs past the plate's box. Judged on the
+    // plate itself, not on what the planner was told, so losing the planner's sheet check fails here.
+    internal static bool LeadsOffPlate(CuttingPlanPlateResult planned, Plate plate)
+    {
+        var sheet = plate.BoundingBox(includeParts: false);
+        return planned.Result.ProposedOrder.Any(proposal => !proposal.IsCutOff
+            && proposal.Execution.Motions.Any(motion => !motion.Rapid && motion.Curve != null
+                && motion.Layer is OpenNest.CNC.LayerType.Leadin or OpenNest.CNC.LayerType.Leadout
+                && OpenNest.CNC.CuttingPlanning.LeadPathValidator.OffSheet(motion, sheet) != null));
+    }
 
     internal static int Rank(string outcome) => outcome switch
     {
@@ -1104,9 +1119,10 @@ public class ProblemNestBaselineTests
     [Fact]
     public void Rank_OrdersReadyAboveBestEffortAboveBudgetAboveBlockedAboveTimeout()
     {
-        var ranks = new[] { "Ready", "BestEffort", "NoSolutionWithinBudget", "UnsupportedGeometry", "Overlap", "Timeout" }
+        var ranks = new[] { "Ready", "BestEffort", "NoSolutionWithinBudget", "UnsupportedGeometry", "Overlap",
+                "LeadOffPlate", "Timeout" }
             .Select(ProblemNestRegressionTests.Rank).ToArray();
 
-        Assert.Equal([3, 2, 1, 0, 0, -1], ranks);
+        Assert.Equal([3, 2, 1, 0, 0, 0, -1], ranks);
     }
 }
