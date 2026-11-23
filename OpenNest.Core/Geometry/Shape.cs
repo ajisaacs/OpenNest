@@ -282,47 +282,29 @@ namespace OpenNest.Geometry
         /// <summary>
         /// Converts the shape to a polygon with a fixed number of segments per arc and circle.
         /// </summary>
-        public Polygon ToPolygon(int arcSegments)
-        {
-            var polygon = new Polygon();
-
-            foreach (var entity in Entities)
-            {
-                switch (entity.Type)
-                {
-                    case EntityType.Arc:
-                        var arc = (Arc)entity;
-                        polygon.Vertices.AddRange(arc.ToPoints(arcSegments));
-                        break;
-
-                    case EntityType.Line:
-                        var line = (Line)entity;
-                        polygon.Vertices.AddRange(new[] { line.StartPoint, line.EndPoint });
-                        break;
-
-                    case EntityType.Circle:
-                        var circle = (Circle)entity;
-                        polygon.Vertices.AddRange(circle.ToPoints(arcSegments));
-                        break;
-
-                    default:
-                        Debug.Fail("Unhandled geometry type");
-                        break;
-                }
-            }
-
-            polygon.Close();
-            polygon.Cleanup();
-            polygon.UpdateBounds();
-
-            return polygon;
-        }
+        public Polygon ToPolygon(int arcSegments) =>
+            BuildPolygon(_ => arcSegments, _ => arcSegments, circumscribe: false);
 
         /// <summary>
         /// Converts the shape to a polygon using a chord tolerance to determine
         /// the number of segments per arc/circle.
         /// </summary>
-        public Polygon ToPolygonWithTolerance(double tolerance, bool circumscribe = false)
+        public Polygon ToPolygonWithTolerance(double tolerance, bool circumscribe = false) =>
+            BuildPolygon(
+                arc => arc.SegmentsForTolerance(tolerance),
+                circle => circle.SegmentsForTolerance(tolerance),
+                circumscribe
+            );
+
+        /// <summary>
+        /// Chains the entities' points into a closed, cleaned-up polygon, flattening each arc and
+        /// circle into the number of segments its selector gives.
+        /// </summary>
+        private Polygon BuildPolygon(
+            Func<Arc, int> arcSegments,
+            Func<Circle, int> circleSegments,
+            bool circumscribe
+        )
         {
             var polygon = new Polygon();
 
@@ -332,9 +314,7 @@ namespace OpenNest.Geometry
                 {
                     case EntityType.Arc:
                         var arc = (Arc)entity;
-                        polygon.Vertices.AddRange(
-                            arc.ToPoints(arc.SegmentsForTolerance(tolerance), circumscribe)
-                        );
+                        polygon.Vertices.AddRange(arc.ToPoints(arcSegments(arc), circumscribe));
                         break;
 
                     case EntityType.Line:
@@ -344,9 +324,7 @@ namespace OpenNest.Geometry
 
                     case EntityType.Circle:
                         var circle = (Circle)entity;
-                        polygon.Vertices.AddRange(
-                            circle.ToPoints(circle.SegmentsForTolerance(tolerance), circumscribe)
-                        );
+                        polygon.Vertices.AddRange(circle.ToPoints(circleSegments(circle), circumscribe));
                         break;
 
                     default:
