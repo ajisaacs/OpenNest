@@ -102,12 +102,19 @@ A `labelMode` number that names no choice (the reader accepts numbers) loads as 
 - **Bend groups.** A bend's group is its line's direction against the sheet grain in 15° steps
   (`BendGrain.Bucket`, bend line plus the part's rotation against `Plate.GrainAngle`), named by a
   fixed letter so a group means the same thing on every part and sheet: **A** across the grain,
-  **B** with it, then **C** to **L** for the steps between, in bucket order from the grain. The
-  letter does not say which way a part bends. It says how the grain runs against its bends, which
-  changes springback and so the angle correction at the press brake: bends with the same letter
-  take the same correction and can be formed together. The letters depend on how the part is
-  rotated on the sheet, which is why the text is made when cutting is planned, not stored with the
-  box.
+  **B** with it, each within 5° (`BendGrain.AngleTolerance`), then **C** to **L** for the steps
+  between, counterclockwise from the grain. A bend just past 5° goes to the neighboring step on its
+  own side, never to A or B, and a bend 30° one way and one 30° the other way get different letters
+  (D and K). A part whose bends fall in several groups lists each once, in alphabetical order.
+  The letter does not say which way a part bends. It says how the grain runs against its bends,
+  which changes springback and so the angle correction at the press brake: bends with the same
+  letter take the same correction and can be formed together. The letters depend on how the part
+  is rotated on the sheet, which is why the text is made when cutting is planned, not stored with
+  the box.
+
+  ![Bend group letters: A across the grain and B with it, each within 5°; C to G at 15° to 75°
+  and H to L at 105° to 165°, counterclockwise from the grain](images/bend-groups.svg)
+
 - **Font.** `StrokeFont` is a small built-in single-stroke font (digits, capitals, `- _ . /`), so
   the label needs no font file. Strokes are lines and arcs: the round digits (0, 2, 3, 5, 6, 8, 9)
   are drawn on arcs and etch as arc moves; the zero keeps its slash so it never reads as the letter
