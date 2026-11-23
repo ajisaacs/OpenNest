@@ -80,6 +80,8 @@ need the previous release's packages beside the output before `vpk pack`.
 
 `.github/workflows/dev-build.yml` runs after every master push whose
 `Cross-platform tests` pass (that workflow includes the Windows desktop tests).
+Pushes that change only `docs/` or Markdown files skip those tests, so they make no
+build; the next code push includes them.
 It packages that commit with `Publish-Windows.ps1` as `X.Y.Z-dev.N`, where
 `X.Y.Z` is the minor after the newest `vX.Y.Z` tag and `N` the commit count, so
 each build outranks the last and the next full release outranks them all. It then

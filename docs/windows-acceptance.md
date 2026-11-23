@@ -1,7 +1,8 @@
 # Automated Windows acceptance
 
 The `windows-desktop` job in `.github/workflows/ci.yml` runs on GitHub-hosted
-`windows-2022` for every pull request and `master` push. It executes the full
+`windows-2022` for every pull request and `master` push that changes more than
+`docs/` or Markdown files. It executes the full
 WinForms and FrontEnd test projects in Release, including shown-form STA tests
 and Windows child-process lifetime tests. No production service, customer
 fixture, physical GPU, or CNC controller is required.

@@ -2,42 +2,28 @@ name: Cross-platform tests
 
 on:
   pull_request:
+    paths-ignore: ['docs/**', '**/*.md']
   push:
     branches: [master]
+    paths-ignore: ['docs/**', '**/*.md']
 
 permissions:
   contents: read
 
+# A newer push to the same branch or pull request supersedes a run in progress;
+# dev-build publishes only master's newest commit anyway.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Runners are billed per job, rounded up to the minute, and each job restores
+# and builds the shared projects again. So the small suites share one job and
+# build once; Engine.Tests, the longest, runs beside them in its own.
 jobs:
-  unit-tests:
-    name: Unit tests (${{ matrix.project }})
+  suites:
+    name: Unit tests and synthetic nests
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    strategy:
-      fail-fast: false
-      max-parallel: 4
-      matrix:
-        project:
-          - OpenNest.Tests
-          - OpenNest.Desktop.Tests
-          - OpenNest.Engine.Tests
-          - OpenNest.IO.Tests
-          - OpenNest.Server.Tests
-          - OpenNest.FrontEnd.Tests
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-        with:
-          persist-credentials: false
-      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
-        with:
-          dotnet-version: '8.0.x'
-      - name: Run ${{ matrix.project }}
-        run: dotnet test "${{ matrix.project }}/${{ matrix.project }}.csproj" -c Release
-
-  synthetic-nests:
-    name: Six synthetic Irregular nests
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -47,16 +33,47 @@ jobs:
           dotnet-version: '8.0.x'
       - name: Test fail-closed final CI check
         run: python3 scripts/test_ci_results.py -v
+      # Each suite runs even when an earlier one fails, so one run reports them all.
+      - name: Run OpenNest.Tests
+        if: ${{ !cancelled() }}
+        run: dotnet test OpenNest.Tests/OpenNest.Tests.csproj -c Release
+      - name: Run OpenNest.Desktop.Tests
+        if: ${{ !cancelled() }}
+        run: dotnet test OpenNest.Desktop.Tests/OpenNest.Desktop.Tests.csproj -c Release
+      - name: Run OpenNest.IO.Tests
+        if: ${{ !cancelled() }}
+        run: dotnet test OpenNest.IO.Tests/OpenNest.IO.Tests.csproj -c Release
+      - name: Run OpenNest.Server.Tests
+        if: ${{ !cancelled() }}
+        run: dotnet test OpenNest.Server.Tests/OpenNest.Server.Tests.csproj -c Release
+      - name: Run OpenNest.FrontEnd.Tests
+        if: ${{ !cancelled() }}
+        run: dotnet test OpenNest.FrontEnd.Tests/OpenNest.FrontEnd.Tests.csproj -c Release
       - name: Check six synthetic Irregular nests
+        if: ${{ !cancelled() }}
         timeout-minutes: 6
         run: |
           python3 scripts/test_check_synthetic_nests.py -v
           python3 scripts/check-synthetic-nests.py --parallel 2
 
+  engine-tests:
+    name: Unit tests (OpenNest.Engine.Tests)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Run OpenNest.Engine.Tests
+        run: dotnet test OpenNest.Engine.Tests/OpenNest.Engine.Tests.csproj -c Release
+
   # Preserve the existing check name for required-status consumers.
   tests:
     name: tests
-    needs: [unit-tests, synthetic-nests]
+    needs: [suites, engine-tests]
     if: ${{ always() }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -66,9 +83,9 @@ jobs:
           persist-credentials: false
       - name: Require every test job to succeed
         env:
-          UNIT_TEST_RESULT: ${{ needs.unit-tests.result }}
-          SYNTHETIC_RESULT: ${{ needs.synthetic-nests.result }}
-        run: bash scripts/check-ci-results.sh "$UNIT_TEST_RESULT" "$SYNTHETIC_RESULT"
+          SUITES_RESULT: ${{ needs.suites.result }}
+          ENGINE_RESULT: ${{ needs.engine-tests.result }}
+        run: bash scripts/check-ci-results.sh "$SUITES_RESULT" "$ENGINE_RESULT"
 
   windows-desktop:
     # WinForms tests need a Windows desktop runtime; the Linux job can only

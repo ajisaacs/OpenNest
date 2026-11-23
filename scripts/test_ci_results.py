@@ -21,10 +21,10 @@ class CIResultsTests(unittest.TestCase):
     def test_both_required_jobs_successful(self):
         self.assertEqual(self.check("success", "success").returncode, 0)
 
-    def test_unit_matrix_failure_blocks_aggregate(self):
+    def test_suites_failure_blocks_aggregate(self):
         self.assertNotEqual(self.check("failure", "success").returncode, 0)
 
-    def test_synthetic_failure_blocks_aggregate(self):
+    def test_engine_failure_blocks_aggregate(self):
         self.assertNotEqual(self.check("success", "failure").returncode, 0)
 
     def test_canceled_dependency_blocks_aggregate(self):
