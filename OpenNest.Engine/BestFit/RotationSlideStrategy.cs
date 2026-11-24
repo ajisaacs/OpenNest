@@ -59,11 +59,14 @@ namespace OpenNest.Engine.BestFit
             if (offsets.Length == 0)
                 return candidates;
 
-            var distances = _distanceComputer.ComputeDistances(
+            // The first slides and the settling slides are of the same two boundaries: a
+            // computer that can prepare them does so once.
+            var prepared = (_distanceComputer as IPreparedDistanceComputer)?.Prepare(
                 part1Entities,
-                part2Entities,
-                offsets
+                part2Entities
             );
+
+            var distances = Distances(prepared, part1Entities, part2Entities, offsets);
 
             // Where each slide came to rest, as an offset of the part 2 template.
             var rests = new List<SlideOffset>();
@@ -89,7 +92,7 @@ namespace OpenNest.Engine.BestFit
             foreach (var rest in rests)
                 candidates.Add(CreateCandidate(drawing, part2Template, rest, spacing, testNumber++));
 
-            foreach (var settled in Settle(part1Entities, part2Entities, rests))
+            foreach (var settled in Settle(prepared, part1Entities, part2Entities, rests))
                 candidates.Add(CreateCandidate(drawing, part2Template, settled, spacing, testNumber++));
 
             return candidates;
@@ -103,6 +106,7 @@ namespace OpenNest.Engine.BestFit
         /// or repeat an earlier one are dropped.
         /// </summary>
         private List<SlideOffset> Settle(
+            IPreparedDistances prepared,
             List<Entity> part1Entities,
             List<Entity> part2Entities,
             List<SlideOffset> rests
@@ -123,11 +127,7 @@ namespace OpenNest.Engine.BestFit
                 sideways[i * 2 + 1] = new SlideOffset(rest.Dx, rest.Dy, rest.DirY, -rest.DirX);
             }
 
-            var distances = _distanceComputer.ComputeDistances(
-                part1Entities,
-                part2Entities,
-                sideways
-            );
+            var distances = Distances(prepared, part1Entities, part2Entities, sideways);
 
             var seen = new HashSet<(long X, long Y)>();
 
@@ -149,6 +149,16 @@ namespace OpenNest.Engine.BestFit
 
             return settled;
         }
+
+        private double[] Distances(
+            IPreparedDistances prepared,
+            List<Entity> part1Entities,
+            List<Entity> part2Entities,
+            SlideOffset[] offsets
+        ) =>
+            prepared != null
+                ? prepared.ComputeDistances(offsets)
+                : _distanceComputer.ComputeDistances(part1Entities, part2Entities, offsets);
 
         private static (long X, long Y) PositionKey(double dx, double dy) =>
             (

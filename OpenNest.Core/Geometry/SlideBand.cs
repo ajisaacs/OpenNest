@@ -167,7 +167,7 @@ namespace OpenNest.Geometry
             );
         }
 
-        private static bool PointMayReachSegment(double v, double a, double b)
+        internal static bool PointMayReachSegment(double v, double a, double b)
         {
             var lo = System.Math.Min(a, b);
             var hi = System.Math.Max(a, b);
@@ -177,7 +177,7 @@ namespace OpenNest.Geometry
             return true;
         }
 
-        private static bool PointMayReachCircle(
+        internal static bool PointMayReachCircle(
             Axis axis,
             double vx,
             double vy,
@@ -206,7 +206,7 @@ namespace OpenNest.Geometry
         }
 
         /// <summary>False for NaN, infinities and magnitudes beyond the coordinate limit.</summary>
-        private static bool Bounded(double value) => System.Math.Abs(value) <= CoordinateLimit;
+        internal static bool Bounded(double value) => System.Math.Abs(value) <= CoordinateLimit;
 
         internal static double Perp(Axis axis, double x, double y) =>
             axis == Axis.PerpendicularY ? y : x;

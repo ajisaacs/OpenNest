@@ -415,7 +415,7 @@ namespace OpenNest.Geometry
             }
         }
 
-        private static void Emit<TSink>(
+        internal static void Emit<TSink>(
             ref TSink sink,
             double vx,
             double vy,
