@@ -55,6 +55,40 @@ public class CirclesNestingEngineTests
     }
 
     [Fact]
+    public void ASmallerDiscGoesBetweenTwoLargeOnesWhenThatShortensTheSheet()
+    {
+        // Largest first sets the 54 and the 53 side by side (107.3 long) and the 20 beyond them,
+        // at the far end of the sheet. With the 20 against the top edge between them the layout
+        // ends near 111.1. Neither leaves a 12-inch drop, so only the tie-break tells them apart.
+        var job = Job([Part("a", Disc(27), 1), Part("b", Disc(26.5), 1), Part("c", Disc(10), 1)],
+            [Stock("s", 60, 120, spacing: 0.25, quantity: 1)],
+            new NestJobOptions(minimumSalvageDimension: 12));
+        var result = new CirclesNestingEngine().Solve(job);
+
+        LayoutAssert.Valid(job, result);
+        Assert.Equal(NestJobStatus.Complete, result.Status);
+        var radius = new Dictionary<string, double> { ["a"] = 27, ["b"] = 26.5, ["c"] = 10 };
+        var placements = Assert.Single(result.Plates).Placements;
+        Assert.InRange(placements.Max(p => p.X + radius[p.PartId]), 107, 111.5);
+        var large = placements.Where(p => p.PartId != "c").Select(p => p.X).ToArray();
+        Assert.InRange(placements.Single(p => p.PartId == "c").X, large.Min(), large.Max());
+    }
+
+    [Fact]
+    public void RoomFreedByAShorterOrderTakesAnotherDisc()
+    {
+        // Largest first leaves no room for the fourth disc on one sheet; with the 21 and the 20
+        // between the two large discs, all four fit.
+        var job = Job([Part("a", Disc(27), 1), Part("b", Disc(26.5), 1), Part("c", Disc(10.5), 1), Part("d", Disc(10), 1)],
+            [Stock("s", 60, 120, spacing: 0.25, quantity: 1)]);
+        var result = new CirclesNestingEngine().Solve(job);
+
+        LayoutAssert.Valid(job, result);
+        Assert.Equal(NestJobStatus.Complete, result.Status);
+        Assert.Equal(4, Assert.Single(result.Plates).Placements.Count);
+    }
+
+    [Fact]
     public void ClampZonesAndEdgeClearanceAreKept()
     {
         var clamps = new[] { new ClampZone("a", new Box(4, 0, 2, 1)), new ClampZone("b", new Box(14, 0, 2, 1)) };

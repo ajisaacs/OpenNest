@@ -52,6 +52,13 @@ internal static class DiscPacker
 
     private const double Epsilon = 1e-9;
 
+    // The order search decodes the whole sheet for every move it tries, so it is kept to sheets
+    // of a few discs, where the order decides the layout; lattices serve sheets of many.
+    private const int SqueezeMaxDiscs = 24;
+    private const int SqueezeDecodes = 600;
+    private const int SqueezeRounds = 3;
+    private const double SqueezeGain = 1e-6;
+
     public static SheetLayout Pack(IReadOnlyList<DiscType> types, IReadOnlyList<int> remaining,
         NestPlateStock stock, DiscOrder order, DiscSeed seed, CancellationToken token)
     {
@@ -71,6 +78,47 @@ internal static class DiscPacker
                 left[lattice.Index]--;
             }
         }
+        Greedy(sheet, fits, left, token);
+        return sheet.Layout(types);
+    }
+
+    /// <summary>
+    /// The plain greedy pack, then the same discs packed again in other orders to end sooner along
+    /// the fill axis, and the room that frees refilled from the remaining demand.
+    /// </summary>
+    /// <remarks>Largest first sets the large discs against each other before any smaller one is
+    /// placed, so a disc that would fit between two of them, were they a little further apart, ends
+    /// up beyond both. Here the placement rule stays (lowest along the fill axis first) and the
+    /// order is searched: the best move of one disc to another position, while a move shortens the
+    /// layout. Only sheets of <see cref="SqueezeMaxDiscs"/> discs or fewer are searched, within
+    /// <see cref="SqueezeDecodes"/> decodes. Null when no order shortens the greedy layout, which
+    /// <see cref="Pack"/> already offers.</remarks>
+    public static SheetLayout? PackSqueezed(IReadOnlyList<DiscType> types, IReadOnlyList<int> remaining,
+        NestPlateStock stock, DiscOrder order, CancellationToken token)
+    {
+        var left = remaining.ToArray();
+        var fits = types.Where(t => left[t.Index] > 0 && Fits(stock, t)).ToList();
+        var maxRadius = types.Where(t => Fits(stock, t)).Select(t => t.Radius).DefaultIfEmpty(0).Max();
+        var sheet = new Sheet(stock, maxRadius, order);
+        Greedy(sheet, fits, left, token);
+        var shortened = false;
+        for (var round = 0; round < SqueezeRounds; round++)
+        {
+            if (Squeeze(sheet, stock, maxRadius, order, token) is not { } squeezed)
+                break;
+            sheet = squeezed;
+            shortened = true;
+            if (Greedy(sheet, fits, left, token) == 0)
+                break;
+        }
+        return shortened ? sheet.Layout(types) : null;
+    }
+
+    /// <summary>Places the remaining demand, higher priority number first, then largest first;
+    /// returns how many discs it placed.</summary>
+    private static int Greedy(Sheet sheet, IReadOnlyList<DiscType> fits, int[] left, CancellationToken token)
+    {
+        var added = 0;
         // Stable: equal radii keep requirement order.
         foreach (var type in fits.OrderByDescending(t => t.Priority).ThenByDescending(t => t.Radius))
         {
@@ -82,9 +130,69 @@ internal static class DiscPacker
                     break;
                 sheet.Place(type, center);
                 left[type.Index]--;
+                added++;
             }
         }
-        return sheet.Layout(types);
+        return added;
+    }
+
+    /// <summary>The sheet's discs in the order that ends soonest along the fill axis, or null
+    /// when no order tried beats the sheet's own.</summary>
+    private static Sheet? Squeeze(Sheet sheet, NestPlateStock stock, double maxRadius, DiscOrder order,
+        CancellationToken token)
+    {
+        if (sheet.Count < 2 || sheet.Count > SqueezeMaxDiscs)
+            return null;
+        var current = sheet.Types.ToList();
+        var extent = sheet.Extent;
+        Sheet? best = null;
+        // Copies of one type are interchangeable: orders are compared by their type sequence.
+        var tried = new HashSet<string>(StringComparer.Ordinal) { OrderKey(current) };
+        var decodes = 0;
+        while (decodes < SqueezeDecodes)
+        {
+            List<DiscType>? improvedOrder = null;
+            Sheet? improved = null;
+            for (var from = 0; from < current.Count && decodes < SqueezeDecodes; from++)
+            {
+                for (var to = 0; to < current.Count && decodes < SqueezeDecodes; to++)
+                {
+                    if (to == from)
+                        continue;
+                    var candidate = new List<DiscType>(current);
+                    candidate.RemoveAt(from);
+                    candidate.Insert(to, current[from]);
+                    if (!tried.Add(OrderKey(candidate)))
+                        continue;
+                    token.ThrowIfCancellationRequested();
+                    decodes++;
+                    if (Decode(candidate) is not { } decoded || decoded.Extent >= extent - SqueezeGain)
+                        continue;
+                    extent = decoded.Extent;
+                    improved = decoded;
+                    improvedOrder = candidate;
+                }
+            }
+            if (improved == null)
+                break;
+            best = improved;
+            current = improvedOrder!;
+        }
+        return best;
+
+        Sheet? Decode(List<DiscType> sequence)
+        {
+            var trial = new Sheet(stock, maxRadius, order);
+            foreach (var type in sequence)
+            {
+                if (trial.Best(type.Radius) is not { } center)
+                    return null;
+                trial.Place(type, center);
+            }
+            return trial;
+        }
+
+        static string OrderKey(List<DiscType> sequence) => string.Join(',', sequence.Select(t => t.Index));
     }
 
     /// <summary>True when the disc fits the work area in both directions.</summary>
@@ -156,6 +264,15 @@ internal static class DiscPacker
         }
 
         public double Gap { get; }
+
+        public int Count => placed.Count;
+
+        /// <summary>The placed discs' types in placement order.</summary>
+        public IEnumerable<DiscType> Types => placed.Select(p => p.Type);
+
+        /// <summary>How far the placed discs reach along the fill axis: up for rows, right for columns.</summary>
+        public double Extent => placed.Count == 0 ? double.NegativeInfinity : placed.Max(p =>
+            (order == DiscOrder.BottomLeft ? p.Center.Y : p.Center.X) + p.Type.Radius);
 
         public void Place(DiscType type, Vector center)
         {

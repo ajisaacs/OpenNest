@@ -21,8 +21,9 @@ namespace OpenNest.Engine.NestingEngines.Circles;
 ///
 /// Sheet by sheet (<see cref="SheetByStock"/>), each available stock is packed bottom-left (rows)
 /// and left-bottom (columns), plain and seeded with a hexagonal lattice of the type with the most
-/// remaining area, and bottom-left over a square lattice of it; the candidate with the lowest
-/// estimated whole-job cost wins. The whole job runs once with that free choice and once
+/// remaining area, and bottom-left over a square lattice of it, and each way again with the
+/// order of its discs searched for a shorter layout (<see cref="DiscPacker.PackSqueezed"/>);
+/// the candidate with the lowest estimated whole-job cost wins. The whole job runs once with that free choice and once
 /// preferring each offered stock, and the best result by <see cref="CandidateScore"/> is kept;
 /// its last sheet, and its last two sheets together, are then re-packed onto each single stock
 /// and replaced when that lowers the whole job's cost. Each run or tail that beats the best so
@@ -138,6 +139,15 @@ public sealed class CirclesNestingEngine : INestingEngine
         {
             if (!types.Any(t => left[t.Index] > 0 && DiscPacker.Fits(stock, t)))
                 yield break;
+            // First, and along the sheet's longer side first, so a shortened layout wins a tie
+            // with the layout it shortens; a sheet the order search does not shorten offers none.
+            var work = stock.WorkArea;
+            var columns = work.Right - work.Left >= work.Top - work.Bottom;
+            foreach (var order in columns
+                ? new[] { DiscOrder.LeftBottom, DiscOrder.BottomLeft }
+                : new[] { DiscOrder.BottomLeft, DiscOrder.LeftBottom })
+                if (DiscPacker.PackSqueezed(types, left, stock, order, token) is { } squeezed)
+                    yield return squeezed;
             foreach (var (order, seed) in Variants)
                 yield return DiscPacker.Pack(types, left, stock, order, seed, token);
         }
