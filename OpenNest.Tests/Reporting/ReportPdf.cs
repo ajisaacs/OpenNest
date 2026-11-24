@@ -30,12 +30,12 @@ public static class ReportPdf
 
     /// <summary>Visual-row text of one page; bbox coordinates avoid platform-specific -layout order.</summary>
     public static string Text(string path, int page) =>
-        LayoutPage(Run("pdftotext", "-bbox", "-f", Page(page), "-l", Page(page), path, "-"));
+        LayoutPage(Run("-bbox", "-f", Page(page), "-l", Page(page), path, "-"));
 
     /// <summary>Every page's visual-row text, in order.</summary>
     public static string[] Pages(string path)
     {
-        var html = Run("pdftotext", "-bbox", path, "-");
+        var html = Run("-bbox", path, "-");
         return Regex.Matches(html, @"<page\b[^>]*>.*?</page>", RegexOptions.Singleline)
             .Select(match => LayoutPage(match.Value)).ToArray();
     }
@@ -62,7 +62,7 @@ public static class ReportPdf
     /// </summary>
     public static List<string> PartCards(string path)
     {
-        var html = Run("pdftotext", "-bbox", path, "-");
+        var html = Run("-bbox", path, "-");
         var cards = new List<(int Page, double Top, int Column, string Text)>();
         var started = false;
         var pages = Regex.Matches(html, @"<page\b[^>]*>.*?</page>", RegexOptions.Singleline).Select(match => match.Value).ToList();
@@ -128,7 +128,7 @@ public static class ReportPdf
 
     /// <summary>Words with page-space boxes (points, Y down).</summary>
     public static List<(double Left, double Top, double Right, double Bottom, string Text)> Words(string path, int page) =>
-        ParseWords(Run("pdftotext", "-bbox", "-f", Page(page), "-l", Page(page), path, "-"));
+        ParseWords(Run("-bbox", "-f", Page(page), "-l", Page(page), path, "-"));
 
     private static List<(double Left, double Top, double Right, double Bottom, string Text)> ParseWords(string xml)
     {
@@ -142,8 +142,73 @@ public static class ReportPdf
 
     private static double Number(string value) => double.Parse(value, CultureInfo.InvariantCulture);
 
-    private static string Run(string tool, params string[] arguments)
+    /// <summary>Names the pdftotext to run, instead of the first on PATH that accepts -bbox.</summary>
+    public const string ToolVariable = "OPENNEST_PDFTOTEXT";
+
+    private static readonly Lazy<(string Tool, string Problem)> PdfToText = new(FindPdfToText);
+
+    /// <summary>
+    /// The pdftotext the text assertions run. PATH can hold more than one: Git for Windows
+    /// ships Xpdf's, which has no -bbox, and a shell that puts Git first hides Poppler's.
+    /// So the search takes the first that offers -bbox rather than the first it meets.
+    /// </summary>
+    private static (string Tool, string Problem) FindPdfToText()
     {
+        var named = Environment.GetEnvironmentVariable(ToolVariable);
+        if (!string.IsNullOrWhiteSpace(named))
+            return (named, null);
+
+        var name = OperatingSystem.IsWindows() ? "pdftotext.exe" : "pdftotext";
+        var found = (Environment.GetEnvironmentVariable("PATH") ?? string.Empty)
+            .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(folder => Path.Combine(folder.Trim('"'), name))
+            .Where(File.Exists)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        var tool = FirstWithBbox(found, Help);
+        if (tool != null)
+            return (tool, null);
+
+        return found.Count == 0
+            ? (null, null)
+            : (null, $"No pdftotext on PATH accepts -bbox (found {string.Join(", ", found)}). "
+                + $"Install Poppler, or name its pdftotext in {ToolVariable}.");
+    }
+
+    /// <summary>The first candidate whose help text offers -bbox, or null when none does.</summary>
+    internal static string FirstWithBbox(IEnumerable<string> candidates, Func<string, string> help) =>
+        candidates.FirstOrDefault(candidate => Regex.IsMatch(help(candidate), @"(?m)^\s*-bbox(?![\w-])"));
+
+    /// <summary>What a pdftotext prints for -h, on either stream; empty when it cannot run.</summary>
+    private static string Help(string tool)
+    {
+        try
+        {
+            var info = new ProcessStartInfo(tool)
+            {
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+            };
+            info.ArgumentList.Add("-h");
+            using var process = Process.Start(info)!;
+            var error = process.StandardError.ReadToEndAsync();
+            var output = process.StandardOutput.ReadToEnd();
+            process.WaitForExit();
+            return output + error.Result;
+        }
+        catch (Exception exception) when (exception is System.ComponentModel.Win32Exception or IOException or InvalidOperationException)
+        {
+            return string.Empty;
+        }
+    }
+
+    private static string Run(params string[] arguments)
+    {
+        var (tool, problem) = PdfToText.Value;
+        Assert.True(problem == null, problem);
+        Skip.If(tool == null, "pdftotext (poppler-utils) is not installed.");
+
         var info = new ProcessStartInfo(tool)
         {
             RedirectStandardOutput = true,
@@ -156,9 +221,10 @@ public static class ReportPdf
         {
             process = Process.Start(info)!;
         }
-        catch (System.ComponentModel.Win32Exception)
+        catch (System.ComponentModel.Win32Exception exception)
         {
-            Skip.If(true, $"{tool} (poppler-utils) is not installed.");
+            // Only a pdftotext named in the variable gets here: one found on PATH exists.
+            Assert.Fail($"{tool} ({ToolVariable}) cannot start: {exception.Message}");
             throw;
         }
         using (process)

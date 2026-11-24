@@ -284,7 +284,11 @@ The writer tests read page sizes and content streams with PDFsharp. Text
 assertions use Poppler's `pdftotext -bbox` coordinates to rebuild visual rows;
 `-layout` can return columns in a different order on Windows. Part cards are
 read column by column (`ReportPdf.PartCards`), each ending at its "Plates:" line. They are skipped,
-not passed, when poppler-utils is absent. The Windows release workflow installs
+not passed, when poppler-utils is absent. The tests run the first `pdftotext` on
+`PATH` whose help offers `-bbox`, so an older one listed first (Git for Windows
+ships Xpdf's) does not hide Poppler's; they fail, naming what they found, when
+every `pdftotext` on `PATH` lacks it. Set `OPENNEST_PDFTOTEXT` to a full path to
+choose one outright. The Windows release workflow installs
 an SHA-256-pinned Poppler binary because the runner's built-in `pdftotext` lacks
 `-bbox`; no PDF text test is skipped for that reason in a release candidate.
 For manual inspection also use `pdfinfo`,
