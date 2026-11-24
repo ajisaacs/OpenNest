@@ -45,6 +45,44 @@ public class CutoutPipelineChainTests
         return builder.Build(complete ? NestJobStopReason.Completed : NestJobStopReason.NoPlacementFound);
     }
 
+    private static List<NestJobPart> BundledParts(Program frame, Program insert, int quantity)
+    {
+        var request = new NestPipelineRequest("stub",
+            new[] { frame, insert }.Select((p, i) =>
+                new NestItem { Drawing = new Drawing($"d{i}", p), Quantity = quantity }).ToArray(),
+            new[] { new NestPlateStock("sheet", new Size(Sheet, Sheet), null, 0.25) });
+        var engine = new Stub(job => new NestJobResultBuilder(job).Build(NestJobStopReason.NoPlacementFound));
+        NestPipeline.RunCutoutTrial(engine, "stub", request);
+        return Assert.Single(engine.Jobs).Parts.ToList();
+    }
+
+    [Fact]
+    public void EveryRepeatedRingTakesItsDisc()
+    {
+        // Discs in round bores are packed analytically, so the limit on searched bundles does
+        // not stop a job of repeated rings short.
+        var parts = BundledParts(TestShapes.Ring(10, 6), TestShapes.Disc(2.5), 40);
+
+        Assert.Equal(40, parts.Count);
+        Assert.All(parts, p => Assert.StartsWith("__cutout-proxy-part-0-", p.Id));
+    }
+
+    [Fact]
+    public void SearchedBundlesStopAtTheLimit()
+    {
+        // A square in a square window needs the lattice and NFP searches: 32 frames are
+        // bundled and the rest of the demand stays ordinary.
+        var frame = TestShapes.Rectangle(8, 8);
+        frame.Codes.Add(new RapidMove(2, 2));
+        foreach (var (x, y) in new[] { (6.0, 2.0), (6.0, 6.0), (2.0, 6.0), (2.0, 2.0) })
+            frame.Codes.Add(new LinearMove(x, y));
+        var parts = BundledParts(frame, TestShapes.Rectangle(3, 3), 40);
+
+        Assert.Equal(32, parts.Count(p => p.Id.StartsWith("__cutout-proxy-")));
+        Assert.Equal(8, parts.Single(p => p.Id == "part-0").Quantity);
+        Assert.Equal(8, parts.Single(p => p.Id == "part-1").Quantity);
+    }
+
     [Fact]
     public void FourLevelChainIsOneBundleThatCutsInnermostFirst()
     {
@@ -58,9 +96,10 @@ public class CutoutPipelineChainTests
         Assert.Equal(NestJobStatus.Complete, result.Status);
         Assert.Equal(new[] { "part-3", "part-2", "part-1", "part-0" },
             Assert.Single(result.Raw.Plates).Placements.Select(p => p.PartId));
-        // A single insert sits concentric at every level.
-        Assert.All(result.Raw.Plates[0].Placements, p =>
-            Assert.True(new Vector(p.X, p.Y).DistanceTo(new Vector(Sheet / 2, Sheet / 2)) < 1e-6));
+        // A single insert sits against its frame's bore at the lowest point, at every level.
+        var placements = result.Raw.Plates[0].Placements;
+        Assert.All(placements, p => Assert.Equal(Sheet / 2, p.X, 6));
+        Assert.All(placements.Zip(placements.Skip(1)), pair => Assert.True(pair.First.Y < pair.Second.Y - 0.5));
     }
 
     [Fact]

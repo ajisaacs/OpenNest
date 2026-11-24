@@ -21,7 +21,12 @@ internal sealed class CutoutPipelinePrepass : IPipelinePrepass
 {
     // A job with thousands of repeats still offers the residual as ordinary demand;
     // do not multiply expensive Clipper/Fill preparation by every physical instance.
-    private const int MaxBundlesPerJob = 32;
+    // Counts the bundles the lattice and NFP searches were consulted for.
+    private const int MaxSearchedBundlesPerJob = 32;
+
+    // Bundles packed as discs alone cost a few analytic passes each, so a job of repeated
+    // rings nests them all; this only bounds the preparation of a very large job.
+    private const int MaxBundlesPerJob = 4096;
 
     /// <summary>Most parts on one frame-in-frame chain: flange, washer, smaller washer, slug.</summary>
     internal const int MaxLevels = 4;
@@ -80,7 +85,9 @@ internal sealed class CutoutPipelinePrepass : IPipelinePrepass
         // rotation policies, not on the frame angle itself: automatic-rotation inserts ask the
         // same question at every angle, and so does every instance of the same frame while the
         // remaining demand is unchanged. Replay those answers.
-        var proposals = new Dictionary<string, IReadOnlyList<NestJobPlacement>>(StringComparer.Ordinal);
+        var proposals = new Dictionary<string, (IReadOnlyList<NestJobPlacement> Poses, bool Searched)>(
+            StringComparer.Ordinal);
+        var searchedBundles = 0;
         // Smallest first: a frame can only hold smaller parts, so its candidate inner bundles
         // already exist, and small holes take small inserts before large holes are tried.
         var frames = original.Parts.Where(p => geometry[p.Id] is { Cutouts.Count: > 0 })
@@ -101,6 +108,9 @@ internal sealed class CutoutPipelinePrepass : IPipelinePrepass
                     break;
                 IReadOnlyList<NestJobPlacement>? chosen = null;
                 double frameAngle = 0;
+                // Past the limit a hole is offered to the disc packer alone.
+                var search = searchedBundles < MaxSearchedBundlesPerJob;
+                var searched = false;
                 // Outer-perimeter symmetry cannot deduplicate asymmetric cutouts.
                 foreach (var angle in frame.Rotation.EnumerateAngles(maxSamples: 16))
                 {
@@ -127,7 +137,7 @@ internal sealed class CutoutPipelinePrepass : IPipelinePrepass
                             : eligible.Where(p => round[p.Id] && !solid.GetValueOrDefault(p.Id)).ToArray();
                         if (flat.Length == 0 && nested.Length == 0)
                             continue;
-                        foreach (var pose in Propose(frame, hole, flat, nested))
+                        foreach (var pose in Propose(frame, hole, flat, nested, search, ref searched))
                         {
                             token.ThrowIfCancellationRequested();
                             var source = geometry[pose.PartId]!;
@@ -151,6 +161,8 @@ internal sealed class CutoutPipelinePrepass : IPipelinePrepass
                     throw new InvalidOperationException("Cutout proxy ID collides with a requirement.");
                 var levels = 1 + chosen.Max(p => bundles.TryGetValue(p.PartId, out var b) ? b.Levels : 1);
                 bundles.Add(proxyId, new Bundle(frame.Id, chosen, levels, outline[frame.Id] + Weight(chosen)));
+                if (searched)
+                    searchedBundles++;
                 var proxy = new NestJobPart(proxyId, frame.Geometry, 1, frame.Priority,
                     RotationPolicy.Fixed(frameAngle));
                 proxies.Add(proxy);
@@ -182,19 +194,25 @@ internal sealed class CutoutPipelinePrepass : IPipelinePrepass
 
         // Ties keep the flat router's proposal, which predates nesting.
         IReadOnlyList<NestJobPlacement> Propose(NestJobPart frame, int hole,
-            NestJobPart[] flat, NestJobPart[] nested)
+            NestJobPart[] flat, NestJobPart[] nested, bool search, ref bool searched)
         {
-            var key = ProposalKey(frame, hole, flat, nested);
-            if (proposals.TryGetValue(key, out var replay))
-                return replay;
-            var proposed = ProposeCore(frame, hole, flat, nested);
-            proposals[key] = proposed;
-            return proposed;
+            var key = ProposalKey(frame, hole, flat, nested, search);
+            if (!proposals.TryGetValue(key, out var proposed))
+            {
+                proposed = ProposeCore(frame, hole, flat, nested, search);
+                proposals[key] = proposed;
+            }
+            searched |= proposed.Searched;
+            return proposed.Poses;
         }
 
-        IReadOnlyList<NestJobPlacement> ProposeCore(NestJobPart frame, int hole,
-            NestJobPart[] flat, NestJobPart[] nested)
+        (IReadOnlyList<NestJobPlacement> Poses, bool Searched) ProposeCore(NestJobPart frame, int hole,
+            NestJobPart[] flat, NestJobPart[] nested, bool search)
         {
+            // A round hole whose flat inserts are all round is the disc packer's alone, inside
+            // the router too: no lattice or NFP search runs for it.
+            var discs = CutoutCirclePacker.RoundHole(geometry[frame.Id]!.Cutouts[hole]) != null
+                && flat.All(p => round[p.Id]);
             IReadOnlyList<NestJobPlacement> poses = Array.Empty<NestJobPlacement>();
             if (nested.Length > 0)
                 poses = CutoutCirclePacker.Fill(frame, hole,
@@ -202,10 +220,11 @@ internal sealed class CutoutPipelinePrepass : IPipelinePrepass
             // Seating every flat copy as a disc leaves the slower proposals nothing to beat.
             var flatIds = flat.Select(p => p.Id).ToHashSet(StringComparer.Ordinal);
             if (flat.Length == 0
-                || poses.Count(p => flatIds.Contains(p.PartId)) == flat.Sum(p => (long)p.Quantity))
-                return poses;
+                || poses.Count(p => flatIds.Contains(p.PartId)) == flat.Sum(p => (long)p.Quantity)
+                || !(search || discs))
+                return (poses, false);
             var router = CutoutRouter.Fill(frame, hole, flat, spacing, memo, token);
-            return CutoutSeatedArea.More(Weight(poses), Weight(router)) ? poses : router;
+            return (CutoutSeatedArea.More(Weight(poses), Weight(router)) ? poses : router, !discs);
         }
 
         // Outline area a proposal seats: a nested bundle counts its frame and contents.
@@ -213,10 +232,11 @@ internal sealed class CutoutPipelinePrepass : IPipelinePrepass
             poses.Sum(p => bundles.TryGetValue(p.PartId, out var b) ? b.Area : outline[p.PartId]);
     }
 
-    private static string ProposalKey(NestJobPart frame, int hole, NestJobPart[] flat, NestJobPart[] nested)
+    private static string ProposalKey(NestJobPart frame, int hole, NestJobPart[] flat, NestJobPart[] nested,
+        bool search)
     {
         var key = new System.Text.StringBuilder();
-        key.Append(frame.Id).Append('|').Append(hole);
+        key.Append(frame.Id).Append('|').Append(hole).Append(search ? "|s" : "|d");
         foreach (var part in flat)
             Append(part, 'f');
         foreach (var part in nested)

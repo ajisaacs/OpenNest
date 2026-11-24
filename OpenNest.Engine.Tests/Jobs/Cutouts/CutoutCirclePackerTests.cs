@@ -13,15 +13,16 @@ public class CutoutCirclePackerTests
     private const double Spacing = 0.25;
 
     [Fact]
-    public void SingleInsertSitsConcentric()
+    public void SingleInsertSitsAgainstTheWallAtTheLowestPoint()
     {
         var frame = JobBuilder.Part("frame", TestShapes.Ring(20, 10), 1);
         var insert = JobBuilder.Part("disc", TestShapes.Disc(3), 1);
 
         var pose = Assert.Single(CutoutCirclePacker.Fill(frame, 0, new[] { insert }, Spacing));
 
+        // A 3 radius disc in a 5 radius bore: the spacing from the wall, less the margins.
         Assert.Equal(0, pose.X, 6);
-        Assert.Equal(0, pose.Y, 6);
+        Assert.InRange(pose.Y, -1.75, -1.7);
         AssertPhysical(frame, new[] { (insert, new Vector()) }, new[] { pose });
     }
 

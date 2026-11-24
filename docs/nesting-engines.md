@@ -671,6 +671,19 @@ Default ranks candidates (valid, fewest unplaced, lowest cost). The last sheet, 
 sheets together, are then re-packed onto each single stock and replaced when that lowers the
 whole job's cost, so a small remainder does not finish on a large sheet.
 
+Largest first sets two large discs side by side before any smaller one is placed, so a disc that
+would fit between them, were they a little further apart, ends up beyond both. Rows and columns
+therefore each run once more with the order searched (`DiscPacker.PackSqueezed`): the sheet's
+discs are placed again by the same rule in other orders, taking the best move of one disc to
+another position while a move makes the layout end sooner along the fill axis, and the room that
+frees is refilled from the remaining demand (at most three rounds). Only sheets of 24 discs or
+fewer are searched, within 600 decodes, and a sheet no order shortens offers no extra layout. A
+shortened layout is listed first, along the sheet's longer side first, so it wins an exact tie
+with the layout it shortens; a plain layout that leaves a larger compactness offcut still wins.
+A 54, a 53 and a 20 inch disc on 60 x 120 at 0.25 spacing end at 111.1 with the 20 against the
+top edge between the other two, rather than at the end of the sheet, and a 21 inch disc then
+fits on the same sheet.
+
 ## Filling cutouts
 
 Every whole-job `NestPipeline.Run` (desktop Auto Nest, Console, MCP and API) first places parts
@@ -749,9 +762,11 @@ more outline area than the others.
 When the cutout is one circle and every insert fills at least 0.8 of its enclosing circle
 (discs, washers, gears by their tip circle), `CutoutCirclePacker` first packs the whole insert
 list as discs: largest first, at centers tangent to two of the hole wall and the placed discs,
-or at the hole's center. It tries a center-out pass, so a single insert sits concentric, and a
-wall-first pass, which reaches the optimal counts for up to nine equal discs, and the pass
-seating more outline area wins, the center-out pass on a tie. Each gap is the
+or at the hole's center. It tries a wall-first pass, which starts at the hole's lowest point and
+reaches the optimal counts for up to nine equal discs, and a center-out pass, and the pass
+seating more outline area wins, the wall-first pass on a tie. So a single insert sits against the
+wall at the lowest point, not concentric, and the room it leaves is one crescent that smaller
+round parts fill, largest first. Each gap is the
 spacing plus twice `NestTolerances.ValidationOutline`, and every pose passes `NestLayoutCheck`.
 Its result is the router's proposal for that hole: the lattice and NFP searches never placed
 more there and were slow on round inserts, most of all when demand exceeds what fits.
@@ -781,9 +796,15 @@ then every physical pose, stock, rotation, quantity and fulfillment is independe
 before binding caller drawings. Forged or geometrically invalid composites return no bindable
 plates even with invalid-result consent. Candidate evaluation progress is forwarded
 with unverified proxy commitment counts zeroed; transformed proxy commits are hidden. Physical
-commits are reported only after physical validation. Preparation is bounded to 32 bundles
-and 16 base sweep-angle samples per frame (automatic quarter-turns are all retained);
-remaining copies stay ordinary requirements. Within one preparation, geometry reads and
+commits are reported only after physical validation. Preparation is bounded to 16 base
+sweep-angle samples per frame (automatic quarter-turns are all retained) and to 32 bundles that
+the lattice and NFP searches were consulted for; past that a hole is offered to the disc packer
+alone. Round inserts in a round hole are packed analytically and do not count, so a job of
+repeated rings bundles every copy, up to 4,096 bundles; 20 each of 58 ring sizes seats 700 of its
+1,160 rings in bores, on 160 sheets of 60 x 120 where 32 bundles left 217. Remaining copies stay
+ordinary requirements. The spacing check answers a part lying wholly inside another's cutout
+without its triangle test (`SpacingOutline.Overlaps`), which a seated ring made as slow as it
+gets: every triangle pair overlaps and each piece is subtracted by the whole cutout. Within one preparation, geometry reads and
 `NestLayoutCheck.Clears` answers are replayed (`CutoutMemo`: same geometry, bit-identical poses),
 so repeated frame instances and frame angles do not repeat that check, its main cost; layouts are
 the same as without the replay. A hole's proposal is also replayed whenever the same frame, hole

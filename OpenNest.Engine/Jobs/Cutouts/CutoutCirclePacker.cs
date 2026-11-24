@@ -13,10 +13,12 @@ namespace OpenNest.Engine.Jobs.Cutouts;
 /// circle (<see cref="Item"/>), so the hole and inserts are discs and placement is analytic.
 /// Never changes demand, stock or a live plate.</summary>
 /// <remarks>Two greedy passes over the copies, largest first, choose among candidate centers
-/// tangent to two of {hole wall, placed discs} plus the hole's center. One grows from the
-/// center, so a single insert sits concentric and keeps its own bore free for a later level;
-/// the other lays rings against the wall first, which reproduces the ring-shaped optimal
-/// packings of up to nine equal circles. The higher count wins, ties keep the centered pass.
+/// tangent to two of {hole wall, placed discs} plus the hole's center. One lays discs against
+/// the wall first, starting at the hole's lowest point, which reproduces the ring-shaped optimal
+/// packings of up to nine equal circles and leaves the room a large insert does not use as one
+/// crescent that smaller inserts fill; the other grows from the center, which wins where a
+/// center disc and a ring around it hold more. The pass seating more area wins, ties keep the
+/// wall pass, so a single insert sits against the wall at the lowest point.
 /// Every pose is certified with <see cref="NestLayoutCheck.Clears"/> before it is returned.</remarks>
 internal static class CutoutCirclePacker
 {
@@ -120,9 +122,9 @@ internal static class CutoutCirclePacker
         discs = discs.OrderByDescending(d => d.Radius).ToList();
 
         var gap = spacing + Margin;
-        var centered = Greedy(discs, wall, gap, fromCenter: true, token);
-        var walled = discs.Count > 1 ? Greedy(discs, wall, gap, fromCenter: false, token) : centered;
-        var chosen = CutoutSeatedArea.More(Seated(walled), Seated(centered)) ? walled : centered;
+        var walled = Greedy(discs, wall, gap, fromCenter: false, token);
+        var centered = discs.Count > 1 ? Greedy(discs, wall, gap, fromCenter: true, token) : walled;
+        var chosen = CutoutSeatedArea.More(Seated(centered), Seated(walled)) ? centered : walled;
 
         var framePose = new NestJobPlacement(frame.Id, 0, 0, 0, 0);
         var accepted = new List<(Disc Disc, Vector Center, NestJobPlacement Pose)>();
