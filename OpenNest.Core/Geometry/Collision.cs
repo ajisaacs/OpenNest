@@ -112,10 +112,21 @@ namespace OpenNest.Geometry
         /// <see cref="Triangulate"/> as the clip loop reads it, without a polygon per triangle:
         /// the same triangles, vertices and bounds. Callers may reuse it for the same polygon.
         /// </summary>
-        internal static List<CollisionTriangle> TriangulateForClipping(Polygon polygon)
+        internal static List<CollisionTriangle> TriangulateForClipping(Polygon polygon) =>
+            TriangulateForClipping(polygon, new List<CollisionTriangle>(polygon.Vertices.Count));
+
+        /// <summary>
+        /// <see cref="TriangulateForClipping(Polygon)"/> into a list the caller reuses: it is
+        /// emptied first and returned holding the same triangles.
+        /// </summary>
+        internal static List<CollisionTriangle> TriangulateForClipping(
+            Polygon polygon,
+            List<CollisionTriangle> triangles
+        )
         {
             PerfCounters.CountPolygonTriangulation();
-            var sink = new TriangleSink(new List<CollisionTriangle>(polygon.Vertices.Count));
+            triangles.Clear();
+            var sink = new TriangleSink(triangles);
             ConvexDecomposition.Triangulate(polygon, ref sink);
             return sink.Triangles;
         }

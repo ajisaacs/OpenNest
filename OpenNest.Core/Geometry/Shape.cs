@@ -314,12 +314,22 @@ namespace OpenNest.Geometry
                 {
                     case EntityType.Arc:
                         var arc = (Arc)entity;
-                        polygon.Vertices.AddRange(arc.ToPoints(arcSegments(arc), circumscribe));
+                        Arc.AppendPoints(
+                            polygon.Vertices,
+                            arc.Center,
+                            arc.Radius,
+                            arc.StartAngle,
+                            arc.SweepAngle(),
+                            arc.IsReversed,
+                            arcSegments(arc),
+                            circumscribe
+                        );
                         break;
 
                     case EntityType.Line:
                         var line = (Line)entity;
-                        polygon.Vertices.AddRange(new[] { line.StartPoint, line.EndPoint });
+                        polygon.Vertices.Add(line.StartPoint);
+                        polygon.Vertices.Add(line.EndPoint);
                         break;
 
                     case EntityType.Circle:

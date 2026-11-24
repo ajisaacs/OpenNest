@@ -166,7 +166,7 @@ namespace OpenNest.Converters
         /// end, which breaks contour chaining. Project the center onto the chord's
         /// perpendicular bisector so the arc passes through both endpoints exactly.
         /// </summary>
-        private static Vector FitCenterToEndpoints(Vector center, Vector start, Vector end)
+        internal static Vector FitCenterToEndpoints(Vector center, Vector start, Vector end)
         {
             var startRadius = center.DistanceTo(start);
             var endRadius = center.DistanceTo(end);

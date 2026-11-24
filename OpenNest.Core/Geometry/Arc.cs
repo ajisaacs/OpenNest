@@ -101,12 +101,15 @@ namespace OpenNest.Geometry
         /// Angle in radians between start and end angles.
         /// </summary>
         /// <returns></returns>
-        public double SweepAngle()
-        {
-            var startAngle = StartAngle;
-            var endAngle = EndAngle;
+        public double SweepAngle() => SweepAngle(StartAngle, EndAngle, IsReversed);
 
-            if (IsReversed)
+        /// <summary>
+        /// <see cref="SweepAngle()"/> of an arc with these angles and direction, for callers
+        /// that flatten arcs without building them.
+        /// </summary>
+        internal static double SweepAngle(double startAngle, double endAngle, bool reversed)
+        {
+            if (reversed)
                 Generic.Swap(ref startAngle, ref endAngle);
 
             if (startAngle > endAngle)
@@ -226,15 +229,21 @@ namespace OpenNest.Geometry
         /// Returns the minimum number of segments needed so that the chord-to-arc
         /// deviation (sagitta) does not exceed the given tolerance.
         /// </summary>
-        public int SegmentsForTolerance(double tolerance)
+        public int SegmentsForTolerance(double tolerance) =>
+            SegmentsForTolerance(Radius, SweepAngle(), tolerance);
+
+        /// <summary>
+        /// <see cref="SegmentsForTolerance(double)"/> of an arc with this radius and sweep.
+        /// </summary>
+        internal static int SegmentsForTolerance(double radius, double sweepAngle, double tolerance)
         {
-            if (tolerance >= Radius)
+            if (tolerance >= radius)
                 return 1;
 
-            var maxAngle = 2.0 * PortableMath.Acos(1.0 - tolerance / Radius);
+            var maxAngle = 2.0 * PortableMath.Acos(1.0 - tolerance / radius);
             return System.Math.Max(
                 1,
-                (int)System.Math.Ceiling(System.Math.Abs(SweepAngle()) / maxAngle)
+                (int)System.Math.Ceiling(System.Math.Abs(sweepAngle) / maxAngle)
             );
         }
 
@@ -246,26 +255,43 @@ namespace OpenNest.Geometry
         public List<Vector> ToPoints(int segments = 1000, bool circumscribe = false)
         {
             var points = new List<Vector>();
-            var stepAngle = reversed ? -SweepAngle() / segments : SweepAngle() / segments;
+            AppendPoints(points, center, radius, startAngle, SweepAngle(), reversed, segments, circumscribe);
+            return points;
+        }
+
+        /// <summary>
+        /// Adds the points <see cref="ToPoints"/> gives for an arc with these values to
+        /// <paramref name="points"/>, without building the arc or a list for it.
+        /// </summary>
+        internal static void AppendPoints(
+            List<Vector> points,
+            Vector center,
+            double radius,
+            double startAngle,
+            double sweepAngle,
+            bool reversed,
+            int segments,
+            bool circumscribe
+        )
+        {
+            var stepAngle = reversed ? -sweepAngle / segments : sweepAngle / segments;
 
             var r =
                 circumscribe && segments > 0
-                    ? Radius / PortableMath.Cos(System.Math.Abs(stepAngle) / 2.0)
-                    : Radius;
+                    ? radius / PortableMath.Cos(System.Math.Abs(stepAngle) / 2.0)
+                    : radius;
 
             for (int i = 0; i <= segments; ++i)
             {
-                var angle = stepAngle * i + StartAngle;
+                var angle = stepAngle * i + startAngle;
 
                 points.Add(
                     new Vector(
-                        PortableMath.Cos(angle) * r + Center.X,
-                        PortableMath.Sin(angle) * r + Center.Y
+                        PortableMath.Cos(angle) * r + center.X,
+                        PortableMath.Sin(angle) * r + center.Y
                     )
                 );
             }
-
-            return points;
         }
 
         /// <summary>
