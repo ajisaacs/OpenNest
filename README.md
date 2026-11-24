@@ -87,7 +87,7 @@ Run `dotnet run --project OpenNest.Console -- --help` for the complete options a
 | **OpenNest.IO** | DXF/DWG/SVG, `.nest`, G-code, BOM I/O; CAD import |
 | **OpenNest.Console** | Headless batch nesting |
 | **OpenNest.Api / .Data** | Programmatic pipeline; machine & cutting-parameter data |
-| **OpenNest.Gpu** | GPU-accelerated pair evaluation (ILGPU) |
+| **OpenNest.Gpu** | GPU-accelerated pair evaluation (ILGPU); currently unused by the apps and engines (only the Training tool wires it in) |
 | **OpenNest.Benchmark** | Head-to-head engine comparison |
 | **OpenNest.Mcp** | MCP server for AI tool integration |
 | **Posts/** | Post-processor plugins (Cincinnati CL / CI Fiber lasers, Gravograph IS8000) |
