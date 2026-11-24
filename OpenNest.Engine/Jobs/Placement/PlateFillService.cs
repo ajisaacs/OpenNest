@@ -541,10 +541,15 @@ public static partial class PlateFillService
     {
         var bounds = part.BoundingBox;
         var full = plate.WorkArea();
-        // The packer permits a tiny overhang only at a real sheet edge,
-        // never across a remnant boundary cut by a clamp or another part.
-        double Slack(double edge, double sheet) => System.Math.Abs(edge - sheet) < 1e-9
+        // The fillers permit the geometry tolerance's overhang at every edge of their area. A
+        // sheet edge always allows it. An inner edge is an occupant (or cut-off) held off by the
+        // part spacing, or a clamp keep-out inflated by at least the spacing slack, so the
+        // overhang stays inside that margin when the spacing is at least the slack; the material
+        // checks below still confirm occupants and clamps. Without that margin, hold the edge.
+        var innerSlack = plate.PartSpacing >= NestTolerances.SpacingSlack
             ? NestTolerances.WorkAreaSlack : 1e-6;
+        double Slack(double edge, double sheet) => System.Math.Abs(edge - sheet) < 1e-9
+            ? NestTolerances.WorkAreaSlack : innerSlack;
         if (bounds.Left < area.Left - Slack(area.Left, full.Left)
             || bounds.Right > area.Right + Slack(area.Right, full.Right)
             || bounds.Bottom < area.Bottom - Slack(area.Bottom, full.Bottom)

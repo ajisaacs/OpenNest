@@ -248,6 +248,28 @@ public class ClampZoneInteractiveFillTests
     }
 
     [Fact]
+    public void FillAreaKeepsToleranceOverhangAtAnInnerEdgeHeldOffByPartSpacing()
+    {
+        // A fill's interlocked partner can end a few millionths past the selected box (the
+        // fillers' geometry tolerance); with clamps on the sheet both partners were dropped.
+        var plate = MakePlate(new ClampZone("front-1", ZoneA));
+        var area = new Box(30, 5, 4, 10);
+        var overhang = OpenNest.Math.Tolerance.Epsilon * 0.5;
+        var drawing = RectDrawing(2, 2);
+        var item = new NestItem { Drawing = drawing };
+        var proposed = new List<Part>
+        {
+            new(drawing, new Vector(area.Left, area.Bottom)),
+            new(drawing, new Vector(area.Right - 2 + overhang, area.Bottom + 3)),
+        };
+
+        var parts = PlateFillService.FillDroppingClampHits((_, _, _) => proposed.ToList(),
+            plate, item, new List<NestItem> { item }, area, null, CancellationToken.None);
+
+        Assert.Equal(2, parts.Count);
+    }
+
+    [Fact]
     public void PackAreaNeverPacksInsideClampKeepOut()
     {
         var plate = MakePlate(new ClampZone("front-1", ZoneA), new ClampZone("front-2", ZoneB));
