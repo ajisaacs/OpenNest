@@ -154,17 +154,40 @@ namespace OpenNest.Forms
                 {
                     DataPropertyName = "DrawingName",
                     HeaderText = "Drawing Name",
-                    Width = 160,
+                    Width = 130,
                     ReadOnly = true,
                     AutoSizeMode = DataGridViewAutoSizeColumnMode.None,
                 }
             );
+            var requiredColumn = new DataGridViewTextBoxColumn
+            {
+                DataPropertyName = "Required",
+                HeaderText = "Required",
+                ToolTipText = "The drawing's required quantity.",
+                Width = 62,
+                ReadOnly = true,
+                AutoSizeMode = DataGridViewAutoSizeColumnMode.None,
+            };
+            requiredColumn.DefaultCellStyle.ForeColor = System.Drawing.SystemColors.GrayText;
+            partsGrid.Columns.Add(requiredColumn);
+            var placedColumn = new DataGridViewTextBoxColumn
+            {
+                DataPropertyName = "Placed",
+                HeaderText = "Placed",
+                ToolTipText = "Parts of the drawing already placed on the nest's plates.",
+                Width = 55,
+                ReadOnly = true,
+                AutoSizeMode = DataGridViewAutoSizeColumnMode.None,
+            };
+            placedColumn.DefaultCellStyle.ForeColor = System.Drawing.SystemColors.GrayText;
+            partsGrid.Columns.Add(placedColumn);
             partsGrid.Columns.Add(
                 new DataGridViewTextBoxColumn
                 {
                     DataPropertyName = "Quantity",
                     HeaderText = "Qty",
-                    Width = 50,
+                    ToolTipText = "How many of the drawing this Auto Nest places.",
+                    Width = 45,
                     AutoSizeMode = DataGridViewAutoSizeColumnMode.None,
                 }
             );
@@ -173,7 +196,7 @@ namespace OpenNest.Forms
                 {
                     DataPropertyName = "Priority",
                     HeaderText = "Priority",
-                    Width = 55,
+                    Width = 52,
                     AutoSizeMode = DataGridViewAutoSizeColumnMode.None,
                 }
             );
@@ -182,7 +205,7 @@ namespace OpenNest.Forms
                 {
                     DataPropertyName = "RotationStart",
                     HeaderText = "Rot Start",
-                    Width = 65,
+                    Width = 62,
                     AutoSizeMode = DataGridViewAutoSizeColumnMode.None,
                 }
             );
@@ -191,7 +214,7 @@ namespace OpenNest.Forms
                 {
                     DataPropertyName = "RotationEnd",
                     HeaderText = "Rot End",
-                    Width = 60,
+                    Width = 57,
                     AutoSizeMode = DataGridViewAutoSizeColumnMode.None,
                 }
             );
@@ -200,7 +223,7 @@ namespace OpenNest.Forms
                 {
                     DataPropertyName = "StepAngle",
                     HeaderText = "Step",
-                    Width = 55,
+                    Width = 45,
                     AutoSizeMode = DataGridViewAutoSizeColumnMode.None,
                 }
             );
@@ -591,6 +614,28 @@ namespace OpenNest.Forms
             summaryLabel.Text = $"{totalQty} parts across {drawingCount} drawings";
         }
 
+        private void loadRequiredButton_Click(object sender, EventArgs e) => LoadPartQuantities(remaining: false);
+
+        private void loadRemainingButton_Click(object sender, EventArgs e) => LoadPartQuantities(remaining: true);
+
+        /// <summary>
+        /// Sets every row's Qty to its drawing's required quantity, or to what is still left to
+        /// place (required less placed, never below zero).
+        /// </summary>
+        internal void LoadPartQuantities(bool remaining)
+        {
+            if (partsGrid.DataSource is not List<DataGridViewItem> gridItems)
+                return;
+            partsGrid.EndEdit();
+            foreach (var item in gridItems)
+            {
+                var quantity = remaining ? item.RefDrawing.Quantity.Remaining : item.Required;
+                item.Quantity = System.Math.Max(0, quantity);
+            }
+            partsGrid.Refresh();
+            UpdateSummary();
+        }
+
         private void PartsGrid_CellValueChanged(object sender, DataGridViewCellEventArgs e)
         {
             if (e.RowIndex < 0)
@@ -977,6 +1022,10 @@ namespace OpenNest.Forms
                 get { return RefDrawing.Name; }
                 set { RefDrawing.Name = value; }
             }
+
+            public int Required => RefDrawing.Quantity.Required;
+
+            public int Placed => RefDrawing.Quantity.Nested;
 
             public int Quantity { get; set; }
 

@@ -22,6 +22,8 @@ namespace OpenNest.Forms
             this.platesTab = new System.Windows.Forms.TabPage();
             this.partsGrid = new System.Windows.Forms.DataGridView();
             this.summaryLabel = new System.Windows.Forms.Label();
+            this.loadRequiredButton = new System.Windows.Forms.Button();
+            this.loadRemainingButton = new System.Windows.Forms.Button();
             this.engineLabel = new System.Windows.Forms.Label();
             this.engineComboBox = new System.Windows.Forms.ComboBox();
             this.nestOnServerBox = new System.Windows.Forms.CheckBox();
@@ -66,6 +68,8 @@ namespace OpenNest.Forms
             //
             this.partsTab.Controls.Add(this.partsGrid);
             this.partsTab.Controls.Add(this.summaryLabel);
+            this.partsTab.Controls.Add(this.loadRequiredButton);
+            this.partsTab.Controls.Add(this.loadRemainingButton);
             this.partsTab.Location = new System.Drawing.Point(4, 25);
             this.partsTab.Name = "partsTab";
             this.partsTab.Padding = new System.Windows.Forms.Padding(6);
@@ -99,17 +103,41 @@ namespace OpenNest.Forms
             this.partsGrid.Name = "partsGrid";
             this.partsGrid.RowHeadersVisible = false;
             this.partsGrid.AutoGenerateColumns = false;
-            this.partsGrid.Size = new System.Drawing.Size(528, 420);
+            this.partsGrid.Size = new System.Drawing.Size(528, 406);
             this.partsGrid.TabIndex = 0;
             //
             // summaryLabel
             //
             this.summaryLabel.AutoSize = true;
             this.summaryLabel.ForeColor = System.Drawing.SystemColors.GrayText;
-            this.summaryLabel.Location = new System.Drawing.Point(10, 436);
+            this.summaryLabel.Location = new System.Drawing.Point(10, 429);
             this.summaryLabel.Name = "summaryLabel";
             this.summaryLabel.Size = new System.Drawing.Size(0, 16);
             this.summaryLabel.TabIndex = 1;
+            //
+            // loadRequiredButton
+            //
+            this.loadRequiredButton.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
+            this.loadRequiredButton.Location = new System.Drawing.Point(290, 423);
+            this.loadRequiredButton.Name = "loadRequiredButton";
+            this.loadRequiredButton.Size = new System.Drawing.Size(120, 28);
+            this.loadRequiredButton.TabIndex = 2;
+            this.loadRequiredButton.Text = "Load Required";
+            this.ledgerToolTip.SetToolTip(this.loadRequiredButton, "Set each drawing's Qty to its required quantity.");
+            this.loadRequiredButton.UseVisualStyleBackColor = true;
+            this.loadRequiredButton.Click += new System.EventHandler(this.loadRequiredButton_Click);
+            //
+            // loadRemainingButton
+            //
+            this.loadRemainingButton.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
+            this.loadRemainingButton.Location = new System.Drawing.Point(418, 423);
+            this.loadRemainingButton.Name = "loadRemainingButton";
+            this.loadRemainingButton.Size = new System.Drawing.Size(120, 28);
+            this.loadRemainingButton.TabIndex = 3;
+            this.loadRemainingButton.Text = "Load Remaining";
+            this.ledgerToolTip.SetToolTip(this.loadRemainingButton, "Set each drawing's Qty to what is still left to place: required less placed.");
+            this.loadRemainingButton.UseVisualStyleBackColor = true;
+            this.loadRemainingButton.Click += new System.EventHandler(this.loadRemainingButton_Click);
             //
             // engineLabel
             //
@@ -332,6 +360,8 @@ namespace OpenNest.Forms
         private System.Windows.Forms.TabPage platesTab;
         private System.Windows.Forms.DataGridView partsGrid;
         private System.Windows.Forms.Label summaryLabel;
+        private System.Windows.Forms.Button loadRequiredButton;
+        private System.Windows.Forms.Button loadRemainingButton;
         private System.Windows.Forms.Label engineLabel;
         private System.Windows.Forms.ComboBox engineComboBox;
         private System.Windows.Forms.CheckBox nestOnServerBox;
