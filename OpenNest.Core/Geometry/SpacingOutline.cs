@@ -107,11 +107,98 @@ namespace OpenNest.Geometry
         public bool Overlaps(SpacingOutline other)
         {
             ArgumentNullException.ThrowIfNull(other);
+            // A part seated in another's cutout shares nothing with it, and is the triangle
+            // test's worst case: every triangle pair overlaps and each piece must be subtracted
+            // by the whole cutout before the answer is no.
+            if (InsideACutout(this, other) || InsideACutout(other, this))
+                return false;
             var at = Triangles;
             var bt = other.Triangles;
             // Keeping translations at zero preserves the reference's floating-point operation order.
             return (at != null && bt != null ? at.Overlaps(bt, 0, 0, 0, 0) : null)
                 ?? Collision.HasOverlap(Perimeter, other.Perimeter, Holes, other.Holes);
+        }
+
+        /// <summary>True when <paramref name="inner"/>'s perimeter lies strictly inside one
+        /// cutout of <paramref name="outer"/>, so the two share no material. A perimeter that
+        /// touches or crosses the cutout's edge is not decided here.</summary>
+        private static bool InsideACutout(SpacingOutline inner, SpacingOutline outer)
+        {
+            if (outer.Holes.Count == 0)
+                return false;
+            var perimeter = inner.Perimeter.Vertices;
+            var (left, bottom, right, top) = Bounds(perimeter);
+
+            foreach (var hole in outer.Holes)
+            {
+                var (holeLeft, holeBottom, holeRight, holeTop) = Bounds(hole.Vertices);
+
+                if (left <= holeLeft || right >= holeRight || bottom <= holeBottom || top >= holeTop)
+                    continue;
+                if (StrictlyInside(perimeter, hole))
+                    return true;
+            }
+
+            return false;
+        }
+
+        // A cutout is a simple polygon, so a closed outline with every vertex inside it and no
+        // edge meeting its edges lies wholly inside it.
+        private static bool StrictlyInside(List<Vector> outline, Polygon cutout)
+        {
+            var edge = cutout.Vertices;
+            // A closed polygon repeats its first vertex; its closing edge is the wrap-around.
+            var outlineCount = Distinct(outline);
+            var edgeCount = Distinct(edge);
+
+            if (outlineCount < 3 || edgeCount < 3)
+                return false;
+
+            for (var i = 0; i < outlineCount; i++)
+                if (!cutout.ContainsPoint(outline[i]))
+                    return false;
+
+            for (var i = 0; i < outlineCount; i++)
+            {
+                var a = outline[i];
+                var b = outline[(i + 1) % outlineCount];
+
+                for (var j = 0; j < edgeCount; j++)
+                {
+                    var c = edge[j];
+                    var d = edge[(j + 1) % edgeCount];
+
+                    // Touching and collinear edges count as meeting: leave those to the full test.
+                    if (Side(a, b, c) * Side(a, b, d) <= 0 && Side(c, d, a) * Side(c, d, b) <= 0)
+                        return false;
+                }
+            }
+
+            return true;
+        }
+
+        private static int Distinct(List<Vector> vertices) =>
+            vertices.Count > 1 && vertices[0] == vertices[^1] ? vertices.Count - 1 : vertices.Count;
+
+        private static double Side(Vector a, Vector b, Vector p) =>
+            (b.X - a.X) * (p.Y - a.Y) - (b.Y - a.Y) * (p.X - a.X);
+
+        private static (double Left, double Bottom, double Right, double Top) Bounds(List<Vector> vertices)
+        {
+            var left = double.PositiveInfinity;
+            var bottom = double.PositiveInfinity;
+            var right = double.NegativeInfinity;
+            var top = double.NegativeInfinity;
+
+            foreach (var vertex in vertices)
+            {
+                left = System.Math.Min(left, vertex.X);
+                bottom = System.Math.Min(bottom, vertex.Y);
+                right = System.Math.Max(right, vertex.X);
+                top = System.Math.Max(top, vertex.Y);
+            }
+
+            return (left, bottom, right, top);
         }
 
         private static void ToWorld(Polygon polygon, Vector location)
