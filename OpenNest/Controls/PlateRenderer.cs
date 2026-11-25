@@ -529,10 +529,24 @@ namespace OpenNest.Controls
         }
 
         // Bend lines are colored by how they run against the sheet's grain. Across the grain is
-        // the preferred direction, so it keeps the plain bend color; the others stand out.
+        // the preferred direction, so it keeps the plain bend color; the others stand out. The
+        // three are far apart in hue (yellow, cyan, magenta) and each has its own dash pattern,
+        // so they can be told apart on any part color and without relying on hue alone.
         private static readonly Color AcrossGrainBendColor = Color.Yellow;
-        private static readonly Color WithGrainBendColor = Color.FromArgb(255, 140, 0);
-        private static readonly Color OtherGrainBendColor = Color.DeepSkyBlue;
+        private static readonly Color WithGrainBendColor = Color.Cyan;
+        private static readonly Color OtherGrainBendColor = Color.Magenta;
+
+        // Drawn under each bend line so a bright line still shows on a light part color.
+        private static readonly Color BendLineOutlineColor = Color.FromArgb(150, 0, 0, 0);
+        private const float BendLineWidth = 2f;
+        private const float BendLineOutlineWidth = 4f;
+
+        internal static DashStyle BendGrainDash(BendGrainKind kind) => kind switch
+        {
+            BendGrainKind.WithGrain => DashStyle.DashDot,
+            BendGrainKind.Other => DashStyle.Dot,
+            _ => DashStyle.Dash,
+        };
 
         internal static Color BendGrainColor(BendGrainKind kind) => kind switch
         {
@@ -551,10 +565,8 @@ namespace OpenNest.Controls
                 return;
 
             var plate = view.DisplayPlate;
-            using var pen = new Pen(Color.Gray, 1.5f)
-            {
-                DashStyle = System.Drawing.Drawing2D.DashStyle.Dash,
-            };
+            using var pen = new Pen(Color.Gray, BendLineWidth);
+            using var outline = new Pen(BendLineOutlineColor, BendLineOutlineWidth);
 
             foreach (var bend in part.BaseDrawing.Bends)
             {
@@ -563,6 +575,9 @@ namespace OpenNest.Controls
                     ? BendGrainKind.AcrossGrain
                     : BendGrain.Classify(bend, part.Rotation, plate.GrainAngle);
                 pen.Color = muted ? Color.Gray : BendGrainColor(kind);
+                pen.DashStyle = BendGrainDash(kind);
+                if (!muted)
+                    DrawBendLine(g, part, bend, outline);
                 DrawBendLine(g, part, bend, pen);
             }
         }
