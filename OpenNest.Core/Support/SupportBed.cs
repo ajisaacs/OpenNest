@@ -61,6 +61,13 @@ namespace OpenNest.Support
         /// </summary>
         public abstract IReadOnlyList<SliceLine> SliceLines(Box region, int quadrant);
 
+        /// <summary>
+        /// How far every contact stays from a slice line along X (<paramref name="alongX"/>) or Y,
+        /// wherever the sheet is registered within its tolerance: material nearer a line than this
+        /// rests on nothing. 0 when a contact may lie on the line (a slat's center line).
+        /// </summary>
+        public virtual double SliceLineClearance(bool alongX) => 0;
+
         /// <summary>This layout with every length multiplied by <paramref name="factor"/> (a unit change).</summary>
         public abstract SupportBed Scaled(double factor);
 

@@ -130,6 +130,55 @@ public class SlugSliceTests
         Assert.Empty(SlugSlicer.Slices(Bed, 1, Slot, Location, Kerf, reach: 0.1, pierceClearance: 0.2));
     }
 
+    // Where each slice lies in world coordinates: "X=5" for a column, "Y=5" for a row.
+    private static string[] Lines(IEnumerable<SlugSlice> slices) => slices
+        .Select(s => s.Start.X == s.End.X
+            ? $"X={System.Math.Round(s.Start.X + Location.X, 6)}"
+            : $"Y={System.Math.Round(s.Start.Y + Location.Y, 6)}")
+        .Order()
+        .ToArray();
+
+    [Fact]
+    public void SliceLineClearance_IsHalfAPitchLessTheRegistrationTolerance()
+    {
+        Assert.Equal(1, Bed.SliceLineClearance(true));
+        Assert.Equal(0.875, new SupportGrid(2, 3, registrationTolerance: 0.125).SliceLineClearance(false));
+        Assert.Equal(1.375, new SupportGrid(2, 3, registrationTolerance: 0.125).SliceLineClearance(true));
+        // A slat's center line is a slice line, so its contacts lie on it.
+        Assert.Equal(0, new SupportSlats(SlatAxis.Y, 3, 0.25).SliceLineClearance(false));
+    }
+
+    [Fact]
+    public void Slices_LeaveOutASliceThatCutsOffOnlyAStripRestingOnNothing()
+    {
+        // World X 4.9375-8.9, Y 3.5-7.5 on points at even X and Y. The column midline at X = 5
+        // runs 1/16 inside the left side and the row midline at Y = 7 half an inch below the top:
+        // the strips they cut off hold no point. X = 7 and Y = 5 divide points.
+        Vector[] world = [new(4.9375, 3.5), new(8.9, 3.5), new(8.9, 7.5), new(4.9375, 7.5)];
+        var hole = world.Select(v => v - Location).ToArray();
+
+        var slices = SlugSlicer.Slices(Bed, 1, hole, Location, Kerf, reach: 0.3, pierceClearance: 0.0625);
+
+        Assert.Equal(["X=7", "Y=5"], Lines(slices));
+    }
+
+    [Fact]
+    public void Slices_KeepASliceWhoseStripHoldsAPoint_EvenWherePartOfTheCutoutComesClose()
+    {
+        // World X 3.5-8.9, Y 3.5-7.5, with a 0.2 long bump 1/16 short of the column midline at
+        // X = 5: left of that slice the slug still reaches the points at X = 4.
+        Vector[] world =
+        [
+            new(3.5, 3.5), new(8.9, 3.5), new(8.9, 7.5), new(3.5, 7.5),
+            new(3.5, 6.0), new(4.9375, 6.0), new(4.9375, 5.8), new(3.5, 5.8),
+        ];
+        var hole = world.Select(v => v - Location).ToArray();
+
+        var slices = SlugSlicer.Slices(Bed, 1, hole, Location, Kerf, reach: 0.3, pierceClearance: 0.0625);
+
+        Assert.Contains("X=5", Lines(slices));
+    }
+
     [Fact]
     public void PlanCutting_SlicesATippingSlugBeforeItsCutout()
     {

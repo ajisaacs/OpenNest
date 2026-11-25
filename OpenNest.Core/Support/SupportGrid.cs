@@ -91,6 +91,10 @@ namespace OpenNest.Support
             return points;
         }
 
+        /// <summary>Half a pitch, less the registration tolerance the points may shift by.</summary>
+        public override double SliceLineClearance(bool alongX) =>
+            System.Math.Max(0, (alongX ? PitchY : PitchX) / 2 - RegistrationTolerance);
+
         /// <summary>
         /// Every line midway between two neighboring rows or columns of points that crosses
         /// <paramref name="region"/>: a cut along one stays half a pitch from every point, so it

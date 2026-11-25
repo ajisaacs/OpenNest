@@ -46,7 +46,11 @@ namespace OpenNest.Support
         /// least <paramref name="standoff"/> from the hole, is longer than it, and is pierced
         /// <paramref name="reach"/> along itself from its start (at most halfway) where the pierce
         /// keeps <paramref name="pierceClearance"/> from the hole; a slice whose pierce fits at
-        /// neither end is left out. Rows (lines along X) come first, then columns, each set from
+        /// neither end is left out. So is a slice that would only cut a strip off the slug next to
+        /// the hole's side, narrower all along it than the bed's points keep from the line
+        /// (<see cref="SupportBed.SliceLineClearance"/>): the strip rests on nothing, so the slice
+        /// separates no contacts and would only cut close beside the part's edge, overheating it
+        /// and leaving a sliver loose to flip up. Rows (lines along X) come first, then columns, each set from
         /// its end nearer the last slice, and each slice starts at its end nearer where the one
         /// before it ended, so the head runs back and forth.
         /// </summary>
@@ -75,11 +79,16 @@ namespace OpenNest.Support
             var bounds = Bounds(ring);
             var world = new Box(bounds.Left + location.X, bounds.Bottom + location.Y, bounds.Length, bounds.Width);
             var lines = bed.SliceLines(world, quadrant);
-            // Each line's pieces inside the eroded hole, local; lines that miss it are dropped.
+            var outline = new PathsD { ToPath(ring) };
+            // Each line's pieces inside the eroded hole, local, but for those that cut off only a
+            // strip resting on nothing; lines left with none are dropped.
             var groups = new[] { true, false }.Select(alongX => lines
                     .Where(line => line.AlongX == alongX)
                     .OrderBy(line => line.At)
-                    .Select(line => Segments(eroded, line, location, standoff))
+                    .Select(line => Segments(eroded, line, location, standoff)
+                        .Where(segment => !CutsOffABareStrip(outline, segment, line.AlongX,
+                            bed.SliceLineClearance(line.AlongX), standoff))
+                        .ToList())
                     .Where(segments => segments.Count > 0)
                     .ToList())
                 .ToArray();
@@ -140,6 +149,49 @@ namespace OpenNest.Support
             return Distance(pierce, ring) >= clearance - Math.Tolerance.Epsilon
                 ? new SlugSlice(pierce, start, end)
                 : null;
+        }
+
+        // Whether the slice cuts off, on one side, only a strip of the slug nearer the line than
+        // `clearance` everywhere: the hole split along the slice's whole chord leaves, on that
+        // side, only pieces that close. No contact lies that near a slice line, so the strip
+        // rests on nothing and leaving the slice out only joins it to the piece beside it. Other
+        // slices only split the strip further, so they are not needed to show it is bare.
+        private static bool CutsOffABareStrip(PathsD outline, (Vector A, Vector B) segment, bool alongX,
+            double clearance, double standoff)
+        {
+            if (!(clearance > standoff))
+                return false;
+            var at = alongX ? segment.A.Y : segment.A.X;
+            var low = alongX ? segment.A.X : segment.A.Y;
+            var high = alongX ? segment.B.X : segment.B.Y;
+            // The chord of the hole the slice lies on: its kerf meets the cutout's at both ends.
+            var chord = Spans(outline, alongX, at).FirstOrDefault(span => span.Low <= low && span.High >= high);
+            if (chord == default)
+                return false;
+            const double cut = 1e-3;
+            var from = chord.Low - cut;
+            var to = chord.High + cut;
+            var cutter = alongX
+                ? new PathD { new(from, at - cut), new(to, at - cut), new(to, at + cut), new(from, at + cut) }
+                : new PathD { new(at - cut, from), new(at + cut, from), new(at + cut, to), new(at - cut, to) };
+            var pieces = Clipper.Difference(outline, new PathsD { cutter }, FillRule.NonZero, ClipperBridge.Precision);
+            // How far the pieces along the chord reach from it, below and above.
+            var reach = new double?[2];
+            foreach (var piece in pieces)
+            {
+                // Offsets from the slice line across it, and positions along it.
+                var across = piece.Select(p => (alongX ? p.y : p.x) - at).ToArray();
+                var along = piece.Select(p => alongX ? p.x : p.y).ToArray();
+                if (along.Max() < from || along.Min() > to || across.Min(d => System.Math.Abs(d)) > 2 * cut)
+                    continue;
+                // A piece on both sides joins them around the chord (another of the hole's
+                // crossings of the line): the slice does not cut anything off there.
+                if (across.Min() < 0 && across.Max() > 0)
+                    return false;
+                var side = across.Max() > 0 ? 1 : 0;
+                reach[side] = System.Math.Max(reach[side] ?? 0, across.Max(d => System.Math.Abs(d)));
+            }
+            return reach.Any(r => r < clearance);
         }
 
         // Where the line at `at` (Y along X, or X along Y) runs inside the eroded paths, sorted.

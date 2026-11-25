@@ -220,6 +220,14 @@ between the supports instead of the whole slug tipping.
   cutout chorded at 0.001, eroded with round corners), so the pieces stay attached to the part
   until the cutout itself is cut, its kerf meets the slices' ends and they all drop together. No
   kerf, no slices. A slice no longer than the kerf is left out.
+- Strips that rest on nothing: a slice that would cut off only a strip of the slug lying nearer
+  its line than the bed's points ever come (`SupportBed.SliceLineClearance`: half the pitch
+  across that line, less the registration tolerance) is left out. The strip is found by
+  splitting the hole along the slice's whole chord, so one that opens into wider material
+  beyond the slice's ends keeps the slice. Such a slice separates no points: without it the
+  strip joins the piece beside it, still on one point, and the head does not cut close
+  alongside the part's edge, which overheats it and leaves a sliver loose to flip up. A slat's
+  center line holds contacts, so slat slices are never left out this way.
 - Which cutouts: one that holds another of the part's cuts (a contour, break cut or tabbed
   cutout), or whose box holds another part's box (a part nested in it), is never sliced, since a
   slice would cut what is inside. Tabbed cutouts keep their slugs, so they are never sliced.
