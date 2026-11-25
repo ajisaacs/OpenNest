@@ -254,6 +254,22 @@ public sealed class PlateExportTests : IDisposable
     }
 
     [Theory]
+    [InlineData("WINDOWS")]
+    [InlineData("LINUX")]
+    [InlineData("OSX")]
+    public void Launcher_StartsTheOpenedProgramInTheFilesFolder(string platform)
+    {
+        // Inheriting the app's working directory (the install folder) would pin that folder
+        // and make every update fail while the CAD program or PDF viewer stays open.
+        var folder = Path.Combine(Path.GetTempPath(), "opennest-launch");
+        var path = Path.Combine(folder, "job-P1.dxf");
+
+        var info = ExternalFileLauncher.StartInfo(path, OSPlatform.Create(platform));
+
+        Assert.Equal(folder, info.WorkingDirectory);
+    }
+
+    [Theory]
     [InlineData("LINUX", "xdg-open")]
     [InlineData("FREEBSD", "xdg-open")]
     [InlineData("OSX", "open")]

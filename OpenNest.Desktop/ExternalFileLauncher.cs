@@ -19,14 +19,20 @@ public static class ExternalFileLauncher
     public static ProcessStartInfo StartInfo(string path, OSPlatform platform)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
+        // The opened program starts in the file's folder, never in ours: it would otherwise
+        // inherit the app's working directory, the Velopack install folder, and hold that folder
+        // open for as long as it runs, so every update fails to swap it.
+        var folder = System.IO.Path.GetDirectoryName(path) ?? "";
+
         // .NET defaults UseShellExecute to false, which would try to run the file itself as a
         // program; the shell opens it in the associated program instead.
         if (platform == OSPlatform.Windows)
-            return new ProcessStartInfo(path) { UseShellExecute = true };
+            return new ProcessStartInfo(path) { UseShellExecute = true, WorkingDirectory = folder };
 
         var info = new ProcessStartInfo(platform == OSPlatform.OSX ? "open" : "xdg-open")
         {
             UseShellExecute = false,
+            WorkingDirectory = folder,
         };
         // An argument, never a shell command line: spaces and quotes in the path stay literal.
         info.ArgumentList.Add(path);
