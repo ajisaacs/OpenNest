@@ -22,6 +22,7 @@ public class NestingEngineRegistryTests
         Assert.Contains("Rectangles", names);
         Assert.Contains("Irregular", names);
         Assert.Contains("Circles", names);
+        Assert.Contains("Raster", names);
         Assert.Contains("Lattice", names);
         Assert.Contains("Strip", names);
         Assert.Contains("Vertical Remnant", names);

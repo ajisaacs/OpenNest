@@ -9,6 +9,7 @@ using OpenNest.Engine.NestingEngines.Circles;
 using OpenNest.Engine.NestingEngines.Default;
 using OpenNest.Engine.NestingEngines.FlatBar;
 using OpenNest.Engine.NestingEngines.Irregular;
+using OpenNest.Engine.NestingEngines.Raster;
 using OpenNest.Engine.NestingEngines.Rectangles;
 
 namespace OpenNest.Engine.Jobs;
@@ -65,6 +66,12 @@ public static class NestingEngineRegistry
             "Circles",
             "Round parts such as blanks, washers and flanges",
             () => new CirclesNestingEngine()
+        );
+
+        Register(
+            "Raster",
+            "Packs irregular parts on a fine grid; a fast first plan",
+            () => new RasterNestingEngine()
         );
 
         Register(

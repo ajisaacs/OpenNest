@@ -6,7 +6,7 @@ see [automatic nesting and validation](automatic-nesting.md).
 
 ## Built-in engines
 
-Engines are named for the jobs they suit, not for how or by whom they were built. Engine code lives
+Engines are named for the jobs they suit, not for how or by whom they were built; Raster is the exception, named for its method because the job it suits (a fast first plan) is a speed another engine may overtake. Engine code lives
 in `OpenNest.Engine/NestingEngines/<Name>/`, its tests in `OpenNest.Engine.Tests/NestingEngines/`.
 
 | Engine | Best for | Method |
@@ -15,6 +15,7 @@ in `OpenNest.Engine/NestingEngines/<Name>/`, its tests in `OpenNest.Engine.Tests
 | Rectangles | Plain and near-rectangular plates | Each part packed as the box of its material at its minimum-area rotation, using a maximal-rectangles free list; the sheet that finishes the job is also squeezed into a shorter or narrower bin; stock chosen sheet by sheet by salvage-credited look-ahead cost, and the whole job also run large parts first with the small parts filling their sheets' gaps |
 | Circles | Round parts: blanks, washers, flanges, gears by their tip circle | Each part packed as its minimum enclosing circle at centers tangent to two of walls, placed discs and clamp keep-outs, with hexagonal and square lattice seeds; bids only when every part is round; stock chosen as Rectangles does, plus whole-job runs preferring each stock and a tail re-plan |
 | Irregular | Irregular profiles | No-fit-polygon frontier packing with gap filling and best-fit pairs, six whole-job strategy variants (each also keeping a stock that finished the job when the per-sheet estimate passed it over for a plan that ended up dearer) and a tail re-plan, then large-first variants that pack each sheet's large parts before any small one, then grouped variants that pack like parts together, then a banded variant that packs each sheet in full-height strips, each group as its Lattice band or each strip from the largest parts down, with the last sheet of every plan it makes its best packed again as such bands, then a sheet-reduction pass that packs edge parts first and turns a key part by its contacts, then a squeeze that packs the last sheet again, largest part first, in ever shorter strips; under a time limit it first reports a quick plan without Lattice blocks, and after its search keeps trying seeded variants until the limit |
+| Raster | A fast first plan of irregular parts | Each part rotation rasterized as a bit mask of its material grown by half the part spacing; coarse raster no-fit maps propose positions over the sheet and a grid four times finer settles each one; the job decoded greedily in 48 variants (orders, rotation sets, leftmost or frontier positions) and once offering every variant's sheet each round, stock chosen as Rectangles does, best by Default's ranking kept; not one of Default's candidates |
 | FlatBar | Flat bar: parts about as wide as the bar | Each stock read as a bar and cut in one row: the CutList cut-list packer and a best-fill search on part lengths less their self-nesting gain, then a slide-left pass that nests shaped ends and refills freed length; stock chosen bar by bar by whole-plan cost |
 | Lattice, Strip, Vertical Remnant, Horizontal Remnant | Many copies of a few parts | The fixed placement strategies behind interactive fill; Lattice is the multi-phase lattice fill (linear, pairs, rectangle best-fit, remainder; the pairs phase fills the strip its grid leaves with rows of pairs when they hold more than single parts, and also tiles herringbone pairs: the part turned so a hull edge lies along a sheet axis, nested into its own row, with every other row reversed), and the remnant strategies run it ranked to keep the largest drop. In whole jobs, all four place a plate with any fixed or bounded part rotation by the rotation-aware ordered placer instead |
 
@@ -116,6 +117,7 @@ progress sink.
   reports such a plan with its last sheet banded (see [last-sheet bands](#last-sheet-bands)) when
   that beats every plan reported, and then skips the search's next best plans until one beats it.
 - Rectangles makes one sheet-by-sheet run, so it reports the finished job as its one plan.
+- Raster runs its variants in parallel and reports the best finished job as its one plan.
 - Circles reports when a stock-preference run or a tail re-plan beats its best result so far.
 - Default scores each candidate plan as it ranks results (valid, fewest unplaced, lowest cost,
   then candidate order) and reports it only when it beats every plan Default has reported, so a
@@ -565,6 +567,37 @@ On a job of eleven one-off parts (two 55-inch plates, two rings, four sectors, a
 strips on 48 x 96 with a clamp rail) the search ended the layout at 75.2 with a 55-inch plate
 behind the sectors; the squeeze stacks both plates along the bottom with everything else above
 and beside them, ends at 62.1, and leaves a 33.4 x 47.5 drop rather than 20.3 x 47.5.
+
+## Raster
+
+Raster (`OpenNest.Engine/NestingEngines/Raster/`) nests on two raster grids per part spacing. The
+fine cell is an eighth of the part spacing (of 0.25 with none), coarsened only so the largest part
+spans at most 2400 cells and the largest sheet 8000; the coarse cell is four fine cells. A mask
+marks every cell whose center lies in the part's material, read from the outline the layout check
+measures (perimeter arcs circumscribed, cutout arcs inscribed), or within half the spacing plus
+0.75 cell of its edges. Two parts closer than the spacing always share a cell (the cell holding
+the midpoint of their closest points is within half the spacing plus 0.71 cell of both), so masks
+that never share a cell keep the spacing and every layout passes the check without a repair pass.
+Cutouts stay open, so small parts nest in holes; clamp keep-outs are tested as boxes.
+
+Each placement picks, over every allowed rotation, the best free coarse position (the coarse
+masks are grown less than half the spacing, so they propose optimistically), and settles it at the
+leftmost, then lowest, free fine position within a window 1.5 coarse cells around it; a proposal
+the fine grid refuses is passed over for the next, at most 4000 per part. A part free to turn
+tries quarter turns, eighth turns and the turns laying its two longest convex-hull edges along the
+sheet's axes; a limited part tries its legal angles (eight sweep samples at most).
+
+On seven real jobs (one to 292 parts, `--parallel 1`, 6" minimum salvage) every Raster layout
+was valid. It matched Irregular's sheet count on five, in 0.6 to 2.3 s where Irregular took 11 to
+78 s, at under 1 to 4% more salvage-credited cost; it took a third sheet where Irregular used two on a
+job of ten large plates, and 24 s on a job offering seven stock sizes. It suits a quick look at a
+job, not a final layout, and is not one of Default's candidates.
+
+Packing tighter than the spacing (masks grown by half the spacing, then half and one cell under)
+and opening the gaps with Fix Spacing was tried on the same jobs: it saved under 0.1% of total
+cost and took up to 25 times as long, since the 0.75-cell margin is only about a ninth of the
+spacing per side. The greedy placement rule, not the margin, is what leaves Raster behind
+Irregular.
 
 ## Flat bar
 

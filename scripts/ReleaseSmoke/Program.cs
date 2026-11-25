@@ -22,7 +22,7 @@ try
     // Every built-in engine the desktop offers must instantiate from the packaged assembly.
     string[] expected =
     [
-        "Default", "Rectangles", "Irregular", "Circles", "FlatBar",
+        "Default", "Rectangles", "Irregular", "Circles", "Raster", "FlatBar",
         "Lattice", "Strip", "Vertical Remnant", "Horizontal Remnant",
     ];
     foreach (var name in expected)
