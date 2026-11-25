@@ -780,8 +780,9 @@ area than the job's smallest part outline (a strap with bolt holes) is an ordina
 can land in its holes. Frames are bundled smallest
 first, so a larger frame's round cutout can take, through `CutoutCirclePacker` only, a round part
 with a cutout some part fits (a washer with an empty bore) or an earlier bundle as one insert: a flange
-holds a washer that holds a smaller washer that holds a slug. Chains stop at four parts deep
-(`CutoutPipelinePrepass.MaxLevels`). Lattice and NFP proposals never take such inserts, since they
+holds a washer that holds a smaller washer that holds a slug. Chains stop at 32 parts deep
+(`CutoutPipelinePrepass.MaxLevels`), which only bounds the recursion: 58 ring sizes with random
+bores chain ten deep. Lattice and NFP proposals never take such inserts, since they
 could seat a part in a ring's bore or over a nested bundle's reserved inserts; non-round frames
 with such cutouts stay independent. A frame's proposals and angles are compared by outline area
 seated, a nested bundle counting its frame's outline plus its contents (all of that leaves the

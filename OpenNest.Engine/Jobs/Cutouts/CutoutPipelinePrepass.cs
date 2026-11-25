@@ -28,8 +28,10 @@ internal sealed class CutoutPipelinePrepass : IPipelinePrepass
     // rings nests them all; this only bounds the preparation of a very large job.
     private const int MaxBundlesPerJob = 4096;
 
-    /// <summary>Most parts on one frame-in-frame chain: flange, washer, smaller washer, slug.</summary>
-    internal const int MaxLevels = 4;
+    /// <summary>Most parts on one frame-in-frame chain (flange, washer, smaller washer, slug, and
+    /// so on). A set of rings in many sizes chains as deep as its bores allow; this only bounds
+    /// the recursion that expands a bundle.</summary>
+    internal const int MaxLevels = 32;
 
     /// <summary>Every frame proxy's part id starts with this; ordinary parts never do.</summary>
     internal const string ProxyPrefix = "__cutout-proxy-";

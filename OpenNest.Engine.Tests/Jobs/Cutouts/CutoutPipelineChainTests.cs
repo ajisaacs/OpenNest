@@ -146,20 +146,42 @@ public class CutoutPipelineChainTests
     [Fact]
     public void ChainsStopAtTheLevelLimit()
     {
-        // Five levels: the outermost flange cannot take the four-level bundle, so it stays
-        // independent and the engine places both.
-        var programs = new[] { TestShapes.Ring(40, 34) }.Concat(new[] {
-            TestShapes.Ring(33, 26), TestShapes.Ring(25, 18), TestShapes.Ring(17, 10), TestShapes.Disc(4.5) }).ToArray();
+        // One level too many: the outermost ring cannot take the bundle at the limit, so it
+        // stays independent and the engine places both. Each ring is 1 thick and its bore is 1
+        // wider than the next part.
+        var levels = CutoutPipelinePrepass.MaxLevels + 1;
+        var programs = Enumerable.Range(0, levels)
+            .Select(i => 3.0 * (levels - i))
+            .Select((outer, i) => i == levels - 1 ? TestShapes.Disc(outer / 2) : TestShapes.Ring(outer, outer - 2))
+            .ToArray();
         var engine = new Stub(job => new NestJobResultBuilder(job).Build(NestJobStopReason.NoPlacementFound));
         var request = Request(programs) with
         {
-            Stock = new[] { new NestPlateStock("sheet", new Size(Sheet, Sheet), 2, 0.25) },
+            Stock = new[] { new NestPlateStock("sheet", new Size(3.0 * levels + 2, 6.0 * levels + 4), 2, 0.25) },
         };
         NestPipeline.RunCutoutTrial(engine, "stub", request);
 
         var job = Assert.Single(engine.Jobs);
         Assert.Equal(new[] { "part-0", "__cutout-proxy-part-1-0" }, job.Parts.Select(p => p.Id));
         Assert.Equal(CutoutPipelinePrepass.MaxLevels, programs.Length - 1);
+    }
+
+    [Fact]
+    public void ADeepChainIsOneBundle()
+    {
+        // Ten rings and a slug, each in the next one's bore.
+        var programs = Enumerable.Range(0, 11)
+            .Select(i => 3.0 * (11 - i))
+            .Select((outer, i) => i == 10 ? TestShapes.Disc(outer / 2) : TestShapes.Ring(outer, outer - 2))
+            .ToArray();
+        var engine = new Stub(PlaceProxies);
+        var result = NestPipeline.RunCutoutTrial(engine, "stub", Request(programs));
+
+        Assert.Equal("__cutout-proxy-part-0-0", Assert.Single(Assert.Single(engine.Jobs).Parts).Id);
+        Assert.True(result.IsValid, string.Join("; ", result.Violations));
+        Assert.Equal(NestJobStatus.Complete, result.Status);
+        Assert.Equal(Enumerable.Range(0, 11).Reverse().Select(i => $"part-{i}"),
+            Assert.Single(result.Raw.Plates).Placements.Select(p => p.PartId));
     }
 
     [Fact]
