@@ -101,7 +101,7 @@ public class PartLabelTests
     {
         Assert.Equal(LabelBoxOptions.CharacterAdvance, StrokeFont.Advance);
 
-        var width = PartLabels.Measure("1234 AB") * 0.25;
+        var width = StrokeFont.Measure("12345678") * 0.25;
         var options = LabelBoxOptions.ForText(LabelBoxOptions.DefaultCharacters, 0.25, 0.125);
         Assert.True(width <= options.Width + 1e-9);
 
@@ -164,72 +164,45 @@ public class PartLabelTests
         Assert.Equal(string.Empty, PartLabels.GroupLetters([], 0, 0));
     }
 
-    // ---- circled groups ----
+    // ---- circled letter ----
 
     [Fact]
-    public void Layout_CirclesEachGroupLetter_ClearOfTheName()
+    public void CircledLetter_IsACircleWithTheLetterInside_HoweverItIsTurned()
     {
-        var box = new LabelBox(new Vector(0, 0), 10, 1, 0);
-
-        var plain = PartLabels.Layout(box, "12", out _)!;
-        var circled = PartLabels.Layout(box, "12 AB", out var fits)!;
-
-        Assert.True(fits);
-        // Each group adds a circle (two half arcs) and its letter's strokes.
-        var letters = StrokeFont.Strokes("A", 1).Count + StrokeFont.Strokes("B", 1).Count;
-        Assert.Equal(plain.Count + 2 + letters, circled.Count);
-
-        var circles = circled.Where(s => s.Segments.Count == 2 && s.Segments.All(g => g.IsArc)).ToList();
-        Assert.Equal(2, circles.Count);
-        var nameRight = circled.Take(StrokeFont.Strokes("12", 1).Count).SelectMany(s => s.Points()).Max(p => p.X);
-        foreach (var circle in circles)
+        var center = new Vector(3, 2);
+        foreach (var rotation in new[] { 0, Quarter / 3, Quarter })
         {
-            var center = circle.Segments[0].Center;
-            Assert.Equal(0.5, center.DistanceTo(circle.Start), 9);
-            Assert.Equal(0, center.Y, 9);
-            Assert.True(center.X - 0.5 > nameRight, "A circle overlaps the name.");
-        }
+            var strokes = PartLabels.CircledLetter('A', center, 1, rotation);
 
-        // Every letter sits inside its circle.
-        var first = circles[0].Segments[0].Center;
-        var second = circles[1].Segments[0].Center;
-        foreach (var point in circled.Except(circles).SelectMany(s => s.Points()).Where(p => p.X > nameRight))
-        {
-            var center = System.Math.Abs(point.X - first.X) < System.Math.Abs(point.X - second.X) ? first : second;
-            Assert.True(center.DistanceTo(point) < 0.5, $"{point} is outside its circle.");
+            // A circle (two half arcs) and the letter's strokes.
+            Assert.Equal(1 + StrokeFont.Strokes("A", 1).Count, strokes.Count);
+            var circle = Assert.Single(strokes, s => s.Segments.Count == 2 && s.Segments.All(g => g.IsArc));
+            Assert.Equal(0.5, circle.Segments[0].Center.DistanceTo(circle.Start), 9);
+            Assert.Equal(center.X, circle.Segments[0].Center.X, 9);
+            Assert.Equal(center.Y, circle.Segments[0].Center.Y, 9);
+            foreach (var point in strokes.Where(s => s != circle).SelectMany(s => s.Points()))
+                Assert.True(center.DistanceTo(point) < 0.5, $"{point} is outside its circle.");
         }
-    }
-
-    [Fact]
-    public void Measure_IsTheNameThenAGapAndACirclePerGroup()
-    {
-        Assert.Equal(StrokeFont.Measure("1234"), PartLabels.Measure("1234"), 9);
-        Assert.Equal(StrokeFont.Measure("1234") + 0.375 + 2 + 0.125, PartLabels.Measure("1234 AB"), 9);
-        Assert.Equal(1, PartLabels.Measure(" A"), 9);
-        Assert.True(PartLabels.Measure("1234 AB") <= LabelBoxOptions.DefaultCharacters * LabelBoxOptions.CharacterAdvance + 1e-9);
     }
 
     // ---- text ----
 
     [Fact]
-    public void Text_IsTheNameThenTheBendGroups()
+    public void Text_IsTheNameAlone_EvenWithBends()
     {
-        var drawing = Panel("1234", BendAt(0), BendAt(Quarter));
-
-        Assert.Equal("1234 AB", PartLabels.Text(drawing, 0, 0));
-        // Turned a quarter, the same bends are in the same two groups: A and B swap.
-        Assert.Equal("1234 AB", PartLabels.Text(drawing, Quarter, 0));
-        Assert.Equal("1234", PartLabels.Text(Panel("1234"), 0, 0));
+        // The groups are etched beside the bend lines, never in the label box.
+        Assert.Equal("1234", PartLabels.Text(Panel("1234", BendAt(0), BendAt(Quarter))));
+        Assert.Equal("1234", PartLabels.Text(Panel("1234")));
     }
 
     [Fact]
     public void Text_UppercasesTheNameAndDropsWhatTheFontLacks()
     {
-        Assert.Equal("N26-2GT", PartLabels.Text(Panel("n26-2gt"), 0, 0));
-        Assert.Equal("BRACKETA", PartLabels.Text(Panel("bracket (a)"), 0, 0));
-        Assert.Equal(string.Empty, PartLabels.Text(Panel("()"), 0, 0));
-        Assert.Equal(" A", PartLabels.Text(Panel("()", BendAt(Quarter)), 0, 0));
-        Assert.Equal(string.Empty, PartLabels.Text(null, 0, 0));
+        Assert.Equal("N26-2GT", PartLabels.Text(Panel("n26-2gt")));
+        Assert.Equal("BRACKETA", PartLabels.Text(Panel("bracket (a)")));
+        Assert.Equal(string.Empty, PartLabels.Text(Panel("()")));
+        Assert.Equal(string.Empty, PartLabels.Text(Panel("()", BendAt(Quarter))));
+        Assert.Equal(string.Empty, PartLabels.Text(null));
     }
 
     // ---- strokes ----
@@ -237,13 +210,12 @@ public class PartLabelTests
     [Fact]
     public void Strokes_AreCenteredInTheBoxAtTheBoxHeight()
     {
-        // H fills its whole character cell and the group circles are the text's height, so the
-        // strokes' bounds are the text's.
-        var drawing = Panel("HH", BendAt(0), BendAt(Quarter));
+        // H fills its whole character cell, so the strokes' bounds are the text's. Bends add nothing.
+        var drawing = Panel("HHH", BendAt(0), BendAt(Quarter));
 
-        var bounds = BoundsOf(PartLabels.Strokes(drawing, 0, 0));
+        var bounds = BoundsOf(PartLabels.Strokes(drawing, 0));
 
-        var width = PartLabels.Measure("HH AB") * 0.5;
+        var width = StrokeFont.Measure("HHH") * 0.5;
         Assert.Equal(0.5, bounds.Height, 9);
         Assert.Equal(width, bounds.Width, 9);
         Assert.Equal(6, bounds.Left + bounds.Width / 2, 9);
@@ -256,12 +228,12 @@ public class PartLabelTests
         var drawing = Panel("HH");
         drawing.Source.Offset = new Vector(1, 2);
 
-        var upright = BoundsOf(PartLabels.Strokes(drawing, 0, 0));
+        var upright = BoundsOf(PartLabels.Strokes(drawing, 0));
         Assert.Equal(5, upright.Left + upright.Width / 2, 9);
         Assert.Equal(4, upright.Bottom + upright.Height / 2, 9);
 
         // A quarter turn about the program origin: (5, 4) goes to (-4, 5), and the text stands on end.
-        var turned = BoundsOf(PartLabels.Strokes(drawing, Quarter, 0));
+        var turned = BoundsOf(PartLabels.Strokes(drawing, Quarter));
         Assert.Equal(-4, turned.Left + turned.Width / 2, 9);
         Assert.Equal(5, turned.Bottom + turned.Height / 2, 9);
         Assert.Equal(upright.Width, turned.Height, 9);
@@ -271,12 +243,12 @@ public class PartLabelTests
     [Fact]
     public void Strokes_ShrinkALongNameToFitTheBox_AndSkipOneThatWouldBeTooSmall()
     {
-        // 3.5 fits "1234 AB" (7 characters) at the full 0.5 height; "123456789 AB" is 11.
-        var shrunk = BoundsOf(PartLabels.Strokes(Panel("123456789", BendAt(0), BendAt(Quarter)), 0, 0));
+        // 3.5 fits nine characters at the full 0.5 height; this name is twelve.
+        var shrunk = BoundsOf(PartLabels.Strokes(Panel("123456789012"), 0));
         Assert.True(shrunk.Width <= 3.5 + 1e-9);
         Assert.InRange(shrunk.Height, 0.25 - 1e-9, 0.5);
 
-        Assert.Null(PartLabels.Strokes(Panel("1234567890123456789012345"), 0, 0));
+        Assert.Null(PartLabels.Strokes(Panel("1234567890123456789012345"), 0));
     }
 
     [Fact]
@@ -284,15 +256,15 @@ public class PartLabelTests
     {
         var none = Panel("1234");
         none.LabelBox = null;
-        Assert.Null(PartLabels.Strokes(none, 0, 0));
+        Assert.Null(PartLabels.Strokes(none, 0));
 
         var broken = Panel("1234");
         broken.LabelBox.Width = 0;
-        Assert.Null(PartLabels.Strokes(broken, 0, 0));
+        Assert.Null(PartLabels.Strokes(broken, 0));
 
-        Assert.Null(PartLabels.Strokes(Panel("()"), 0, 0));
-        Assert.Null(PartLabels.Strokes(Panel("1234"), double.NaN, 0));
-        Assert.Null(PartLabels.Strokes(null, 0, 0));
+        Assert.Null(PartLabels.Strokes(Panel("()"), 0));
+        Assert.Null(PartLabels.Strokes(Panel("1234"), double.NaN));
+        Assert.Null(PartLabels.Strokes(null, 0));
     }
 
     [Fact]
@@ -302,7 +274,7 @@ public class PartLabelTests
         var program = (Program)drawing.Program.Clone();
         var before = program.Codes.Count;
 
-        Assert.True(PartLabels.AddTo(program, drawing, 0, 0));
+        Assert.True(PartLabels.AddTo(program, drawing, 0));
 
         var added = program.Codes.Skip(before).ToList();
         Assert.IsType<RapidMove>(added[0]);
@@ -313,7 +285,7 @@ public class PartLabelTests
 
         var untouched = (Program)drawing.Program.Clone();
         drawing.LabelBox = null;
-        Assert.False(PartLabels.AddTo(untouched, drawing, 0, 0));
+        Assert.False(PartLabels.AddTo(untouched, drawing, 0));
         Assert.Equal(before, untouched.Codes.Count);
     }
 
@@ -328,8 +300,8 @@ public class PartLabelTests
         incremental.Mode = Mode.Incremental;
         var before = absolute.Codes.Count;
 
-        Assert.True(PartLabels.AddTo(absolute, drawing, Quarter, 0));
-        Assert.True(PartLabels.AddTo(incremental, drawing, Quarter, 0));
+        Assert.True(PartLabels.AddTo(absolute, drawing, Quarter));
+        Assert.True(PartLabels.AddTo(incremental, drawing, Quarter));
         incremental.Mode = Mode.Absolute;
 
         var expected = absolute.Codes.Skip(before).OfType<Motion>().Select(m => m.EndPoint)
@@ -389,13 +361,39 @@ public class PartLabelTests
 
         Assert.True(result.Status == CuttingPlanStatus.Ready, string.Join("\n", result.Findings.Select(f => f.Message)));
         var marks = ScribeOf(result);
-        Assert.True(marks.Count > 10);
         // The box is centered at (6, 6) on the part, which sits at (1, 1) on the sheet.
-        foreach (var mark in marks)
+        bool InBox(ExecutionMotion mark) =>
+            System.Math.Abs(mark.End.X - 7) <= 1.75 + 1e-6 && System.Math.Abs(mark.End.Y - 7) <= 0.25 + 1e-6;
+        Assert.True(marks.Count(InBox) > 5);
+
+        // Every other mark is a bend's own letter: a half inch circle beside one of the two
+        // bend lines, which leave (3, 3) on the sheet along X and along Y.
+        var letters = marks.Where(mark => !InBox(mark)).ToList();
+        Assert.NotEmpty(letters);
+        Assert.All(letters, mark =>
+        {
+            var alongX = mark.End.X is >= 3 and <= 7 ? System.Math.Abs(mark.End.Y - 3) : double.MaxValue;
+            var alongY = mark.End.Y is >= 3 and <= 7 ? System.Math.Abs(mark.End.X - 3) : double.MaxValue;
+            Assert.InRange(System.Math.Min(alongX, alongY), 0.125 - 1e-6, 0.125 + 0.5 + 0.02);
+        });
+        Assert.Contains(letters, mark => mark.End.Y > 3.6);
+        Assert.Contains(letters, mark => mark.End.X > 3.6);
+    }
+
+    [Fact]
+    public void PlanCutting_PartNumberMode_EtchesNoBendLetters()
+    {
+        var (plate, _) = PlateOf(Panel("1234", BendAt(0), BendAt(Quarter)), Parameters(PartLabelMode.PartNumber));
+
+        var result = CuttingPlanService.Plan(CuttingPlanRequest.ForPlate(plate, Vector.Zero,
+            confirmedParameters: Parameters(PartLabelMode.PartNumber)));
+
+        Assert.Equal(CuttingPlanStatus.Ready, result.Status);
+        Assert.All(ScribeOf(result), mark =>
         {
             Assert.InRange(mark.End.X, 7 - 1.75 - 1e-6, 7 + 1.75 + 1e-6);
             Assert.InRange(mark.End.Y, 7 - 0.25 - 1e-6, 7 + 0.25 + 1e-6);
-        }
+        });
     }
 
     [Fact]
@@ -409,11 +407,33 @@ public class PartLabelTests
 
         var unboxed = Panel("1234", BendAt(0));
         unboxed.LabelBox = null;
-        var (onPlate, _) = PlateOf(unboxed, Parameters(true));
+        var (onPlate, _) = PlateOf(unboxed, Parameters(PartLabelMode.PartNumber));
         var on = CuttingPlanService.Plan(CuttingPlanRequest.ForPlate(onPlate, Vector.Zero,
-            confirmedParameters: Parameters(true)));
+            confirmedParameters: Parameters(PartLabelMode.PartNumber)));
         Assert.Equal(CuttingPlanStatus.Ready, on.Status);
         Assert.Empty(ScribeOf(on));
+    }
+
+    // The label box is only for the part number: a bend's letter needs none.
+    [Fact]
+    public void PlanCutting_WithoutABox_StillEtchesEachBendsLetterBesideItsLine()
+    {
+        var unboxed = Panel("1234", BendAt(0));
+        unboxed.LabelBox = null;
+        var (plate, _) = PlateOf(unboxed, Parameters(true));
+
+        var result = CuttingPlanService.Plan(CuttingPlanRequest.ForPlate(plate, Vector.Zero,
+            confirmedParameters: Parameters(true)));
+
+        Assert.Equal(CuttingPlanStatus.Ready, result.Status);
+        var marks = ScribeOf(result);
+        Assert.NotEmpty(marks);
+        // A half inch circle an eighth inch off the bend, which runs from (3, 3) along X on the sheet.
+        Assert.All(marks, mark =>
+        {
+            Assert.InRange(mark.End.X, 3, 7);
+            Assert.InRange(System.Math.Abs(mark.End.Y - 3), 0.125 - 1e-6, 0.125 + 0.5 + 0.02);
+        });
     }
 
     [Fact]
@@ -429,7 +449,7 @@ public class PartLabelTests
 
         Assert.Equal(CuttingPlanStatus.Ready, a.Status);
         Assert.Equal(CuttingPlanStatus.Ready, b.Status);
-        // Circled A and circled B differ in their letter's glyph, so their strokes differ in count.
+        // The bend's circled A and circled B differ in their glyph, so their strokes differ in count.
         Assert.NotEqual(ScribeOf(a).Count, ScribeOf(b).Count);
     }
 
@@ -474,7 +494,7 @@ public class PartLabelTests
     [Fact]
     public void PlanCutting_PartNumberMode_EtchesTheNumberWithoutTheGroups()
     {
-        // "7" alone is one glyph; "7 A" adds a circle and a letter, so it has more strokes.
+        // "7" alone is one glyph; the bend's circled letter beside its line adds more strokes.
         var drawing = Panel("7", BendAt(Quarter));
         var strokesOf = (PartLabelMode mode) =>
         {
@@ -496,16 +516,16 @@ public class PartLabelTests
     // ---- the option ----
 
     [Fact]
-    public void Text_PartNumberMode_OmitsTheGroups_AndOffIsEmpty()
+    public void Text_IsTheSameInBothModes_AndOffIsEmpty()
     {
         var drawing = Panel("1234", BendAt(0), BendAt(Quarter));
 
-        Assert.Equal("1234", PartLabels.Text(drawing, 0, 0, PartLabelMode.PartNumber));
-        Assert.Equal("1234 AB", PartLabels.Text(drawing, 0, 0, PartLabelMode.PartNumberAndBendGroups));
-        Assert.Equal("1234 AB", PartLabels.Text(drawing, 0, 0));
-        Assert.Equal(string.Empty, PartLabels.Text(drawing, 0, 0, PartLabelMode.Off));
+        Assert.Equal("1234", PartLabels.Text(drawing, PartLabelMode.PartNumber));
+        Assert.Equal("1234", PartLabels.Text(drawing, PartLabelMode.PartNumberAndBendGroups));
+        Assert.Equal("1234", PartLabels.Text(drawing));
+        Assert.Equal(string.Empty, PartLabels.Text(drawing, PartLabelMode.Off));
         // A name the font cannot draw is nothing to etch in number mode, even with bends.
-        Assert.Equal(string.Empty, PartLabels.Text(Panel("()", BendAt(Quarter)), 0, 0, PartLabelMode.PartNumber));
+        Assert.Equal(string.Empty, PartLabels.Text(Panel("()", BendAt(Quarter)), PartLabelMode.PartNumber));
     }
 
     [Fact]
@@ -515,9 +535,9 @@ public class PartLabelTests
         var program = (Program)drawing.Program.Clone();
         var before = program.Codes.Count;
 
-        Assert.False(PartLabels.AddTo(program, drawing, 0, 0, PartLabelMode.Off));
+        Assert.False(PartLabels.AddTo(program, drawing, 0, PartLabelMode.Off));
         Assert.Equal(before, program.Codes.Count);
-        Assert.True(PartLabels.AddTo(program, drawing, 0, 0, PartLabelMode.PartNumber));
+        Assert.True(PartLabels.AddTo(program, drawing, 0, PartLabelMode.PartNumber));
     }
 
     [Fact]

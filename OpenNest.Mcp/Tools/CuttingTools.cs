@@ -89,7 +89,7 @@ namespace OpenNest.Mcp.Tools
 
             var batch = CuttingPlanBatch.Capture(scope, parameters, keepPartOrder,
                 scope.Select(p => all.FindIndex(candidate => ReferenceEquals(candidate, p))).ToArray(),
-                cancellationToken);
+                cancellationToken, units: _session.Nest?.Units ?? Units.Inches);
             var proposal = batch.Plan(token: cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
 

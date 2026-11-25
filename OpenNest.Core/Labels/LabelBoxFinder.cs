@@ -13,8 +13,7 @@ namespace OpenNest.Labels
     public sealed class LabelBoxOptions
     {
         /// <summary>
-        /// Characters in the longest label: a four-digit part number and two circled bend group
-        /// letters ("1234 AB"), which take the room of eight.
+        /// Characters the label box is sized for: a part number of eight.
         /// </summary>
         public const int DefaultCharacters = 8;
 
@@ -112,11 +111,6 @@ namespace OpenNest.Labels
                 || !double.IsFinite(options.Height) || !(options.Clearance >= 0) || !double.IsFinite(options.Clearance))
                 throw new ArgumentException("The label size and clearance must be finite and positive.", nameof(options));
 
-            var material = entities.Where(e => !ScribeLayerRepair.IsMarkLayer(e.Layer)).ForNesting();
-            var shapes = ShapeBuilder.GetShapes(material).Where(s => s.IsClosed()).ToList();
-            if (shapes.Count == 0)
-                return null;
-
             var bendList = (bends ?? Enumerable.Empty<Bend>())
                 .Where(b => b.Length > Tolerance.Epsilon)
                 .ToList();
@@ -126,21 +120,13 @@ namespace OpenNest.Labels
             var tolerance = System.Math.Max(System.Math.Min(clearance, bendClearance) / 20,
                 System.Math.Pow(10, -ClipperBridge.Precision));
 
-            // The perimeter is flattened inside the true curve and cutouts outside it, so the
-            // region never reaches past the real material.
-            var region = ClipperBridge.ToRegion(ShapeProfile.FromShapes(shapes), tolerance, circumscribe: false);
-            var free = clearance > 0
-                ? Clipper.InflatePaths(region, -(clearance + tolerance), JoinType.Round, EndType.Polygon, 2.0,
-                    ClipperBridge.Precision, tolerance)
-                : region;
+            var free = Material(entities, clearance, tolerance, out var shapes);
+            if (free == null)
+                return null;
 
             var bands = new PathsD();
             foreach (var bend in bendList)
-            {
-                bands.AddRange(Clipper.InflatePaths(
-                    new PathsD { new PathD { new PointD(bend.StartPoint.X, bend.StartPoint.Y), new PointD(bend.EndPoint.X, bend.EndPoint.Y) } },
-                    bendClearance + tolerance, JoinType.Round, EndType.Round, 2.0, ClipperBridge.Precision, tolerance));
-            }
+                bands.AddRange(Strip(bend.StartPoint, bend.EndPoint, bendClearance + tolerance, tolerance));
 
             // A kept-out outline is flattened outside its curve so it never under-covers.
             foreach (var outline in keepOut ?? Enumerable.Empty<IEnumerable<Entity>>())
@@ -186,6 +172,31 @@ namespace OpenNest.Labels
             }
             return best;
         }
+
+        // The part's material (marks and rapids are not material, a tabbed cutout's slug is)
+        // eroded by the clearance, or null without a closed outline. The perimeter is flattened
+        // inside the true curve and cutouts outside it, so the region never reaches past the
+        // real material.
+        internal static PathsD Material(IEnumerable<Entity> entities, double clearance, double tolerance,
+            out List<Shape> shapes)
+        {
+            var material = entities.Where(e => !ScribeLayerRepair.IsMarkLayer(e.Layer)).ForNesting();
+            shapes = ShapeBuilder.GetShapes(material).Where(s => s.IsClosed()).ToList();
+            if (shapes.Count == 0)
+                return null;
+
+            var region = ClipperBridge.ToRegion(ShapeProfile.FromShapes(shapes), tolerance, circumscribe: false);
+            return clearance > 0
+                ? Clipper.InflatePaths(region, -(clearance + tolerance), JoinType.Round, EndType.Polygon, 2.0,
+                    ClipperBridge.Precision, tolerance)
+                : region;
+        }
+
+        // A segment grown by halfWidth all round, ends rounded.
+        internal static PathsD Strip(Vector start, Vector end, double halfWidth, double tolerance) =>
+            Clipper.InflatePaths(
+                new PathsD { new PathD { new PointD(start.X, start.Y), new PointD(end.X, end.Y) } },
+                halfWidth, JoinType.Round, EndType.Round, 2.0, ClipperBridge.Precision, tolerance);
 
         // The widest margin the label can have on every side, beyond the clearance already taken
         // out of the region, with the label upright in the region's frame; negative when it does

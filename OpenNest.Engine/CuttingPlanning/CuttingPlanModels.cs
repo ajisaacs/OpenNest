@@ -38,10 +38,10 @@ public sealed class CuttingPlanRequest
     /// </summary>
     public static CuttingPlanRequest ForPlate(Plate plate, Vector startPoint = default, int expansionBudget = 20000,
         CuttingParameters confirmedParameters = null, IEnumerable<Part> eligibleParts = null,
-        bool preservePartOrder = false, int maxEntries = 16) =>
+        bool preservePartOrder = false, int maxEntries = 16, Units units = Units.Inches) =>
         new(plate?.Parts, startPoint, expansionBudget, confirmedParameters, eligibleParts,
             preservePartOrder, maxEntries)
-        { Plate = plate, SupportBed = plate?.SupportBed, SupportQuadrant = plate?.Quadrant ?? 1 };
+        { Plate = plate, SupportBed = plate?.SupportBed, SupportQuadrant = plate?.Quadrant ?? 1, Units = units };
 
     /// <summary>The plate scope, or null for a detached part list that cannot be applied.</summary>
     public Plate Plate { get; private init; }
@@ -55,6 +55,12 @@ public sealed class CuttingPlanRequest
 
     /// <summary>The sheet quadrant that places <see cref="SupportBed"/> on the parts' coordinates.</summary>
     public int SupportQuadrant { get; init; } = 1;
+
+    /// <summary>
+    /// The units the parts are drawn in (the nest's), which size the bend letters etched beside
+    /// bend lines (docs/label-box.md).
+    /// </summary>
+    public Units Units { get; init; } = Units.Inches;
     public CuttingParameters ConfirmedParameters { get; }
     public IReadOnlyList<Part> EligibleParts { get; }
     public bool PreservePartOrder { get; }

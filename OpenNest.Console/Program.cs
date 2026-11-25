@@ -854,7 +854,7 @@ static class NestConsole
         Console.WriteLine("---");
         Console.WriteLine($"Cutting settings: {(explicitParameters != null ? options.CuttingParamsFile : "saved with the plates")}");
         var batch = CuttingPlanBatch.Capture(scope, parameters, options.KeepPartOrder,
-            scope.Select(p => nest.Plates.IndexOf(p)).ToArray(), token);
+            scope.Select(p => nest.Plates.IndexOf(p)).ToArray(), token, units: nest.Units);
         var proposal = batch.Plan(new PlanningProgress(scope.Length), token);
         token.ThrowIfCancellationRequested();
 

@@ -1,4 +1,3 @@
-using OpenNest.Bending;
 using OpenNest.Geometry;
 using OpenNest.Labels;
 
@@ -7,17 +6,11 @@ namespace OpenNest.Tests.Labels;
 public class LabelPreviewTests
 {
     [Fact]
-    public void PreviewText_IsTheFullLabelForTheUnrotatedPart()
+    public void PreviewText_IsTheNameAsItIsEtched()
     {
-        var bends = new List<Bend>
-        {
-            new() { StartPoint = new Vector(1, 0), EndPoint = new Vector(1, 1) },
-            new() { StartPoint = new Vector(0, 2), EndPoint = new Vector(3, 2) },
-        };
-
-        Assert.Equal("4980A01PT103 AB", PartLabels.PreviewText("4980 A01 pt103", bends));
-        Assert.Equal("1234", PartLabels.PreviewText("1234", null));
-        Assert.Equal("", PartLabels.PreviewText(null, null));
+        Assert.Equal("4980A01PT103", PartLabels.PreviewText("4980 A01 pt103"));
+        Assert.Equal("1234", PartLabels.PreviewText("1234"));
+        Assert.Equal("", PartLabels.PreviewText(null));
     }
 
     [Fact]
@@ -55,9 +48,9 @@ public class LabelPreviewTests
     {
         var drawing = new Drawing("12345") { LabelBox = new LabelBox(new Vector(1, 1), 0.3, 0.25, 0) };
 
-        PartLabels.Layout(drawing.LabelBox, PartLabels.Text(drawing, 0, 0), out var fits);
+        PartLabels.Layout(drawing.LabelBox, PartLabels.Text(drawing), out var fits);
 
         Assert.False(fits);
-        Assert.Null(PartLabels.Strokes(drawing, 0, 0));
+        Assert.Null(PartLabels.Strokes(drawing, 0));
     }
 }

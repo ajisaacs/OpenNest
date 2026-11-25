@@ -143,6 +143,44 @@ namespace OpenNest.Forms
             entityView1.Invalidate();
         }
 
+        private string bendLabelPreviewKey;
+        private System.Collections.Generic.List<Stroke> bendLabelPreview;
+
+        /// <summary>
+        /// The bend group letters as Plan Cutting would etch them beside the bend lines
+        /// (<see cref="BendLabels.Place"/>), for the part unrotated on a sheet whose grain runs
+        /// along X, like the label's own preview; null for a part without bends. Kept until the box, the bends or the cut
+        /// geometry's makeup change, since it is asked for at every paint.
+        /// </summary>
+        internal System.Collections.Generic.IReadOnlyList<Stroke> BendLabelPreview(FileListItem item)
+        {
+            if (item?.Bends == null || item.Bends.Count == 0)
+                return null;
+
+            // The label box is only kept clear of; a part without one still gets its bend letters.
+            var box = item.LabelBox is { IsValid: true } valid ? valid : null;
+            var key = new System.Text.StringBuilder();
+            key.Append(System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(item)).Append('|').Append(DrawingUnits).Append('|')
+                .Append(box?.Center.X).Append(',').Append(box?.Center.Y).Append(',').Append(box?.Width).Append(',')
+                .Append(box?.Height).Append(',').Append(box?.Rotation).Append('|')
+                .Append(item.Entities.Count(en => en.Layer.IsVisible && en.IsVisible)).Append(',')
+                .Append(item.Breakoffs.Count).Append(',').Append(item.TabbedCutouts.Count).Append(',')
+                .Append(item.EntityRoles?.Count ?? 0);
+            foreach (var bend in item.Bends)
+                key.Append('|').Append(bend.StartPoint.X).Append(',').Append(bend.StartPoint.Y).Append(',')
+                    .Append(bend.EndPoint.X).Append(',').Append(bend.EndPoint.Y).Append(',')
+                    .Append((int)bend.Direction).Append(',').Append(bend.Angle).Append(',').Append(bend.Radius);
+
+            var text = key.ToString();
+            if (text != bendLabelPreviewKey)
+            {
+                bendLabelPreviewKey = text;
+                bendLabelPreview = BendLabels.Layout(
+                    BendLabels.Place(DimensionedEntities(item), item.Bends, box, DrawingUnits), item.Bends, 0, 0);
+            }
+            return bendLabelPreview;
+        }
+
         internal virtual void ShowLabelBoxMessage(string message) =>
             MessageBox.Show(this, message, "Label Box", MessageBoxButtons.OK, MessageBoxIcon.Information);
     }

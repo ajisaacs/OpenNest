@@ -235,6 +235,35 @@ public class CadConverterLabelBoxTests
         form.Close();
     });
 
+    [Fact]
+    public void EachBendsLetterIsPreviewedBesideItsLine_WithOrWithoutABox_ClearOfTheBox() => ArchUnitsTests.RunSta(() =>
+    {
+        using var form = new LabelTestForm();
+        Show(form);
+        var bend = new Bend { StartPoint = new Vector(5, 0), EndPoint = new Vector(5, 6), Direction = BendDirection.Up };
+        form.LoadDrawings([Part(10, 6, [bend])]);
+        var view = Field<EntityView>(form, "entityView1");
+        var item = Field<FileListControl>(form, "fileList").SelectedItem!;
+
+        // The letter needs no label box: a half inch circle within an inch of the bend line.
+        Assert.Null(item.LabelBox);
+        var points = view.BendLabelPreview!().SelectMany(stroke => stroke.Points()).ToList();
+        Assert.NotEmpty(points);
+        Assert.All(points, point => Assert.InRange(System.Math.Abs(point.X - 5), 0, 1));
+        Assert.Equal(0.5, points.Max(p => p.Y) - points.Min(p => p.Y), 2);
+        var before = points[0];
+
+        // A label box over the letter moves it clear; painting works.
+        item.LabelBox = new LabelBox(before, 2, 0.5, 0);
+        Invoke(form, "RefreshLabelBox", item);
+        var moved = view.BendLabelPreview!().SelectMany(stroke => stroke.Points()).ToList();
+        Assert.NotEmpty(moved);
+        Assert.All(moved, point => Assert.False(item.LabelBox.Contains(point)));
+        using var bitmap = new System.Drawing.Bitmap(view.Width, view.Height);
+        view.DrawToBitmap(bitmap, new System.Drawing.Rectangle(0, 0, view.Width, view.Height));
+        form.Close();
+    });
+
     private static Drawing Part(double width, double height, List<Bend>? bends = null)
     {
         var entities = new List<Entity>

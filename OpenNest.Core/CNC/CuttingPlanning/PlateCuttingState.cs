@@ -230,8 +230,8 @@ public sealed class PlateCuttingState
         [BitConverter.DoubleToInt64Bits(box.X), BitConverter.DoubleToInt64Bits(box.Y),
          BitConverter.DoubleToInt64Bits(box.Width), BitConverter.DoubleToInt64Bits(box.Length)];
 
-    // Exact text of what a part label is made from (PartLabels.Strokes): the name, the box, the
-    // bends and the source offset, doubles by bit pattern.
+    // Exact text of what a part label and its bend letters are made from (PartLabels.Strokes,
+    // BendLabels.Spots): the name, the box, the bends and the source offset, doubles by bit pattern.
     private static string LabelInputs(Drawing drawing)
     {
         var text = new System.Text.StringBuilder();
@@ -251,7 +251,9 @@ public sealed class PlateCuttingState
                 if (bend == null)
                     text.Append("null;");
                 else
-                    Values(bend.StartPoint.X, bend.StartPoint.Y, bend.EndPoint.X, bend.EndPoint.Y);
+                    // The direction, angle and radius place the bend's own letter (BendLabels.Place).
+                    Values(bend.StartPoint.X, bend.StartPoint.Y, bend.EndPoint.X, bend.EndPoint.Y,
+                        (double)bend.Direction, bend.Angle ?? double.NaN, bend.Radius ?? double.NaN);
             }
         return text.ToString();
 

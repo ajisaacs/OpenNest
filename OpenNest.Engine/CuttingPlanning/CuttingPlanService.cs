@@ -71,6 +71,8 @@ public static class CuttingPlanService
             var identities = new HashSet<Part>(ReferenceEqualityComparer.Instance);
             // Every part's box, read once, for slug slices to keep clear of parts nested in a cutout.
             Box[] partBoxes = null;
+            // Where each drawing's bend letters go: the same for all its parts, so found once.
+            var bendSpots = new Dictionary<Drawing, List<BendLabelSpot>>(ReferenceEqualityComparer.Instance);
             // The sheet every planned lead must stay on; none for a detached part list or a plate
             // with no usable size, which the pre-post plate edge check reports instead.
             var plateSize = request.Plate?.Size;
@@ -165,8 +167,17 @@ public static class CuttingPlanService
                 // The label is etched, never material: clean bounds and lead material skip scribe
                 // moves, and the planner emits them like any other mark (docs/label-box.md).
                 else if (request.ConfirmedParameters?.LabelMode is { } labelMode && labelMode != PartLabelMode.Off)
-                    PartLabels.AddTo(ownedClean, source.BaseDrawing, source.Rotation,
-                        request.Plate?.GrainAngle ?? 0, labelMode);
+                {
+                    var grain = request.Plate?.GrainAngle ?? 0;
+                    PartLabels.AddTo(ownedClean, source.BaseDrawing, source.Rotation, labelMode);
+                    // Each bend's own group letter beside its line, so the groups can be told apart.
+                    if (labelMode == PartLabelMode.PartNumberAndBendGroups)
+                    {
+                        if (!bendSpots.TryGetValue(source.BaseDrawing, out var spots))
+                            bendSpots[source.BaseDrawing] = spots = BendLabels.Spots(source.BaseDrawing, request.Units);
+                        BendLabels.AddTo(ownedClean, source.BaseDrawing, spots, source.Rotation, grain);
+                    }
+                }
                 // Material extent only: remote rapids and scribe marks must not widen it, or a
                 // genuine insert could fail the containment prefilter.
                 var cleanBounds = NestedPartContainment.CleanBounds(ownedClean, source.Location, token);

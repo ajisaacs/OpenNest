@@ -73,7 +73,8 @@ namespace OpenNest.Forms
             filterPanel.DimensionRemoved += OnDimensionRemoved;
             entityView1.DimensionDragged += OnDimensionDragged;
             entityView1.LabelBoxChanged += OnLabelBoxChanged;
-            entityView1.LabelPreviewText = () => CurrentItem is { } item ? PartLabels.PreviewText(item.Name, item.Bends) : null;
+            entityView1.LabelPreviewText = () => CurrentItem is { } item ? PartLabels.PreviewText(item.Name) : null;
+            entityView1.BendLabelPreview = () => BendLabelPreview(CurrentItem);
             entityView1.TextConvertRequested += OnTextConvertRequested;
             entityView1.EntityActionRequested += OnEntityActionRequested;
             btnSplit.Click += OnSplitClicked;

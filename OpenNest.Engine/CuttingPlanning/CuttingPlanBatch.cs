@@ -83,15 +83,16 @@ public sealed class CuttingPlanBatch
     /// and <see cref="MaximumBudgetMultiplier"/>. The caller passes the operator's setting; the
     /// worker never reads it.
     /// </param>
+    /// <param name="units">The nest's units, which size etched bend letters (docs/label-box.md).</param>
     public static CuttingPlanBatch Capture(IReadOnlyList<Plate> plates, CuttingParameters confirmedParameters,
         bool preservePartOrder, IReadOnlyList<int> plateNumbers = null, CancellationToken token = default,
-        double budgetMultiplier = DefaultBudgetMultiplier) =>
-        Capture(plates, confirmedParameters, preservePartOrder, plateNumbers, null, token, budgetMultiplier);
+        double budgetMultiplier = DefaultBudgetMultiplier, Units units = Units.Inches) =>
+        Capture(plates, confirmedParameters, preservePartOrder, plateNumbers, null, token, budgetMultiplier, units);
 
     /// <param name="reorderBudget">Overrides the new-order budget (tests); null gives <see cref="PlateBudget"/>.</param>
     internal static CuttingPlanBatch Capture(IReadOnlyList<Plate> plates, CuttingParameters confirmedParameters,
         bool preservePartOrder, IReadOnlyList<int> plateNumbers, int? reorderBudget, CancellationToken token,
-        double budgetMultiplier = DefaultBudgetMultiplier)
+        double budgetMultiplier = DefaultBudgetMultiplier, Units units = Units.Inches)
     {
         ArgumentNullException.ThrowIfNull(plates);
         ArgumentNullException.ThrowIfNull(confirmedParameters);
@@ -125,7 +126,7 @@ public sealed class CuttingPlanBatch
             // over the same owned geometry, programs and freshness record.
             var captured = CuttingPlanService.Capture(CuttingPlanRequest.ForPlate(plate,
                 expansionBudget: budget, confirmedParameters: confirmedParameters,
-                preservePartOrder: preservePartOrder), token);
+                preservePartOrder: preservePartOrder, units: units), token);
             var keepOrder = preservePartOrder ? captured : captured.WithPreservedOrder();
             var reorder = preservePartOrder ? null
                 : reorderBudget is { } reorderLimit ? captured.WithSearchLimits(reorderLimit, captured.MaxEntries) : captured;
@@ -133,7 +134,8 @@ public sealed class CuttingPlanBatch
             var fallback = reorder ?? keepOrder;
             if (fallback.Failure == CuttingPlanStatus.UnsupportedGeometry)
                 fallback = CuttingPlanService.Capture(CuttingPlanRequest.ForPlate(plate,
-                    confirmedParameters: confirmedParameters, preservePartOrder: preservePartOrder), token, bestEffort: true);
+                    confirmedParameters: confirmedParameters, preservePartOrder: preservePartOrder, units: units),
+                    token, bestEffort: true);
             entries[index] = new(plate, plateNumbers?[index] ?? index + 1, reorder, keepOrder, overlap, fallback);
         }
         return new(entries, owned);

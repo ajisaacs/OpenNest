@@ -36,6 +36,12 @@ namespace OpenNest.Controls
         /// </summary>
         public Func<string> LabelPreviewText { get; set; }
 
+        /// <summary>
+        /// The bend group letters previewed beside the bend lines, read at each paint, with or
+        /// without a <see cref="LabelBox"/>; null previews none.
+        /// </summary>
+        public Func<System.Collections.Generic.IReadOnlyList<Labels.Stroke>> BendLabelPreview { get; set; }
+
         /// <summary>The label box was moved, resized or turned; the argument is its new placement.</summary>
         public event EventHandler<Labels.LabelBox> LabelBoxChanged;
 
@@ -137,6 +143,26 @@ namespace OpenNest.Controls
             RotateHandlePart => Cursors.Hand,
             _ => Cursors.SizeNWSE,
         };
+
+        // Each bend's own group letter, where Plan Cutting would etch it beside the line.
+        private void DrawBendLabels(Graphics g)
+        {
+            if (BendLabelPreview?.Invoke() is not { Count: > 0 } letters)
+                return;
+
+            using var pen = new Pen(LabelBoxColor, 1.5f)
+            {
+                StartCap = LineCap.Round,
+                EndCap = LineCap.Round,
+                LineJoin = LineJoin.Round,
+            };
+            foreach (var stroke in letters)
+            {
+                var path = stroke.Points().Select(PointWorldToGraph).ToArray();
+                if (path.Length > 1)
+                    g.DrawLines(pen, path);
+            }
+        }
 
         private void DrawLabelBox(Graphics g)
         {

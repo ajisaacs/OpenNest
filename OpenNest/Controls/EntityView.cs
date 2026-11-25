@@ -163,6 +163,7 @@ namespace OpenNest.Controls
             DrawSelection(e.Graphics);
             DrawTexts(e.Graphics);
             DrawDimensions(e.Graphics);
+            DrawBendLabels(e.Graphics);
             DrawLabelBox(e.Graphics);
 
             if (ShowEntityLabels)

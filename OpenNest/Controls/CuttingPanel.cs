@@ -280,7 +280,7 @@ namespace OpenNest.Controls
             column.Controls.Add(chkSliceSlugs);
             chkSliceSlugs.CheckedChanged += (s, e) => OnParametersChanged();
 
-            // Marks: the part number and bend groups etched in each drawing's label box.
+            // Marks: the part number etched in each drawing's label box, and bend group letters.
             AddSection("Marks");
 
             var marksGrid = ControlFactory.SettingsGrid(0);
@@ -295,8 +295,9 @@ namespace OpenNest.Controls
             AddRow(marksGrid, "Etch part label:", cboLabelMode, 0);
             toolTip.SetToolTip(cboLabelMode,
                 "Plan Cutting etches each part's number in the label box set in the CAD Converter, "
-                + "alone or with its bend groups (A across the grain, B with it, then C and on). "
-                + "Parts with no label box get none.");
+                + "alone or with each bend's group letter beside its bend line "
+                + "(A across the grain, B with it, then C and on). "
+                + "Parts with no label box get no part number.");
             column.Controls.Add(marksGrid);
             cboLabelMode.SelectedIndexChanged += (s, e) => OnParametersChanged();
 

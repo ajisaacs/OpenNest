@@ -835,7 +835,8 @@ internal sealed class CuttingInspectionPanel : UserControl
         {
             // Capture on the owner thread; no worker recapture of the live plate or settings.
             var batch = CuttingPlanBatch.Capture(plates, parameters, keepOrderCheckBox.Checked, plateNumbers,
-                budgetMultiplier: CuttingPlanBatch.ClampBudgetMultiplier(Properties.Settings.Default.CuttingPlanEffort));
+                budgetMultiplier: CuttingPlanBatch.ClampBudgetMultiplier(Properties.Settings.Default.CuttingPlanEffort),
+                units: units);
             var run = ++generation;
             var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             PlanningTask = completion.Task;
