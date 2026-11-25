@@ -125,13 +125,16 @@ public class IrregularSearchUntilCancelledTests
         var plain = new Recorder();
         // Grouped, or with ten ells (whose blocks Fill nests as herringbone pairs), this job's
         // normal search already finds a plan the seeds do not beat within the sheets allowed
-        // here; this test is of the seeded search, so it runs ungrouped with twelve.
-        var plainResult = new IrregularNestingEngine { GroupLikeParts = false }.Solve(MixedJob(false, Ells), plain);
+        // here; this test is of the seeded search, so it runs ungrouped with twelve. So does the
+        // normal search's best plan with its last sheet banded, so the bands are off as well.
+        var plainResult = new IrregularNestingEngine { GroupLikeParts = false, BandLastSheet = false }
+            .Solve(MixedJob(false, Ells), plain);
         var normalSheets = 0;
-        new IrregularNestingEngine { GroupLikeParts = false, SheetPacked = () => normalSheets++ }.Solve(MixedJob(false, Ells));
+        new IrregularNestingEngine { GroupLikeParts = false, BandLastSheet = false, SheetPacked = () => normalSheets++ }
+            .Solve(MixedJob(false, Ells));
         // A time-limited solve packs its quick plan before the normal search.
         var quickSheets = 0;
-        var quick = new IrregularNestingEngine { GroupLikeParts = false, SheetPacked = () => quickSheets++ }
+        var quick = new IrregularNestingEngine { GroupLikeParts = false, BandLastSheet = false, SheetPacked = () => quickSheets++ }
             .QuickPlanForTesting(MixedJob(false, Ells));
 
         var extendedSheets = 0;
@@ -140,6 +143,7 @@ public class IrregularSearchUntilCancelledTests
         var engine = new IrregularNestingEngine
         {
             GroupLikeParts = false,
+            BandLastSheet = false,
             // The quick plan and the normal search pack exactly quickSheets + normalSheets sheets;
             // later ones are extended.
             TailReplanning = budget =>

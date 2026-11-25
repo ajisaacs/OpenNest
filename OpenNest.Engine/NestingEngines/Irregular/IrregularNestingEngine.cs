@@ -95,6 +95,9 @@ public sealed partial class IrregularNestingEngine : INestingEngine
                 .Any(level => level.Select(t => ranks[t.Index]).Distinct().Count() > 1));
     }
 
+    /// <summary>Whether the last sheet is packed again as bands; off only in tests of the search before it.</summary>
+    internal bool BandLastSheet { get; init; } = true;
+
     /// <summary>Whether the sheet-reduction pass runs; off only in tests of the search before it.</summary>
     internal bool ReduceSheets { get; init; } = true;
 
@@ -229,7 +232,7 @@ public sealed partial class IrregularNestingEngine : INestingEngine
 
         if (untilCancelled)
             search.SeededVariants(groups);
-        return BuildResult(job, types, search.Best, progress, token);
+        return BuildResult(job, types, search.Result, progress, token);
     }
 
     /// <summary>
@@ -248,8 +251,19 @@ public sealed partial class IrregularNestingEngine : INestingEngine
     {
         private Plan? best;
 
+        /// <summary>
+        /// The best plan reported so far: <see cref="Best"/>, or one of the search's best plans
+        /// with its last sheet banded (<see cref="BandLastSheet"/>). The search never reads it, so
+        /// it runs as without the banding.
+        /// </summary>
+        private Plan? shown;
+
         /// <summary>The best plan so far; the strategy variants find the first.</summary>
         public Plan Best => best ?? throw new InvalidOperationException("The strategy variants have not run.");
+
+        /// <summary>The plan to return, which is the last one reported as the best: the search's
+        /// best, or a banded plan it has not beaten.</summary>
+        public Plan Result => shown ?? Best;
 
         private long WorkBudget => engine.WorkBudget;
 
@@ -278,7 +292,7 @@ public sealed partial class IrregularNestingEngine : INestingEngine
                 if (leader == null || plan.IsBetterThan(leader))
                 {
                     leader = plan;
-                    Report(leader);
+                    ReportBest(leader);
                 }
                 else
                     ReportAlternative(plan);
@@ -287,7 +301,9 @@ public sealed partial class IrregularNestingEngine : INestingEngine
             }
 
             best = leader!;
+            BandLastSheet();
             Replace(solver.ImproveTail(leader!, WorkBudget * 2));
+            BandLastSheet();
         }
 
         /// <summary>Decodes the grouped variants, none starting once the work budget is spent.</summary>
@@ -313,7 +329,7 @@ public sealed partial class IrregularNestingEngine : INestingEngine
                 || solver.Work.Value >= BandedWorkLimit * WorkBudget)
                 return;
             token.ThrowIfCancellationRequested();
-            Offer(solver.Plan(demand, Strategy.Banded));
+            Offer(solver.Plan(demand, Strategy.Banded), banded: true);
         }
 
         /// <summary>
@@ -346,7 +362,30 @@ public sealed partial class IrregularNestingEngine : INestingEngine
             return true;
         }
 
-        public void ReduceSheets() => Replace(solver.ReduceSheets(Best));
+        /// <summary>
+        /// Packs the best plan's last sheet again as bands, each time a plan becomes the best: the
+        /// like parts that end a job, which the frontier packer set down one at a time behind the
+        /// others, each as its Lattice pattern. The banded plan is reported when it beats every
+        /// plan reported and returned when it beats the search's result; it never becomes
+        /// <see cref="Best"/>. Bands ignore priority, so only for jobs of one priority.
+        /// </summary>
+        private void BandLastSheet()
+        {
+            if (!engine.BandLastSheet || job.Parts.Select(p => p.Priority).Distinct().Count() != 1)
+                return;
+            token.ThrowIfCancellationRequested();
+            var banded = solver.BandLastSheet(Best);
+            if (!ReferenceEquals(banded, Best))
+                ReportBest(banded);
+        }
+
+        public void ReduceSheets()
+        {
+            var before = Best;
+            Replace(solver.ReduceSheets(before));
+            if (!ReferenceEquals(Best, before))
+                BandLastSheet();
+        }
 
         public void SqueezeLastSheet() => Replace(solver.Squeeze(Best));
 
@@ -375,22 +414,30 @@ public sealed partial class IrregularNestingEngine : INestingEngine
         /// Takes a variant's plan: it becomes the best by beating it, and is otherwise reported as
         /// another layout, like the complete plans its decode passed over.
         /// </summary>
-        private void Offer(Plan plan)
+        /// <param name="banded">The plan's sheets are banded already.</param>
+        private void Offer(Plan plan, bool banded = false)
         {
             ReportAlternatives();
             if (plan.IsBetterThan(Best))
-                Adopt(plan);
+                Adopt(plan, banded);
             else
                 ReportAlternative(plan);
         }
 
-        /// <summary>Makes a plan that beat the best the new best, and re-plans its tail on a fresh budget.</summary>
-        private void Adopt(Plan plan)
+        /// <summary>Makes a plan that beat the best the new best and re-plans its tail on a fresh
+        /// budget, banding the last sheet before and after: a tail re-plan can take a minute, and
+        /// the plan shown meanwhile is the one a person stopping the search gets. A plan whose
+        /// sheets are <paramref name="banded"/> already is banded only when its tail changes.</summary>
+        private void Adopt(Plan plan, bool banded = false)
         {
             // Report before the tail re-plan, which the limit may cut short.
-            Report(plan);
+            ReportBest(plan);
             best = plan;
+            if (!banded)
+                BandLastSheet();
             Replace(solver.ImproveTail(plan, solver.Work.Value + WorkBudget * 2));
+            if (!banded || !ReferenceEquals(best, plan))
+                BandLastSheet();
         }
 
         /// <summary>Takes a pass's result, which is the plan it was given unless it found a better one.</summary>
@@ -399,10 +446,22 @@ public sealed partial class IrregularNestingEngine : INestingEngine
             if (ReferenceEquals(result, best))
                 return;
             best = result;
-            Report(result);
+            ReportBest(result);
         }
 
-        /// <summary>Reports a new best whole-job plan.</summary>
+        /// <summary>
+        /// Reports a plan the search made its best, or its banded form, unless a plan already
+        /// reported is as good: a banded plan can stay ahead of the search's next best.
+        /// </summary>
+        private void ReportBest(Plan plan)
+        {
+            if (shown != null && !plan.IsBetterThan(shown))
+                return;
+            shown = plan;
+            Report(plan);
+        }
+
+        /// <summary>Reports a whole-job plan as the best so far.</summary>
         private void Report(Plan plan)
         {
             if (progress != null)

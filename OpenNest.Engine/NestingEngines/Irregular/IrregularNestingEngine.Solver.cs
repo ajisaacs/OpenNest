@@ -52,7 +52,7 @@ public sealed partial class IrregularNestingEngine
 
         public void Dispose()
         {
-            foreach (var catalog in blocks.Values)
+            foreach (var catalog in blocks.Values.Concat(tailBlocks.Values))
                 catalog.Dispose();
         }
 

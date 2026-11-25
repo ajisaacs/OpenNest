@@ -171,6 +171,74 @@ public sealed partial class IrregularNestingEngine
                 yield return snake;
         }
 
+        /// <summary>First orientation index of the catalogs of <see cref="BandLastSheet"/>: above
+        /// the other catalogs' and below the solved ones.</summary>
+        private const int TailOrientations = 500_000;
+
+        /// <summary>The work meter of <see cref="BandLastSheet"/>, which its catalogs keep.</summary>
+        private readonly WorkCounter tailWork = new();
+
+        /// <summary>The Lattice catalogs of <see cref="BandLastSheet"/>, per spacing.</summary>
+        private readonly Dictionary<double, BlockCatalog> tailBlocks = new();
+
+        /// <summary>The last sheets <see cref="BandLastSheet"/> has banded, by stock and demand;
+        /// null where the sheet did not band whole.</summary>
+        private readonly Dictionary<string, SheetFill?> tailBands = new(StringComparer.Ordinal);
+
+        /// <summary>
+        /// The plan with its last sheet packed again as bands (<see cref="BandedFill.Fill"/>, full
+        /// height only): each like-part group as its Lattice pattern, side by side, as a person
+        /// fills the end of a job. The frontier packer is offered Lattice blocks only on an empty
+        /// sheet, so the groups that end a job behind other parts go down one copy at a time and
+        /// end ragged. Returns the plan given unless the banded sheet holds every part and the
+        /// plan then beats it.
+        ///
+        /// It runs on a work meter and Lattice catalogs of its own, so every other pass runs as
+        /// without it.
+        /// </summary>
+        public Plan BandLastSheet(Plan plan)
+        {
+            if (plan.Unplaced != 0 || plan.Sheets.Count == 0)
+                return plan;
+            var last = plan.Sheets[^1];
+            var stock = last.Stock;
+            var demand = new int[types.Count];
+            foreach (var part in last.Parts)
+                demand[part.Orientation.TypeIndex]++;
+            if (stock.Outline != null || !demand.Any(d => d >= GroupedFill.MinGroup))
+                return plan;
+
+            var key = stock.Id + ":" + string.Join(",", demand);
+            if (!tailBands.TryGetValue(key, out var fill))
+            {
+                FrontierPacker Gaps() => new(types, CacheFor(stock), PairsFor(stock), stock, PackAxis.X, 1.0, tailWork,
+                    clamps: ClampsFor(stock));
+                fill = new BandedFill(types, TailBlocksFor(stock), stock, ClampsFor(stock), Gaps, CompareSheets,
+                    tailWork, tailWork.Value + workBudget, lowerBands: false).Fill(demand, token);
+                if (fill != null && fill.Parts.Count != last.Parts.Count)
+                    fill = null;
+                tailBands[key] = fill;
+            }
+            if (fill == null)
+                return plan;
+            var candidate = plan with
+            {
+                Sheets = plan.Sheets.Take(plan.Sheets.Count - 1).Append(fill).ToList(),
+                Cost = NestJobCost.RequireFinite(plan.Cost - NetCost(job.Options, last) + NetCost(job.Options, fill)),
+            };
+            return candidate.IsBetterThan(plan) ? candidate : plan;
+        }
+
+        /// <summary>Lattice patterns for this stock's spacing, for <see cref="BandLastSheet"/> alone.</summary>
+        private BlockCatalog TailBlocksFor(NestPlateStock stock)
+        {
+            var spacing = Clearance(stock);
+            if (!tailBlocks.TryGetValue(spacing, out var found))
+                tailBlocks[spacing] = found = new BlockCatalog(spacing, types, PairsFor(stock), tailWork, workBudget,
+                    engine.DrawingFor, TailOrientations);
+            return found;
+        }
+
         /// <summary>
         /// Packs the last sheet of a complete plan again inside ever shorter strips
         /// (<see cref="OrderedSqueeze"/>), along each of <see cref="SqueezeAxes"/>; a shorter

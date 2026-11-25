@@ -61,6 +61,9 @@ internal sealed class BlockCatalog : IDisposable
     private readonly long budget;
     private readonly Func<NestJobPart, Drawing>? drawingFor;
 
+    /// <summary>Least index of an orientation a proposal adds; see the constructor.</summary>
+    private readonly int firstIndex;
+
     /// <summary>The catalog's own drawing per type, made only without <see cref="drawingFor"/>.</summary>
     private readonly Dictionary<int, Drawing> drawings = new();
 
@@ -188,10 +191,13 @@ internal sealed class BlockCatalog : IDisposable
 
     /// <param name="drawingFor">Shared private drawings whose best-fit entries the caller owns;
     /// null makes the catalog own one per type and release it on dispose.</param>
+    /// <param name="firstIndex">Least index of an orientation a proposal adds. A solve's second
+    /// catalog of one spacing sets it past the first's, as no-fit polygons are kept per index.</param>
     public BlockCatalog(double spacing, IReadOnlyList<PartType> types,
         IReadOnlyDictionary<int, IReadOnlyList<PairPose>> pairs, WorkCounter counter, long budget,
-        Func<NestJobPart, Drawing>? drawingFor = null)
+        Func<NestJobPart, Drawing>? drawingFor = null, int firstIndex = 0)
     {
+        this.firstIndex = firstIndex;
         this.spacing = spacing;
         bandSpacing = spacing + System.Math.Pow(10, -NoFitCache.Precision);
         this.counter = counter;
@@ -317,7 +323,8 @@ internal sealed class BlockCatalog : IDisposable
             return Array.Empty<Placed>();
         var type = request.Type;
         var poses = Propose(request, spacing, DrawingOf(type), token, out _);
-        return poses == null ? Array.Empty<Placed>() : Bind(type, poses, orientations[type.Index], token);
+        return poses == null ? Array.Empty<Placed>()
+            : Bind(type, poses, orientations[type.Index], token, firstIndex);
     }
 
     /// <summary>
@@ -355,7 +362,7 @@ internal sealed class BlockCatalog : IDisposable
             return Array.Empty<Placed>();
         var entry = BandFor(request, token, prefetch);
         if (prefetch != null)
-            return entry.Members ?? Bind(type, entry.Poses!, orientations[type.Index].ToList(), token);
+            return entry.Members ?? Bind(type, entry.Poses!, orientations[type.Index].ToList(), token, firstIndex);
         lock (bands)
         {
             // The first ordinary request pays for the pattern, whichever request built it.
@@ -368,7 +375,7 @@ internal sealed class BlockCatalog : IDisposable
                 return entry.Members;
         }
         // Ordinary requests of one type run on one thread at a time.
-        var bound = Bind(type, entry.Poses!, orientations[type.Index], token);
+        var bound = Bind(type, entry.Poses!, orientations[type.Index], token, firstIndex);
         lock (bands)
             entry.Members = bound;
         return bound;
@@ -533,11 +540,11 @@ internal sealed class BlockCatalog : IDisposable
 
     /// <summary>
     /// The certified poses as members relative to the first, each at the orientation of its
-    /// rotation, which is added to <paramref name="orientations"/> when missing; empty when one
-    /// cannot be made.
+    /// rotation, which is added to <paramref name="orientations"/> when missing, at
+    /// <paramref name="firstIndex"/> or above; empty when one cannot be made.
     /// </summary>
     private static IReadOnlyList<Placed> Bind(PartType type, NestJobPlacement[] poses, List<Orientation> orientations,
-        CancellationToken token)
+        CancellationToken token, int firstIndex = 0)
     {
         try
         {
@@ -545,7 +552,7 @@ internal sealed class BlockCatalog : IDisposable
             foreach (var pose in poses)
             {
                 token.ThrowIfCancellationRequested();
-                var orientation = OrientationAt(type, orientations, pose.Rotation);
+                var orientation = OrientationAt(type, orientations, pose.Rotation, firstIndex);
                 if (orientation == null)
                     return Array.Empty<Placed>();
                 result.Add(new Placed(orientation, pose.X - poses[0].X, pose.Y - poses[0].Y));
@@ -560,12 +567,14 @@ internal sealed class BlockCatalog : IDisposable
 
     /// <summary>The orientation at the rotation, made and added to <paramref name="orientations"/>
     /// when missing; null when it cannot be made.</summary>
-    private static Orientation? OrientationAt(PartType type, List<Orientation> orientations, double rotation)
+    private static Orientation? OrientationAt(PartType type, List<Orientation> orientations, double rotation,
+        int firstIndex)
     {
         var orientation = orientations.FirstOrDefault(o => o.Rotation == rotation);
         if (orientation != null)
             return orientation;
-        orientation = PartCatalog.CreateOrientation(type, orientations.Max(o => o.Index) + 1, rotation);
+        orientation = PartCatalog.CreateOrientation(type,
+            System.Math.Max(firstIndex, orientations.Max(o => o.Index) + 1), rotation);
         if (orientation != null)
             orientations.Add(orientation);
         return orientation;

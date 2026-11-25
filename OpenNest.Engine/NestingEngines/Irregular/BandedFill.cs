@@ -26,6 +26,9 @@ namespace OpenNest.Engine.NestingEngines.Irregular;
 /// A person nesting many copies of a few parts lays them out in tidy columns; a frontier packer
 /// placing one part at a time instead leaves every group's last column ragged and scatters the
 /// smallest parts into the gaps between groups.
+///
+/// Without <c>lowerBands</c> a type has only its full-height bands: about half the patterns to
+/// build, for a caller that packs a sheet again and again.
 /// </summary>
 internal sealed class BandedFill(
     IReadOnlyList<PartType> types,
@@ -35,7 +38,8 @@ internal sealed class BandedFill(
     Func<FrontierPacker> packer,
     Comparison<SheetFill> compare,
     WorkCounter counter,
-    long budget)
+    long budget,
+    bool lowerBands = true)
 {
     /// <summary>Fewest copies a band may hold back to be narrower; a third of them when more.</summary>
     private const int MaxHeldBack = 4;
@@ -539,7 +543,7 @@ internal sealed class BandedFill(
         var options = FullBands(t, copies, token);
         var shortest = ShortestSide(types[t]);
         var last = options.FirstOrDefault();
-        for (var i = 0; i < LowerHeights && last != null; i++)
+        for (var i = 0; lowerBands && i < LowerHeights && last != null; i++)
         {
             var height = Tall(last) - StepShort;
             // Nothing between the clear height and the full band's could sit past the clamps whole.

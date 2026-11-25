@@ -14,7 +14,7 @@ in `OpenNest.Engine/NestingEngines/<Name>/`, its tests in `OpenNest.Engine.Tests
 | Default | Any job; used when no engine is named | Runs Irregular, Rectangles and Circles, checks each layout with the layout check and keeps the best: valid first, then fewest unplaced parts, then lowest salvage-credited cost, then the largest compactness offcut; remaining ties keep the engine listed first here |
 | Rectangles | Plain and near-rectangular plates | Each part packed as the box of its material at its minimum-area rotation, using a maximal-rectangles free list; the sheet that finishes the job is also squeezed into a shorter or narrower bin; stock chosen sheet by sheet by salvage-credited look-ahead cost, and the whole job also run large parts first with the small parts filling their sheets' gaps |
 | Circles | Round parts: blanks, washers, flanges, gears by their tip circle | Each part packed as its minimum enclosing circle at centers tangent to two of walls, placed discs and clamp keep-outs, with hexagonal and square lattice seeds; bids only when every part is round; stock chosen as Rectangles does, plus whole-job runs preferring each stock and a tail re-plan |
-| Irregular | Irregular profiles | No-fit-polygon frontier packing with gap filling and best-fit pairs, six whole-job strategy variants (each also keeping a stock that finished the job when the per-sheet estimate passed it over for a plan that ended up dearer) and a tail re-plan, then large-first variants that pack each sheet's large parts before any small one, then grouped variants that pack like parts together, then a banded variant that packs each sheet in full-height strips, each group as its Lattice band or each strip from the largest parts down, then a sheet-reduction pass that packs edge parts first and turns a key part by its contacts, then a squeeze that packs the last sheet again, largest part first, in ever shorter strips; under a time limit it first reports a quick plan without Lattice blocks, and after its search keeps trying seeded variants until the limit |
+| Irregular | Irregular profiles | No-fit-polygon frontier packing with gap filling and best-fit pairs, six whole-job strategy variants (each also keeping a stock that finished the job when the per-sheet estimate passed it over for a plan that ended up dearer) and a tail re-plan, then large-first variants that pack each sheet's large parts before any small one, then grouped variants that pack like parts together, then a banded variant that packs each sheet in full-height strips, each group as its Lattice band or each strip from the largest parts down, with the last sheet of every plan it makes its best packed again as such bands, then a sheet-reduction pass that packs edge parts first and turns a key part by its contacts, then a squeeze that packs the last sheet again, largest part first, in ever shorter strips; under a time limit it first reports a quick plan without Lattice blocks, and after its search keeps trying seeded variants until the limit |
 | FlatBar | Flat bar: parts about as wide as the bar | Each stock read as a bar and cut in one row: the CutList cut-list packer and a best-fill search on part lengths less their self-nesting gain, then a slide-left pass that nests shaped ends and refills freed length; stock chosen bar by bar by whole-plan cost |
 | Lattice, Strip, Vertical Remnant, Horizontal Remnant | Many copies of a few parts | The fixed placement strategies behind interactive fill; Lattice is the multi-phase lattice fill (linear, pairs, rectangle best-fit, remainder; the pairs phase fills the strip its grid leaves with rows of pairs when they hold more than single parts, and also tiles herringbone pairs: the part turned so a hull edge lies along a sheet axis, nested into its own row, with every other row reversed), and the remnant strategies run it ranked to keep the largest drop. In whole jobs, all four place a plate with any fixed or bounded part rotation by the rotation-aware ordered placer instead |
 
@@ -112,7 +112,9 @@ returned layout. Reporting never changes the search: layouts are identical with 
 progress sink.
 
 - Irregular reports when a strategy variant, a grouped variant or a tail re-plan beats its best plan so far;
-  under a time limit it reports a quick plan before them (see [time limits](#time-limits)).
+  under a time limit it reports a quick plan before them (see [time limits](#time-limits)). It also
+  reports such a plan with its last sheet banded (see [last-sheet bands](#last-sheet-bands)) when
+  that beats every plan reported, and then skips the search's next best plans until one beats it.
 - Rectangles makes one sheet-by-sheet run, so it reports the finished job as its one plan.
 - Circles reports when a stock-preference run or a tail re-plan beats its best result so far.
 - Default scores each candidate plan as it ranks results (valid, fewest unplaced, lowest cost,
@@ -444,6 +446,36 @@ lower (two rows of nine and two copies turned across the top), flush to the top,
 and leaves a strip below it for the smaller leg's last two copies, ending the layout at 103.9. It
 starts while the work spent stays under three work budgets and replaces the result only by
 beating it, with its own tail re-plan.
+
+### Last-sheet bands
+
+The frontier packer is offered Lattice blocks only on an empty sheet and after its first
+placement, a type gets at most eight block preparations a solve, none once the work budget is
+spent, and the large-first and grouped variants prepare none. So the like parts that end a job,
+behind whatever else is on the last sheet, go down one copy at a time and end ragged, and the
+banded variant, which would lay them out as a person does, runs minutes later and replaces the
+plan only by beating all of it. Someone stopping the search on an early plan got that ragged
+sheet.
+
+So each time a plan becomes the best, and again after its tail re-plan, Irregular packs its last
+sheet again as bands (`BandedFill.Fill`): each type of three or more copies on it as its Lattice
+pattern in the narrowest full-height strip, the bands side by side in the best of the three
+orders, narrower bands tried in turn, the rest filling the gaps. Only full-height bands are
+searched (no lower bands, no strips), which takes about half the Lattice fills of the banded
+variant's sheet; a last sheet banded once is not banded again, and a plan the banded variant
+made only when its tail re-plan changes it. It needs a complete plan, a rectangular last sheet
+and a job of one priority.
+
+The banded sheet stays beside the search. The search keeps its own best plan and runs as without
+the pass, on the same work meter and Lattice catalogs: the pass has its own (its orientations
+are numbered apart, as no-fit polygons are kept per orientation). A plan with the banded sheet
+is reported when it beats every plan reported, and returned when the search ends without a plan
+that beats it, so a result is never worse for it.
+
+On the large-first job below, the nine-sheet plan reported 80 s into the solve ended its last
+sheet (six 43 x 6 strips, 27 small plates and 106 triangles on 48 x 144) at 120.8, the triangles
+scattered over the last 45 inches; banded 22 s later it ends at 114.6. The tail re-plan that
+follows moves those small plates and triangles to a 48 x 96 ending at 95.8, which bands to 76.4.
 
 ### Large-first variants
 
