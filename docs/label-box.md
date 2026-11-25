@@ -137,6 +137,11 @@ A `labelMode` number that names no choice (the reader accepts numbers) loads as 
   - Fit: on material a clearance inside every edge and hole, clear of every bend's band, of scribe
     and etch marks and break cuts, of the label box and of the letters placed before it. A bend
     with no such spot gets no letter.
+  - Sharing: a bend gets no letter of its own when one is already placed, for a bend parallel to
+    it (within 1°), within 12 inches (300 mm) of its line (`BendLabels.SharedReach`). Parallel
+    bends are in one group however the part is turned, so two bends an inch apart show one
+    letter, not two. Bends are taken in the drawing's order, so the earlier one carries it. A
+    bend at any other angle keeps its own letter, however close.
   - Each letter reads along its own bend line, turned at most a quarter so it is never upside
     down. Where they go depends only on the drawing (its cut geometry, bends and box), so every
     part of a drawing gets them in the same place; which letter each one is depends on the part's

@@ -17,7 +17,7 @@ namespace OpenNest.Labels
 
     /// <summary>
     /// The bend group letter etched beside each bend line, so a part whose bends fall in several
-    /// groups shows which bend is which (the label box only lists the groups).
+    /// groups shows which bend is which. Parallel bends close together share one letter.
     /// </summary>
     /// <remarks>
     /// Each letter sits in a circle on flat material just past the bend's radius band, never on
@@ -28,6 +28,16 @@ namespace OpenNest.Labels
     /// </remarks>
     public static class BendLabels
     {
+        // Bends within this angle of each other are parallel: always in one group, however the
+        // part is turned against the grain.
+        private static readonly double ParallelTolerance = Angle.ToRadians(1);
+
+        /// <summary>
+        /// How near a letter must be to a parallel bend's line for that bend to share it instead
+        /// of getting its own: 12 inches, or 300 mm.
+        /// </summary>
+        public static double SharedReach(Units units) => units == Units.Millimeters ? 300 : 12;
+
         /// <summary>
         /// A spot for each bend's letter that has room for one, in the frame of
         /// <paramref name="entities"/>, <paramref name="bends"/> and <paramref name="box"/> (the
@@ -41,7 +51,8 @@ namespace OpenNest.Labels
         /// the line and then the right; the first that fits is kept. A spot fits on material a
         /// clearance inside every edge, clear of every bend's band, of scribe marks and break
         /// cuts, of the label box and of the letters placed before it. A bend with no such spot
-        /// gets none.
+        /// gets none. Neither does a bend with a letter already placed for a parallel bend within
+        /// <see cref="SharedReach"/> of its line: the two are always in one group, so they share it.
         /// </remarks>
         public static List<BendLabelSpot> Place(IEnumerable<Entity> entities, IReadOnlyList<Bend> bends, LabelBox box,
             Units units = Units.Inches)
@@ -81,10 +92,15 @@ namespace OpenNest.Labels
 
             // Where a circle's center may be, per size: the free region eroded by its radius.
             var centers = new PathsD[sizes.Count];
+            var reach = SharedReach(units);
             for (var index = 0; index < bends.Count; index++)
             {
                 var bend = bends[index];
                 if (!IsBend(bend))
+                    continue;
+
+                // A parallel bend's letter close by says this bend's group too.
+                if (spots.Any(s => Parallel(bends[s.Bend], bend) && DistanceTo(bend, s.Center) <= reach))
                     continue;
 
                 var length = bend.Length;
@@ -212,6 +228,23 @@ namespace OpenNest.Labels
             PartLabels.Append(program, Strokes(drawing, spots, partRotation, grainAngle));
 
         private static bool IsBend(Bend bend) => bend != null && bend.Length > Tolerance.Epsilon;
+
+        // Undirected: a line and its reverse are parallel.
+        private static bool Parallel(Bend a, Bend b)
+        {
+            var between = System.Math.Abs(System.Math.IEEERemainder(a.LineAngle - b.LineAngle, System.Math.PI));
+            return between <= ParallelTolerance;
+        }
+
+        // The distance from a point to the nearest point of a bend's line segment.
+        private static double DistanceTo(Bend bend, Vector point)
+        {
+            var dx = bend.EndPoint.X - bend.StartPoint.X;
+            var dy = bend.EndPoint.Y - bend.StartPoint.Y;
+            var along = ((point.X - bend.StartPoint.X) * dx + (point.Y - bend.StartPoint.Y) * dy) / (dx * dx + dy * dy);
+            along = System.Math.Clamp(along, 0, 1);
+            return point.DistanceTo(new Vector(bend.StartPoint.X + dx * along, bend.StartPoint.Y + dy * along));
+        }
 
         // Half the width kept clear along a bend line: the clearance, or half the arc the bend
         // rolls the material through when that is wider, so the letter stays on flat material.

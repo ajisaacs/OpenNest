@@ -160,6 +160,51 @@ public class BendLabelTests
     }
 
     [Fact]
+    public void ParallelBendsCloseTogether_ShareOneLetter()
+    {
+        // An inch apart, as on a channel's two flanges: the first bend's letter says both.
+        var near = new List<Bend> { Bend(2, 5, 28, 5), Bend(2, 6, 28, 6) };
+        var shared = Assert.Single(BendLabels.Place(Rectangle(0, 0, 30, 30), near, null));
+        Assert.Equal(0, shared.Bend);
+
+        // Running the other way is still parallel.
+        var reversed = new List<Bend> { Bend(2, 5, 28, 5), Bend(28, 6, 2, 6) };
+        Assert.Single(BendLabels.Place(Rectangle(0, 0, 30, 30), reversed, null));
+
+        // Past twelve inches from the letter, the second bend gets its own.
+        var far = new List<Bend> { Bend(2, 5, 28, 5), Bend(2, 25, 28, 25) };
+        Assert.Equal([0, 1], BendLabels.Place(Rectangle(0, 0, 30, 30), far, null).Select(s => s.Bend));
+
+        // So does a parallel bend in line with the first but far along it.
+        var inLine = new List<Bend> { Bend(2, 5, 8, 5), Bend(40, 5, 46, 5) };
+        Assert.Equal([0, 1], BendLabels.Place(Rectangle(0, 0, 48, 30), inLine, null).Select(s => s.Bend));
+    }
+
+    [Fact]
+    public void ABendAtAnotherAngle_KeepsItsOwnLetter_HoweverClose()
+    {
+        // The slanted bend lies between two parallel ones: it may be another group.
+        var bends = new List<Bend> { Bend(2, 5, 28, 5), Bend(2, 7, 28, 9), Bend(2, 12, 28, 12) };
+
+        var spots = BendLabels.Place(Rectangle(0, 0, 30, 30), bends, null);
+
+        Assert.Equal([0, 1], spots.Select(s => s.Bend));
+    }
+
+    [Fact]
+    public void SharedReach_IsTwelveInchesOrThreeHundredMillimeters()
+    {
+        Assert.Equal(12, BendLabels.SharedReach(Units.Inches));
+        Assert.Equal(300, BendLabels.SharedReach(Units.Millimeters));
+
+        // 200 mm apart shares; 400 mm apart does not.
+        var near = new List<Bend> { Bend(50, 100, 700, 100), Bend(50, 300, 700, 300) };
+        Assert.Single(BendLabels.Place(Rectangle(0, 0, 750, 750), near, null, Units.Millimeters));
+        var far = new List<Bend> { Bend(50, 100, 700, 100), Bend(50, 500, 700, 500) };
+        Assert.Equal(2, BendLabels.Place(Rectangle(0, 0, 750, 750), far, null, Units.Millimeters).Count);
+    }
+
+    [Fact]
     public void NothingToPlace_IsEmpty()
     {
         var bend = Bend(5, 0, 5, 5);
