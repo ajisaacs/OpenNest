@@ -155,8 +155,8 @@ the final replay enforce them:
   obstacles or unexplained open fragments.
 - [Slug slices](support-tabs.md#slug-slices) (`CuttingParameters.SliceTippingSlugs`) are break
   cuts capture adds inside each cutout whose slug the plate's support bed cannot hold level,
-  along the bed's contact lines and a kerf short of the cutout. Every full and prefix emission
-  cuts them right after the drawing's break cuts, pierced on themselves; the open-cut proof leaves
+  along the bed's slice lines and a kerf short of the cutout. Every emission cuts a
+  cutout's slices directly before that cutout, pierced on themselves; the open-cut proof leaves
   out those wholly inside one of the part's closed holes.
 - A drawing's tabbed cutouts (closed holes with `LayerType.Tab` spans, see
   [tabbed cutouts](tabbed-cutouts.md)) are material but not contour choices. Every full

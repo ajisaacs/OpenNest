@@ -57,9 +57,10 @@ public sealed class PreparedContours
     // Closed cutouts with tab spans, in program order. Like break cuts they are not choices:
     // every full or prefix emission cuts their pieces after the break cuts.
     private readonly List<Shape> tabbedCutouts;
-    // Slices of the slugs the support bed cannot hold level, in cutting order: open cuts inside
-    // their cutouts, cut right after the break cuts so every slug is sliced before its cutout.
-    private readonly IReadOnlyList<SlugSlice> slugSlices;
+    // Slices of the slugs the support bed cannot hold level, by contour ordinal (null where there
+    // are none; the whole list null without any), each cutout's in cutting order: open cuts
+    // inside the cutout, cut directly before it.
+    private readonly IReadOnlyList<IReadOnlyList<SlugSlice>> slugSlices;
     // Pierce-zone resolutions by contour, shared with every copy: the contours are the same by ordinal.
     private readonly PierceZoneMemo pierceZones;
     // By contour ordinal; all null without pins. A pinned contour has exactly one entry and
@@ -89,9 +90,9 @@ public sealed class PreparedContours
 
     private PreparedContours(Shape[] shapes, List<Entity> scribes, List<Shape> breakCuts, List<Shape> tabbedCutouts,
         CuttingParameters parameters, Shape displayOutline, PierceZoneMemo pierceZones = null,
-        CommonLinePerimeter commonLine = null, IReadOnlyList<SlugSlice> slugSlices = null)
+        CommonLinePerimeter commonLine = null, IReadOnlyList<IReadOnlyList<SlugSlice>> slugSlices = null)
     {
-        this.slugSlices = slugSlices ?? Array.Empty<SlugSlice>();
+        this.slugSlices = slugSlices;
         this.pierceZones = pierceZones ?? new PierceZoneMemo();
         this.displayOutline = displayOutline;
         this.commonLine = commonLine;
@@ -210,7 +211,7 @@ public sealed class PreparedContours
     }
 
     // A copy that slices slugs; everything else, pins and support analysis included, is kept.
-    private PreparedContours(PreparedContours source, IReadOnlyList<SlugSlice> slices)
+    private PreparedContours(PreparedContours source, IReadOnlyList<IReadOnlyList<SlugSlice>> slices)
         : this(source.shapes, source.scribes, source.breakCuts, source.tabbedCutouts, source.parameters,
             source.displayOutline, source.pierceZones, source.commonLine, slices)
     {
@@ -228,9 +229,9 @@ public sealed class PreparedContours
     /// <summary>
     /// A copy that slices the slug of each cutout <paramref name="bed"/> cannot hold level
     /// (<see cref="SlugSlicer.Tips"/>), with the part placed at <paramref name="location"/> on a
-    /// sheet in <paramref name="quadrant"/>, along the bed's contact lines, each slice stopping the
-    /// kerf short of its cutout (docs/support-tabs.md#slug-slices). Every full or prefix emission
-    /// cuts the slices right after the break cuts, so each slug is sliced before its cutout.
+    /// sheet in <paramref name="quadrant"/>, along the bed's slice lines, each slice stopping the
+    /// kerf short of its cutout (docs/support-tabs.md#slug-slices). Every emission cuts a cutout's
+    /// slices directly before that cutout, so its slug is sliced and then dropped in one visit.
     /// A cutout that holds another of this part's cuts, or whose box holds one of
     /// <paramref name="otherParts"/> (world boxes of the plate's other parts), is not sliced:
     /// a slice would cut what is nested in it. Without a bed or a kerf, or with nothing to slice,
@@ -249,7 +250,7 @@ public sealed class PreparedContours
         var clearance = parameters.GetEffectivePierceClearance();
         var reach = System.Math.Max(clearance,
             ContourCuttingStrategy.CommonLineLeadInReach(parameters.InternalLeadIn ?? new NoLeadIn()));
-        var slices = new List<SlugSlice>();
+        var slices = new IReadOnlyList<SlugSlice>[Count];
         for (var ordinal = 0; ordinal < PerimeterOrdinal; ordinal++)
         {
             token.ThrowIfCancellationRequested();
@@ -262,9 +263,11 @@ public sealed class PreparedContours
             if (EnclosesOtherCuts(ordinal, polygon)
                 || !SlugSlicer.Tips(bed, quadrant, SupportMaterial.FromPolygons(polygon.Vertices.Select(v => v + location))))
                 continue;
-            slices.AddRange(SlugSlicer.Slices(bed, quadrant, polygon.Vertices, location, standoff, reach, clearance));
+            var cuts = SlugSlicer.Slices(bed, quadrant, polygon.Vertices, location, standoff, reach, clearance);
+            if (cuts.Count > 0)
+                slices[ordinal] = cuts;
         }
-        return slices.Count == 0 ? this : new PreparedContours(this, slices.AsReadOnly());
+        return slices.All(cuts => cuts == null) ? this : new PreparedContours(this, slices);
     }
 
     // Whether another contour, break cut or tabbed cutout of this part lies inside the cutout.
@@ -279,8 +282,9 @@ public sealed class PreparedContours
         }));
     }
 
-    /// <summary>The slug slices this preparation cuts after its break cuts and before its contours.</summary>
-    public IReadOnlyList<SlugSlice> SlugSlices => slugSlices;
+    /// <summary>The slug slices this preparation cuts directly before contour <paramref name="contourOrdinal"/>.</summary>
+    public IReadOnlyList<SlugSlice> SlugSlicesFor(int contourOrdinal) =>
+        slugSlices?[contourOrdinal] ?? Array.Empty<SlugSlice>();
 
     /// <summary>
     /// The analysis of a part its support bed cannot hold level (see <see cref="WithSupportTab"/>),

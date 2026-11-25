@@ -94,7 +94,7 @@ namespace OpenNest.CNC.CuttingStrategy
 
         /// <summary>
         /// Slices the slug of each cutout its plate's support bed cannot hold level along the
-        /// bed's contact lines before the cutout is cut, so the slug drops as pieces between the
+        /// bed's slice lines before the cutout is cut, so the slug drops as pieces between the
         /// supports instead of tipping (see docs/support-tabs.md#slug-slices). Each slice stops
         /// <see cref="Kerf"/> short of the cutout, so nothing is sliced without a kerf.
         /// </summary>

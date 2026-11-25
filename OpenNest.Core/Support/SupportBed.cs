@@ -13,10 +13,10 @@ namespace OpenNest.Support
     /// slats imported from a CAD layout can follow as further subclasses.
     /// </summary>
     /// <summary>
-    /// A line a support bed's contacts lie on: along X at Y = <see cref="At"/> when
+    /// A line a support bed's slugs are sliced along: along X at Y = <see cref="At"/> when
     /// <see cref="AlongX"/>, else along Y at X = <see cref="At"/> (world coordinates).
     /// </summary>
-    public readonly record struct ContactLine(bool AlongX, double At);
+    public readonly record struct SliceLine(bool AlongX, double At);
 
     public abstract class SupportBed : IEquatable<SupportBed>
     {
@@ -54,12 +54,12 @@ namespace OpenNest.Support
             bool extremesOnly = false);
 
         /// <summary>
-        /// The straight lines every contact lies on across <paramref name="region"/> (world
-        /// coordinates) on a sheet in <paramref name="quadrant"/>: a grid's rows and columns, a
-        /// slat's center line. Material cut along all of them keeps no contact, so it drops
-        /// between the supports (see <see cref="SlugSlicer"/>).
+        /// The straight lines a slug is sliced along across <paramref name="region"/> (world
+        /// coordinates) on a sheet in <paramref name="quadrant"/> (see <see cref="SlugSlicer"/>):
+        /// a grid's lines midway between its rows and columns of points, so no slice cuts over a
+        /// point, or a slat's center line.
         /// </summary>
-        public abstract IReadOnlyList<ContactLine> ContactLines(Box region, int quadrant);
+        public abstract IReadOnlyList<SliceLine> SliceLines(Box region, int quadrant);
 
         /// <summary>This layout with every length multiplied by <paramref name="factor"/> (a unit change).</summary>
         public abstract SupportBed Scaled(double factor);

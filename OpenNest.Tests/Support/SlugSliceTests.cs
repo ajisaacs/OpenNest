@@ -11,7 +11,8 @@ namespace OpenNest.Tests.Support;
 
 /// <summary>
 /// Slug slices (docs/support-tabs.md#slug-slices): the slug of a cutout its support bed cannot
-/// hold level is cut along the bed's contact lines, a kerf short of the cutout, before the cutout.
+/// hold level is cut along the bed's slice lines (between a grid's points, never over them), a
+/// kerf short of the cutout, before the cutout.
 /// </summary>
 public class SlugSliceTests
 {
@@ -65,18 +66,20 @@ public class SlugSliceTests
     }
 
     [Fact]
-    public void ContactLines_AreTheGridsRowsAndColumnsAndTheSlatsCenters()
+    public void SliceLines_AreMidwayBetweenTheGridsPointsAndOnTheSlatsCenters()
     {
         var region = new Box(3, 3.5, 8, 1);
 
-        var grid = Bed.ContactLines(region, 1);
-        var slats = new SupportSlats(SlatAxis.Y, 3, 0.25, offset: 1.5).ContactLines(region, 1);
-        var mirrored = new SupportGrid(2, 2, 1, 0).ContactLines(new Box(-5, 0, 2, 1), 2);
+        var grid = Bed.SliceLines(region, 1);
+        var slats = new SupportSlats(SlatAxis.Y, 3, 0.25, offset: 1.5).SliceLines(region, 1);
+        var mirrored = new SupportGrid(2, 2, 1, 0).SliceLines(new Box(-5, 0, 2, 1), 2);
 
-        Assert.Equal([new(true, 4), new(false, 4), new(false, 6), new(false, 8), new(false, 10)], grid);
+        // Points at even X and Y: no row midline (Y = 3 or 5) crosses the region, column midlines do.
+        Assert.Equal([new(false, 3), new(false, 5), new(false, 7), new(false, 9), new(false, 11)], grid);
         Assert.Equal([new(false, 4.5), new(false, 7.5), new(false, 10.5)], slats);
-        // A sheet in quadrant 2 sees the grid's X offset mirrored: columns at -1, -3, -5, ...
-        Assert.Equal([new(true, 0), new(false, -5), new(false, -3)], mirrored);
+        // A sheet in quadrant 2 sees the grid's X offset mirrored: columns at -1, -3, -5, ..., so
+        // the midlines are at even X; rows at even Y, midlines at odd Y.
+        Assert.Equal([new(true, 1), new(false, -4)], mirrored);
     }
 
     [Fact]
@@ -94,18 +97,16 @@ public class SlugSliceTests
     }
 
     [Fact]
-    public void Slices_RunAlongTheContactLinesAKerfShortOfTheCutout()
+    public void Slices_RunBetweenTheGridPointsAKerfShortOfTheCutout()
     {
         var slices = SlugSlicer.Slices(Bed, 1, Slot, Location, Kerf, reach: 0.3, pierceClearance: 0.05);
 
-        // The row at world Y = 4 left to right, then the columns from X = 10 back to 4, back and forth.
-        Assert.Equal(5, slices.Count);
-        var row = slices[0];
-        Assert.Equal(3, row.Start.Y, 9);
-        Assert.Equal(3, row.End.Y, 9);
-        Assert.True(row.End.X > row.Start.X);
-        Assert.Equal([9, 7, 5, 3], slices.Skip(1).Select(s => System.Math.Round(s.Start.X, 9)));
-        for (var i = 2; i < slices.Count; i++)
+        // The grid's points are at even world X and Y. No row midline crosses the slot; the column
+        // midlines at world X = 5, 7 and 9 do (3 and 11 are its ends), cut back and forth.
+        Assert.Equal(3, slices.Count);
+        Assert.Equal([4, 6, 8], slices.Select(s => System.Math.Round(s.Start.X, 9)));
+        Assert.All(slices, s => Assert.Equal(s.Start.X, s.End.X, 9));
+        for (var i = 1; i < slices.Count; i++)
             Assert.NotEqual(slices[i - 1].End.Y > slices[i - 1].Start.Y, slices[i].End.Y > slices[i].Start.Y);
         foreach (var slice in slices)
         {
@@ -143,9 +144,12 @@ public class SlugSliceTests
         Assert.Empty(result.Findings);
         var motions = Motions(Assert.Single(result.ProposedOrder));
         var slices = motions.Where(m => !m.Rapid && m.Layer == LayerType.Break).ToList();
-        Assert.Equal(5, slices.Count);
+        Assert.Equal(3, slices.Count);
         foreach (var slice in slices)
         {
+            // Midway between the grid's columns of points (even X), so never over a point.
+            Assert.Equal(1, System.Math.Abs(slice.Curve.Start.X % 2), 9);
+            Assert.Equal(slice.Curve.Start.X, slice.Curve.End.X, 9);
             Assert.InRange(DistanceToSlot(slice.Curve.Start), Kerf - 1e-9, 1);
             Assert.InRange(DistanceToSlot(slice.Curve.End), Kerf - 1e-9, 1);
         }
@@ -158,6 +162,35 @@ public class SlugSliceTests
         var review = PostVerificationAnalyzer.Analyze(nest).Findings;
         Assert.DoesNotContain(review, f => f.Kind is PostVerificationKind.Incomplete or PostVerificationKind.RapidCrossing
             or PostVerificationKind.MissingLeadIn or PostVerificationKind.FixedLead or PostVerificationKind.PierceZone);
+    }
+
+    [Fact]
+    public void PlanCutting_CutsEachSlugsSlicesDirectlyBeforeItsCutout()
+    {
+        // Two slots, each on one row of contacts: neither may be left sliced while the other is cut.
+        var program = LeadPathValidationTests.Rectangle(0, 0, 12, 12);
+        program.Codes.AddRange(LeadPathValidationTests.Rectangle(2, 2.5, 10, 3.5).Codes);
+        program.Codes.AddRange(LeadPathValidationTests.Rectangle(2, 6.5, 10, 7.5).Codes);
+        var (_, plate, _) = Plate(Parameters(), new Drawing("two slots", program));
+
+        var result = CuttingPlanService.Plan(CuttingPlanRequest.ForPlate(plate, Vector.Zero,
+            confirmedParameters: Parameters()));
+
+        Assert.True(result.Status == CuttingPlanStatus.Ready, string.Join("\n", result.Findings.Select(f => f.Message)));
+        // Each cut in order, by the slot it is in: slices (break cuts) and the slot's own sides.
+        static int SlotOf(ExecutionMotion m) => m.End.Y is > 3 and < 5 ? 0 : m.End.Y is > 7 and < 9 ? 1 : -1;
+        var cuts = Motions(Assert.Single(result.ProposedOrder))
+            .Where(m => !m.Rapid && SlotOf(m) >= 0 && m.Layer is LayerType.Break or LayerType.Cut or LayerType.Display)
+            .Select(m => (Slot: SlotOf(m), Slice: m.Layer == LayerType.Break))
+            .ToList();
+        Assert.Equal(6, cuts.Count(c => c.Slice));
+        // One slot's slices, then that slot, then the other's slices, then the other slot.
+        var runs = cuts.Where((c, i) => i == 0 || c != cuts[i - 1]).ToList();
+        Assert.Equal(4, runs.Count);
+        Assert.True(runs[0].Slice && !runs[1].Slice && runs[2].Slice && !runs[3].Slice);
+        Assert.Equal(runs[0].Slot, runs[1].Slot);
+        Assert.Equal(runs[2].Slot, runs[3].Slot);
+        Assert.NotEqual(runs[0].Slot, runs[2].Slot);
     }
 
     [Theory]

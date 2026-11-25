@@ -264,19 +264,21 @@ namespace OpenNest.CNC.CuttingStrategy
 
         /// <param name="contourParameters">Per-contour settings by contour ordinal (a drawing pin's
         /// own lead-in, lead-out and tab); a null list or entry uses <see cref="Parameters"/>.</param>
+        /// <param name="slugSlices">Slug slices by contour ordinal, cut directly before their
+        /// contour; a null list or entry has none.</param>
         internal Program EmitPrepared(Shape[] shapes, List<Entity> scribes,
             IReadOnlyList<CuttingPlanning.ContourChoice> choices,
             IReadOnlyList<CuttingParameters> contourParameters = null, IReadOnlyList<Shape> breakCuts = null,
             IReadOnlyList<Shape> tabbedCutouts = null, int? perimeterOrdinal = null, Shape displayTail = null,
-            CuttingPlanning.CommonLinePerimeter commonLine = null, IReadOnlyList<Support.SlugSlice> slugSlices = null)
+            CuttingPlanning.CommonLinePerimeter commonLine = null,
+            IReadOnlyList<IReadOnlyList<Support.SlugSlice>> slugSlices = null)
         {
             var result = new Program(Mode.Absolute);
             EmitBreakCuts(result, breakCuts, shapes);
-            EmitSlugSlices(result, slugSlices);
             foreach (var cutout in tabbedCutouts ?? Array.Empty<Shape>())
                 EmitTabbedCutout(result, cutout);
             EmitChosenContours(result, shapes, choices, contourParameters, perimeterOrdinal ?? shapes.Length - 1,
-                commonLine);
+                commonLine, slugSlices);
             if (displayTail != null)
             {
                 // Display only, after every cut: executed reads and posts stop at its marker.
@@ -311,7 +313,8 @@ namespace OpenNest.CNC.CuttingStrategy
         // prior choices â€” the differential tests in ContourCandidateEmissionTests pin this.
         private void EmitChosenContours(Program result, Shape[] shapes,
             IReadOnlyList<CuttingPlanning.ContourChoice> choices, IReadOnlyList<CuttingParameters> contourParameters,
-            int perimeterOrdinal, CuttingPlanning.CommonLinePerimeter commonLine = null)
+            int perimeterOrdinal, CuttingPlanning.CommonLinePerimeter commonLine = null,
+            IReadOnlyList<IReadOnlyList<Support.SlugSlice>> slugSlices = null)
         {
             var shared = Parameters;
             try
@@ -355,6 +358,9 @@ namespace OpenNest.CNC.CuttingStrategy
                     Parameters = contourParameters?[choice.ContourOrdinal] ?? shared;
                     var shape = shapes[choice.ContourOrdinal];
                     var arrival = result.Codes.Count;
+                    // A cutout's slug is sliced directly before the cutout, so the head arrives
+                    // at its first slice.
+                    EmitSlugSlices(result, slugSlices?[choice.ContourOrdinal]);
                     var leftInSlug = EmitContour(result, shape, choice.Point, shape.Entities[choice.EntityOrdinal],
                         choice.ContourOrdinal == perimeterOrdinal ? ContourType.External : null,
                         exactCirclePrograms: true, scrapPierce: choice.Pierce,

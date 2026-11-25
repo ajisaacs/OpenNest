@@ -205,16 +205,17 @@ A cutout's slug drops onto the bed too, and one the bed cannot hold level can ti
 head's path. Cutting Parameters > Cutouts > "Slice slugs the support grid can't hold level" sets
 `CuttingParameters.SliceTippingSlugs` (off by default, kept per machine thickness like every
 cutting setting, and written to settings and nest files only when on). With it on and a support
-bed, Plan Cutting cuts each such slug into pieces that hold no contact before it cuts the cutout,
-so the pieces drop between the supports (or lie flat across them) instead of tipping.
+bed, Plan Cutting cuts each such slug into pieces before it cuts the cutout, so the pieces drop
+between the supports instead of the whole slug tipping.
 
 - Which slugs: `SlugSlicer.Tips` analyzes the cutout's inside as material on the bed (as above,
   at the part's placed position). A slug the bed holds level is not sliced, and nor is one that
   rests on no contact, which falls through whole.
-- Where: along every line the bed's contacts lie on (`SupportBed.ContactLines`): the grid's rows
-  and columns through its points, a slat bed's slat center lines. Every contact under the slug is
-  then under a slice's kerf, so no piece rests on one: a grid's pieces are its cells, a slat bed's
-  are strips between slats.
+- Where: along the bed's slice lines (`SupportBed.SliceLines`). A grid's are midway between its
+  rows and between its columns of points, so no slice cuts over a point and into the grid: each
+  piece is at most one pitch square on a single point, which cannot hold it, so it drops off. A
+  slug no midline crosses (smaller than a pitch, between two of them) is left whole. A slat bed's
+  are its slat center lines, so its pieces are strips between slats that rest on no slat.
 - How far: each slice stops `CuttingParameters.Kerf` short of the cutout (measured from the
   cutout chorded at 0.001, eroded with round corners), so the pieces stay attached to the part
   until the cutout itself is cut, its kerf meets the slices' ends and they all drop together. No
@@ -224,8 +225,9 @@ so the pieces drop between the supports (or lie flat across them) instead of tip
   slice would cut what is inside. Tabbed cutouts keep their slugs, so they are never sliced.
 - Cutting: the slices are break cuts (`LayerType.Break`) inside the slug: never material, never
   rapid obstacles, cut by every post that cuts break cuts. `PreparedContours.WithSlugSlices` keeps
-  them in cutting order, and every full or prefix emission cuts them right after the drawing's
-  own break cuts and before any contour, so every slug is sliced before its cutout. The grid's
+  each cutout's in cutting order, and every emission cuts them directly before that cutout, so
+  a slug is sliced and dropped in one visit and never left sliced while the head cuts elsewhere.
+  The grid's
   rows come first, then its columns, each set from its end nearer the last slice, every slice
   started at its end nearer where the one before ended. Each is pierced on itself, the cutouts'
   lead-in reach (but at least the pierce clearance, and at most halfway) along it, and led
@@ -238,8 +240,8 @@ so the pieces drop between the supports (or lie flat across them) instead of tip
   of it: what it encloses is that hole's slug. Break cuts in material still take part in the proof.
 
 The hole's own lead-in is chosen as usual and may pierce in a slice's kerf or a piece already
-dropped. Slices are planned for the nominal bed: a sheet registered off by up to its tolerance can
-leave a contact just inside a piece's edge.
+dropped. Slices are planned for the nominal bed: on slats, a sheet registered off by up to its
+tolerance can leave a contact just inside a piece's edge.
 
 ## Lead-ins placed by hand
 

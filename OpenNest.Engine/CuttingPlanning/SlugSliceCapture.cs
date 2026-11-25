@@ -8,7 +8,7 @@ namespace OpenNest.Engine.CuttingPlanning;
 /// <summary>
 /// Capture-time slug slices for one regenerated part (docs/support-tabs.md#slug-slices): with
 /// <see cref="CNC.CuttingStrategy.CuttingParameters.SliceTippingSlugs"/> on and a support bed,
-/// the slug of each cutout the bed cannot hold level is sliced along the bed's contact lines
+/// the slug of each cutout the bed cannot hold level is sliced along the bed's slice lines
 /// before the cutout is cut (<see cref="PreparedContours.WithSlugSlices"/>).
 /// </summary>
 internal static class SlugSliceCapture

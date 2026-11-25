@@ -15,11 +15,12 @@ namespace OpenNest.Support
 
     /// <summary>
     /// Slices for the slug of a cutout its support bed cannot hold level (see
-    /// docs/support-tabs.md#slug-slices). The slug is cut along every line the bed's contacts lie
-    /// on (<see cref="SupportBed.ContactLines"/>), so each piece keeps no contact and drops between
-    /// the supports once the cutout is cut, instead of tipping. Each slice stops a standoff (the
-    /// kerf) short of the cutout, so the pieces stay attached until the cutout itself is cut and
-    /// no slice reaches the part.
+    /// docs/support-tabs.md#slug-slices). The slug is cut along the bed's slice lines
+    /// (<see cref="SupportBed.SliceLines"/>): midway between a grid's points, so no slice cuts
+    /// into the grid and each piece, on one point at most, drops off it instead of tipping up as
+    /// a whole; along a slat bed's center lines, so the strips drop between the slats. Each slice
+    /// stops a standoff (the kerf) short of the cutout, so the pieces stay attached until the
+    /// cutout itself is cut and no slice reaches the part.
     /// </summary>
     public static class SlugSlicer
     {
@@ -40,7 +41,7 @@ namespace OpenNest.Support
 
         /// <summary>
         /// The slices of the slug inside <paramref name="hole"/> (a closed polygon in the part's
-        /// local coordinates; world = local + <paramref name="location"/>), along the contact lines
+        /// local coordinates; world = local + <paramref name="location"/>), along the slice lines
         /// of <paramref name="bed"/> on a sheet in <paramref name="quadrant"/>. Each slice keeps at
         /// least <paramref name="standoff"/> from the hole, is longer than it, and is pierced
         /// <paramref name="reach"/> along itself from its start (at most halfway) where the pierce
@@ -73,7 +74,7 @@ namespace OpenNest.Support
 
             var bounds = Bounds(ring);
             var world = new Box(bounds.Left + location.X, bounds.Bottom + location.Y, bounds.Length, bounds.Width);
-            var lines = bed.ContactLines(world, quadrant);
+            var lines = bed.SliceLines(world, quadrant);
             // Each line's pieces inside the eroded hole, local; lines that miss it are dropped.
             var groups = new[] { true, false }.Select(alongX => lines
                     .Where(line => line.AlongX == alongX)
@@ -113,9 +114,9 @@ namespace OpenNest.Support
             return slices;
         }
 
-        // The pieces of one contact line inside the eroded hole, local, low to high, each longer
+        // The pieces of one slice line inside the eroded hole, local, low to high, each longer
         // than the standoff.
-        private static List<(Vector A, Vector B)> Segments(PathsD eroded, ContactLine line, Vector location,
+        private static List<(Vector A, Vector B)> Segments(PathsD eroded, SliceLine line, Vector location,
             double standoff)
         {
             var at = line.At - (line.AlongX ? location.Y : location.X);

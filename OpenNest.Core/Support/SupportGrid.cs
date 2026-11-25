@@ -91,19 +91,23 @@ namespace OpenNest.Support
             return points;
         }
 
-        /// <summary>Every row and column of contacts that crosses <paramref name="region"/>.</summary>
-        public override IReadOnlyList<ContactLine> ContactLines(Box region, int quadrant)
+        /// <summary>
+        /// Every line midway between two neighboring rows or columns of points that crosses
+        /// <paramref name="region"/>: a cut along one stays half a pitch from every point, so it
+        /// never cuts into the grid.
+        /// </summary>
+        public override IReadOnlyList<SliceLine> SliceLines(Box region, int quadrant)
         {
             ArgumentNullException.ThrowIfNull(region);
-            var lines = new List<ContactLine>();
-            var baseX = SignX(quadrant) * OffsetX;
-            var baseY = SignY(quadrant) * OffsetY;
+            var lines = new List<SliceLine>();
+            var baseX = SignX(quadrant) * OffsetX + PitchX / 2;
+            var baseY = SignY(quadrant) * OffsetY + PitchY / 2;
             for (var row = System.Math.Ceiling((region.Bottom - baseY) / PitchY);
                  row <= System.Math.Floor((region.Top - baseY) / PitchY); row++)
-                lines.Add(new ContactLine(true, baseY + row * PitchY));
+                lines.Add(new SliceLine(true, baseY + row * PitchY));
             for (var column = System.Math.Ceiling((region.Left - baseX) / PitchX);
                  column <= System.Math.Floor((region.Right - baseX) / PitchX); column++)
-                lines.Add(new ContactLine(false, baseX + column * PitchX));
+                lines.Add(new SliceLine(false, baseX + column * PitchX));
             return lines;
         }
 
