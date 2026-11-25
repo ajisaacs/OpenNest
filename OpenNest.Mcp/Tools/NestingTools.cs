@@ -31,6 +31,7 @@ namespace OpenNest.Mcp.Tools
             + "Irregular: irregular profiles; no-fit-polygon packing into notches and gaps, best-fit pairs. "
             + "Rectangles: plain and near-rectangular parts; packs each part as its bounding box, fastest. "
             + "Circles: round parts (blanks, washers, flanges); packs each part as its enclosing circle; places nothing when any part is not round. "
+            + "Raster: a fast first plan of irregular parts, packed on a fine grid; not run by Default. "
             + "FlatBar: flat bar, parts about as wide as the bar; each stock cut as one row of parts along its length, shaped ends nested together; not run by Default. "
             + "Lattice: many copies of few drawings; lattice fill with pairs and rectangle best-fit. "
             + "Strip: Lattice variant laying mixed drawings in strips. "
