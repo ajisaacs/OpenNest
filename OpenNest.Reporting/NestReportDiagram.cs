@@ -7,8 +7,10 @@ namespace OpenNest.Reporting;
 /// <summary>
 /// A part ID label in canvas-local page coordinates (Y down). A label set beside a part too thin
 /// to hold it has a leader <see cref="Anchor"/> on the part's material.
+/// <see cref="Backed"/> labels get a white box: those that overhang their outline, sit off the part or
+/// label a group. One clear inside its material or a hole is drawn bare, over the part's own fill.
 /// </summary>
-internal sealed record DiagramLabel(int Part, string Id, XRect Box, XPoint? Anchor = null);
+internal sealed record DiagramLabel(int Part, string Id, XRect Box, XPoint? Anchor = null, bool Backed = true);
 
 /// <summary>A dotted group boundary and its shared ID, in canvas coordinates.</summary>
 internal sealed record DiagramGroup(IReadOnlyList<int> Parts, XRect Boundary, DiagramLabel Label);
@@ -377,7 +379,7 @@ internal static class NestReportDiagram
             var test = ModelBox(fit, padded);
             if (canvas.Holds(box) && !placed.Any(label => label.Box.IntersectsWith(box))
                 && !obstacles.Any(shape => shape.Crosses(test)))
-                placed.Add(new DiagramLabel(index, id, box));
+                placed.Add(new DiagramLabel(index, id, box, Backed: false));
             else
                 failed.Add(index);
         }
@@ -397,7 +399,7 @@ internal static class NestReportDiagram
                 new XPoint(area.X + area.Width / 2, area.Y + area.Height / 2));
             if (spot is not { } found)
                 continue;
-            placed.Add(new DiagramLabel(index, id, found));
+            placed.Add(new DiagramLabel(index, id, found, Backed: false));
             failed.Remove(index);
         }
 

@@ -128,7 +128,10 @@ the weight of one part and of all nested copies, required and nested counts,
 and its plates. A shortage (**SHORT n**, in red) or extra (**EXTRA n**) sits
 beside the ID; complete drawings show no status. Cards without a weight show
 "-" with a note under the Parts heading saying what is missing. A card row is
-a table row, so a card never splits across pages.
+a one-row table, so a card never splits across pages, and the thumbnail is
+short enough (50 pt) that a full page holds five rows of typical cards. Each
+row being its own table keeps MigraDoc from drawing the next row's top edges
+under the last row on a page.
 
 The summary's header lists the job and material on the left and the totals on
 the right, to leave room for part cards on the first page. When the nest
@@ -143,6 +146,11 @@ the totals. The summary's Plates table adds a **Sheet weight** column when any
 plate's weight is known; a plate with copies shows one sheet's weight, then all
 copies on a second line.
 
+A plate page's parts table is split into two side-by-side halves, so twice as
+many drawings fit beside the diagram. Entries run left to right, then down (IDs
+in order across each row), which keeps the order intact when the table continues
+on later pages; each continuation repeats both halves' headings.
+
 Individual IDs use 7 pt text centered on the part's pole of inaccessibility
 (`PolyLabel`, as in `PlateView`), clear of edges, holes, cutoffs and other labels.
 The search uses a placement-independent quantized copy for consistent placement
@@ -151,6 +159,11 @@ ID goes in the clear spot of one of the part's own enclosed holes with the most
 room, nearest the part's center. Open space beside a concave part (inside a C
 shape's opening) never holds its ID that way, since it reads as belonging to
 whatever is nearby.
+
+An ID clear inside its part's material or hole is drawn bare over the part's fill.
+Every other label (one overhanging a thin strip's outline, one beside its part on
+a leader, a group's shared ID) keeps a white box so outlines and leaders under it
+do not cross the text.
 
 A strip a hair thinner than its ID (closely packed bars) still takes the ID at its
 pole: the label may overhang the part's own outline by up to the clearance, so its

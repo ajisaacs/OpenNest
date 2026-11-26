@@ -88,7 +88,7 @@ public sealed class NestPdfLayoutTests : IDisposable
         Assert.True(platePages.Count >= 2, $"plate 1 pages: {platePages.Count}");
         Assert.All(platePages, page => Assert.Contains("Nest report: Report test job", page));
         // Every page carrying plate-table rows repeats the table heading.
-        var tablePages = platePages.Where(page => Regex.IsMatch(page, @"(?m)^\d+\s+Demand \d{2}\s+1\s+2$")).ToList();
+        var tablePages = platePages.Where(page => Regex.IsMatch(page, @"(?m)^\d+\s+Demand \d{2}\s+1\s+2\b")).ToList();
         Assert.True(tablePages.Count >= 2, $"plate table pages: {tablePages.Count}");
         Assert.All(tablePages, page => Assert.Matches(@"ID\s+Drawing\s+Parts per plate\s+Total \(2 plates\)", page));
         var plateText = string.Join("\n", platePages);
@@ -130,7 +130,7 @@ public sealed class NestPdfLayoutTests : IDisposable
         Assert.Contains("Est. cut time:", platePage);
         Assert.Contains("A dashed rectangle crossed out is a clamp to remove before cutting.", platePage);
         for (var i = 1; i <= 10; i++)
-            Assert.Matches($@"(?m)^{i}\s+Part {i:D2}\s+1\s+1$", platePage);
+            Assert.Matches($@"(?m)(?:^|\s){i}\s+Part {i:D2}\s+1\s+1(?:\s|$)", platePage);
     }
 
     [SkippableFact]
@@ -156,7 +156,7 @@ public sealed class NestPdfLayoutTests : IDisposable
         Assert.True(size > 2, "the long name should need several card lines");
         Assert.Equal(longName.Replace(" ", ""), string.Concat(card[1..size]).Replace(" ", ""));
         var platePage = Array.FindIndex(pages, page => page.Contains("Plate 1 of 4"));
-        Assert.Equal(longName.Replace(" ", ""), ColumnText(path, platePage + 1, "Drawing", "Parts"));
+        Assert.Equal(longName.Replace(" ", ""), ColumnText(path, platePage + 1, "Drawing", "Parts", "2"));
     }
 
     [SkippableTheory]
@@ -697,19 +697,32 @@ public sealed class NestPdfLayoutTests : IDisposable
     }
 
     /// <summary>Text of the 2 row inside one table column, read from word boxes in reading order.</summary>
-    private static string ColumnText(string path, int page, string column, string next)
+    /// <summary>
+    /// The text of drawing <paramref name="id"/>'s cell under <paramref name="column"/> in the
+    /// plate parts table, whichever of its two halves holds the drawing.
+    /// </summary>
+    private static string ColumnText(string path, int page, string column, string next, string id)
     {
+        const double idColumn = 60;
         var words = ReportPdf.Words(path, page);
-        var heading = words.First(word => word.Text == column);
-        var limit = words.First(word => word.Text == next && System.Math.Abs(word.Top - heading.Top) < 1);
-        var above = words.First(word => word.Text == "1" && word.Left < heading.Left && word.Top > heading.Top);
-        var below = words.First(word => word.Text == "3" && word.Left < heading.Left && word.Top > above.Top);
-        var cell = words.Where(word => word.Left >= heading.Left - 1 && word.Right <= limit.Left
-                && word.Top > above.Bottom && word.Bottom < below.Top)
+        var heading = words.Where(word => word.Text == column)
+            .Single(candidate => words.Any(word => word.Text == id && word.Top > candidate.Bottom
+                && word.Left < candidate.Left && word.Left > candidate.Left - idColumn));
+        var limit = words.Where(word => word.Text == next && System.Math.Abs(word.Top - heading.Top) < 1
+            && word.Left > heading.Left).MinBy(word => word.Left)!;
+        bool InIdColumn((double Left, double Top, double Right, double Bottom, string Text) word) => word.Left < heading.Left && word.Left > heading.Left - idColumn;
+        var row = words.First(word => word.Text == id && InIdColumn(word) && word.Top > heading.Bottom);
+        // Cells are vertically centered, so a wrapped cell rises above its ID: the row runs
+        // between the IDs (or heading) above and below it.
+        var start = words.Where(word => InIdColumn(word) && word.Bottom < row.Top)
+            .Select(word => word.Bottom).DefaultIfEmpty(heading.Bottom).Max();
+        var end = words.Where(word => InIdColumn(word) && word.Top > row.Bottom)
+            .Select(word => word.Top).DefaultIfEmpty(double.MaxValue).Min();
+        bool InRow((double Left, double Top, double Right, double Bottom, string Text) word) => word.Top > start && word.Bottom < end;
+        var cell = words.Where(word => word.Left >= heading.Left - 1 && word.Right <= limit.Left && InRow(word))
             .OrderBy(word => word.Top).ThenBy(word => word.Left);
         // Nothing from this cell may extend into the next column.
-        Assert.DoesNotContain(words, word => word.Left < limit.Left && word.Right > limit.Left
-            && word.Top > above.Bottom && word.Bottom < below.Top);
+        Assert.DoesNotContain(words, word => word.Left < limit.Left && word.Right > limit.Left && InRow(word));
         return string.Concat(cell.Select(word => word.Text));
     }
 

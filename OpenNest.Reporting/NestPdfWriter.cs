@@ -23,7 +23,7 @@ public static class NestPdfWriter
     private const int CardsPerRow = 4;
     private const double CardGap = 8;
     private const double CardWidth = (PortraitWidth - (CardsPerRow - 1) * CardGap) / CardsPerRow;
-    private const double CardThumbnailHeight = 66;
+    private const double CardThumbnailHeight = 50;
     private const double CardFontSize = 8;
     private const double PortraitWidth = 540;
     private const double LandscapeWidth = 720;
@@ -236,7 +236,9 @@ public static class NestPdfWriter
 
     /// <summary>
     /// One card per drawing, <see cref="CardsPerRow"/> to a row. Cards are table cells with
-    /// unbordered spacer columns between them; MigraDoc never splits a row across pages.
+    /// unbordered spacer columns between them; MigraDoc never splits a row across pages. Each
+    /// row is its own table: rows of one table share borders across a page break, which drew the
+    /// next cards' top edges under the last row on a page.
     /// </summary>
     private static void AddPartCards(Section section, NestReportSnapshot snapshot)
     {
@@ -247,24 +249,24 @@ public static class NestPdfWriter
                 columns.Add(CardGap);
             columns.Add(CardWidth);
         }
-        var table = AddTable(section, columns.ToArray());
-        table.Borders.Visible = false;
-        table.LeftPadding = table.RightPadding = Unit.FromPoint(CellPadding);
-        table.TopPadding = table.BottomPadding = Unit.FromPoint(CellPadding);
-        table.Format.Font.Size = CardFontSize;
 
         Row? row = null;
         for (var index = 0; index < snapshot.Drawings.Length; index++)
         {
             if (index % CardsPerRow == 0)
             {
-                if (row != null)
+                if (index > 0)
                 {
-                    var gap = table.AddRow();
-                    gap.HeightRule = RowHeightRule.Exactly;
-                    gap.Height = Unit.FromPoint(CardGap);
-                    gap.TopPadding = gap.BottomPadding = Unit.Zero;
+                    // An empty line exactly the gap tall; at a page's foot it is just blank.
+                    var gap = section.AddParagraph();
+                    gap.Format.LineSpacingRule = LineSpacingRule.Exactly;
+                    gap.Format.LineSpacing = Unit.FromPoint(CardGap);
                 }
+                var table = AddTable(section, columns.ToArray());
+                table.Borders.Visible = false;
+                table.LeftPadding = table.RightPadding = Unit.FromPoint(CellPadding);
+                table.TopPadding = table.BottomPadding = Unit.FromPoint(CellPadding);
+                table.Format.Font.Size = CardFontSize;
                 row = table.AddRow();
                 row.VerticalAlignment = VerticalAlignment.Top;
             }
@@ -399,21 +401,88 @@ public static class NestPdfWriter
         gap.Format.Font.Size = 1;
         gap.Format.SpaceAfter = Unit.FromPoint(4);
 
-        var names2 = snapshot.Drawings.ToDictionary(drawing => drawing.Id, drawing => drawing.Name, StringComparer.Ordinal);
+        AddPlatePartsTable(section, snapshot, plate, colors, tabbed);
+    }
+
+    /// <summary>
+    /// The plate's drawings as two side-by-side tables sharing one MigraDoc table, so twice as
+    /// many fit on the diagram's page. Entries run left to right, then down, which keeps ID order
+    /// intact when the table continues on later pages; an unbordered column separates the halves.
+    /// </summary>
+    private static void AddPlatePartsTable(Section section, NestReportSnapshot snapshot, ReportPlate plate,
+        IReadOnlyDictionary<string, XColor> colors, HashSet<string> tabbed)
+    {
+        const int Halves = 2;
+        const double Gap = 16;
+        double[] half = [40, 0, 86, 92];
+        half[1] = (LandscapeWidth - Gap) / Halves - half.Sum();
+        var widths = new List<double>(half);
+        widths.Add(Gap);
+        widths.AddRange(half);
+        var stride = half.Length + 1;
+
+        var names = snapshot.Drawings.ToDictionary(drawing => drawing.Id, drawing => drawing.Name, StringComparer.Ordinal);
         var perSheet = plate.Parts.GroupBy(part => part.ReportId, StringComparer.Ordinal)
             .ToDictionary(group => group.Key, group => (long)group.Count(), StringComparer.Ordinal);
-        var parts = AddTable(section, 60, 400, 110, 150);
-        AddHeader(parts, "ID", "Drawing", "Parts per plate", $"Total ({plate.Copies} plates)");
-        foreach (var drawing in snapshot.Drawings.Where(drawing => perSheet.ContainsKey(drawing.Id)))
+        var drawings = snapshot.Drawings.Where(drawing => perSheet.ContainsKey(drawing.Id)).ToList();
+
+        var parts = AddTable(section, widths.ToArray());
+        string?[] heading = ["ID", "Drawing", "Parts per plate", $"Total ({plate.Copies} plates)"];
+        var header = AddRow(parts, "Table heading", true, [.. heading, null, .. heading]);
+        header.HeadingFormat = true;
+        header.Format.Font.Bold = true;
+        for (var index = 0; index < widths.Count; index++)
         {
-            var count = perSheet[drawing.Id];
-            var row = AddRow(parts, $"Plate {plate.Number}, drawing {drawing.Id}", false,
-                tabbed.Contains(drawing.Id) ? drawing.Id + NestReportDiagram.TabbedMark : drawing.Id, names2[drawing.Id],
-                count.ToString(Invariant), checked(count * plate.Copies).ToString(Invariant));
-            // The ID cell carries the part's diagram color: the key when an ID could not be placed.
-            var color = ColorOf(colors, drawing.Id);
-            row.Cells[0].Shading.Color = new Color(color.R, color.G, color.B);
+            if (index != half.Length)
+                header.Cells[index].Shading.Color = Colors.LightGray;
         }
+        ClearGap(header, half.Length);
+
+        for (var first = 0; first < drawings.Count; first += Halves)
+        {
+            var cells = new string?[widths.Count];
+            var entries = drawings.Skip(first).Take(Halves).ToList();
+            for (var side = 0; side < entries.Count; side++)
+            {
+                var drawing = entries[side];
+                var count = perSheet[drawing.Id];
+                cells[side * stride] = tabbed.Contains(drawing.Id) ? drawing.Id + NestReportDiagram.TabbedMark : drawing.Id;
+                cells[side * stride + 1] = names[drawing.Id];
+                cells[side * stride + 2] = count.ToString(Invariant);
+                cells[side * stride + 3] = checked(count * plate.Copies).ToString(Invariant);
+            }
+            var row = AddRow(parts, $"Plate {plate.Number}, drawing {entries[0].Id}", false, cells);
+            for (var side = 0; side < entries.Count; side++)
+            {
+                // The ID cell carries the part's diagram color: the key when an ID could not be placed.
+                var color = ColorOf(colors, entries[side].Id);
+                row.Cells[side * stride].Shading.Color = new Color(color.R, color.G, color.B);
+            }
+            ClearGap(row, half.Length);
+            // An odd count leaves the last right half empty: no grid where there is no entry.
+            if (entries.Count < Halves)
+            {
+                row.Cells[half.Length].Borders.Right.Visible = false;
+                for (var index = half.Length + 1; index < widths.Count; index++)
+                    ClearBorders(row.Cells[index]);
+            }
+        }
+    }
+
+    /// <summary>The separating column draws only the halves' outer edges beside it.</summary>
+    private static void ClearGap(Row row, int index)
+    {
+        var cell = row.Cells[index];
+        cell.Borders.Top.Visible = false;
+        cell.Borders.Bottom.Visible = false;
+    }
+
+    private static void ClearBorders(Cell cell)
+    {
+        cell.Borders.Top.Visible = false;
+        cell.Borders.Bottom.Visible = false;
+        cell.Borders.Right.Visible = false;
+        cell.Borders.Left.Visible = false;
     }
 
     /// <summary>A fixed-height, never-split table row reserves a vector drawing area in MigraDoc's flow.</summary>
@@ -505,7 +574,8 @@ public static class NestPdfWriter
         var font = NestReportDiagram.LabelFont();
         foreach (var label in view.Labels.Concat(view.Groups.Select(group => group.Label)))
         {
-            gfx.DrawRectangle(XBrushes.White, label.Box);
+            if (label.Backed)
+                gfx.DrawRectangle(XBrushes.White, label.Box);
             gfx.DrawString(label.Id, font, XBrushes.Black, label.Box, XStringFormats.Center);
         }
     }
