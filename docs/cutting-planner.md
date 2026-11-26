@@ -271,10 +271,16 @@ past that part and came back across it, so the search learns "cut those two the 
 instead: the tool then leaves from the nearer one, as with two stacked strips cut far
 one first. An approach that crosses other parts too would still cross them after the swap,
 so it teaches "cut this part before those". A swap is a guess: when the search later
-stalls with nothing new to learn, it takes back the newest swap, learns "cut this part
-before those" from the attempt that taught it, and backs up from there. When the part
-cannot come earlier (a sheet separator is cut after everything), it learns the other
-way round, "cut the part the approach left from before those", so the tool arrives
+stalls with nothing new to learn, it takes back the newest swap. Order rules only move the
+parts an approach crossed, but where another part is cut can decide the block: the part cut
+just before the crossed ones sets where the tool arrives from, and so how they are entered
+and left. So the search first tries each part still to be cut after the blocked one that may
+come that early in front of the earliest crossed part, nearest to where the tool arrives
+first, one stall-bounded pass each, with the part before it (if any) planned again facing
+it. Only when none of those finishes does it learn "cut this part before those" from the
+attempt that taught the swap, and back up from there. When the part cannot come earlier (a
+sheet separator is cut after everything), it learns the other way round, "cut the part the
+approach left from before those", so the tool arrives
 from beyond them. The first pass
 along an order that teaches such a rule ends the round; the directed-recovery and
 full passes run only when the lighter pass taught nothing. An attempt
