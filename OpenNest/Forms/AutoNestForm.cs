@@ -28,6 +28,9 @@ namespace OpenNest.Forms
         private CancellationTokenSource ledgerCancellation;
         private bool loadingLedger;
         private string ledgerSummary = "";
+        // Kept apart from nestOnServerBox.Visible, which reads false whenever the form is
+        // hidden (as it is once ShowDialog returns) or another tab is selected.
+        private bool serverNestingAvailable;
 
         /// <summary>A dark amber that reads on the grid's white rows.</summary>
         internal static readonly System.Drawing.Color SubstituteColor = System.Drawing.Color.FromArgb(160, 82, 0);
@@ -116,9 +119,10 @@ namespace OpenNest.Forms
         /// </summary>
         public bool ServerNestingAvailable
         {
-            get => nestOnServerBox.Visible;
+            get => serverNestingAvailable;
             set
             {
+                serverNestingAvailable = value;
                 nestOnServerBox.Visible = value;
                 nestOnServerBox.Checked = value && Properties.Settings.Default.AutoNestOnServer;
                 UpdateNestOnServerBox();
@@ -126,7 +130,8 @@ namespace OpenNest.Forms
         }
 
         /// <summary>True when the user chose to nest on the server with an engine it can run.</summary>
-        public bool NestOnServer => nestOnServerBox.Visible && nestOnServerBox.Enabled && nestOnServerBox.Checked;
+        public bool NestOnServer =>
+            serverNestingAvailable && nestOnServerBox.Enabled && nestOnServerBox.Checked;
 
         private void engineComboBox_SelectedIndexChanged(object sender, EventArgs e) => UpdateNestOnServerBox();
 
@@ -559,7 +564,8 @@ namespace OpenNest.Forms
                 DialogResult = DialogResult.None;
                 ReportStockValidationFailure(error);
             }
-            else if (DialogResult == DialogResult.OK && nestOnServerBox.Visible && nestOnServerBox.Enabled)
+            else if (DialogResult == DialogResult.OK && serverNestingAvailable
+                && nestOnServerBox.Enabled)
             {
                 Properties.Settings.Default.AutoNestOnServer = nestOnServerBox.Checked;
                 Properties.Settings.Default.Save();

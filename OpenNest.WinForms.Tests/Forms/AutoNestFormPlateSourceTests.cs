@@ -33,6 +33,25 @@ public class AutoNestFormPlateSourceTests
     });
 
     [Fact]
+    public void NestOnServerIsReadableWhileTheFormIsHidden() => RunSta(() =>
+    {
+        // AutoNestCommand reads the choice after ShowDialog returns, when every control
+        // reports Visible == false.
+        using var form = new AutoNestForm(new Nest()) { ServerNestingAvailable = true };
+        var box = Assert.IsType<CheckBox>(form.Controls.Find("nestOnServerBox", true).Single());
+        box.Checked = true;
+
+        Assert.True(form.ServerNestingAvailable);
+        Assert.True(form.NestOnServer);
+        box.Checked = false;
+        Assert.False(form.NestOnServer);
+        form.ServerNestingAvailable = false;
+        box.Checked = true;
+        Assert.False(form.ServerNestingAvailable);
+        Assert.False(form.NestOnServer);
+    });
+
+    [Fact]
     public void CurrentPlatesOnlyOffersNoStockOptions() => RunSta(() =>
     {
         using var form = new AutoNestForm(new Nest()) { OptimizePlateSize = true };
