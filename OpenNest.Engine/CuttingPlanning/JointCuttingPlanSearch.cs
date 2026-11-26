@@ -144,6 +144,34 @@ internal static class JointCuttingPlanSearch
             // stall after it can mean the swapped pair is what blocks now.
             var swaps = new List<(Attempt Attempt, int[] Sequence, int First, int Then)>();
             var revoked = new HashSet<(int, int)>();
+            // Where a part is cut can block a later approach without being crossed by it: the
+            // part cut just before the crossed ones decides where the tool arrives from, and so
+            // how they are entered and left. Order rules only move the crossed parts, so when a
+            // swap is taken back, each part still to be cut after the blocked one is tried in
+            // front of the earliest crossed part, nearest first: one stall-bounded pass each, from
+            // the part before (if any), which is planned again facing the part now following it.
+            IReadOnlyList<FixedProgramPlacement> PullForward(Attempt stopped, int[] stoppedSequence)
+            {
+                if (stopped.Blocked is not int blocked || stopped.Crossed.Count == 0)
+                    return null;
+                var back = stopped.Crossed.Min(part => Array.IndexOf(stoppedSequence, part));
+                var kept = stoppedSequence.Take(back).ToHashSet();
+                var arrival = stopped.BoundaryAt(back).Position;
+                var resumeAt = stopped.BoundaryAt(back > 0 ? back - 1 : back);
+                var later = stoppedSequence.Skip(Array.IndexOf(stoppedSequence, blocked) + 1);
+                foreach (var part in later
+                    .Where(part => prerequisites[part].All(kept.Contains))
+                    .OrderBy(part => centers[part].DistanceTo(arrival)).ThenBy(part => part))
+                {
+                    int[] pulled = [.. stoppedSequence.Take(back), part,
+                        .. stoppedSequence.Skip(back).Where(p => p != part)];
+                    var pass = walk.Follow(pulled, stall, resumeAt, preferEndpoints,
+                        prerequisites: prerequisites);
+                    if (pass.Order != null)
+                        return pass.Order;
+                }
+                return null;
+            }
             while (true)
             {
                 // A pass that teaches an order rule ends the round: the heavier passes would
@@ -175,14 +203,17 @@ internal static class JointCuttingPlanSearch
                     resume = onward;
                     continue;
                 }
-                // Nothing new to learn after a swap: take back the newest swap and learn the plain
-                // rule its attempt would have taught instead, backing up from that attempt.
+                // Nothing new to learn after a swap: take back the newest swap, try pulling a
+                // later part in front of the parts its attempt crossed, and otherwise learn the
+                // plain rule that attempt would have taught instead, backing up from it.
                 while (attempt == null && swaps.Count != 0)
                 {
                     var (swapped, swappedSequence, first, then) = swaps[^1];
                     swaps.RemoveAt(swaps.Count - 1);
                     prerequisites[then].Remove(first);
                     revoked.Add((first, then));
+                    if (PullForward(swapped, swappedSequence) is { } pulled)
+                        return walk.Ready(pulled);
                     if (Learn(swapped, swappedSequence, prerequisites, revoked, swaps))
                     {
                         attempt = swapped;
