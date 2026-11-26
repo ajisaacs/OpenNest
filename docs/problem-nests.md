@@ -85,6 +85,11 @@ cost decides: a layout costing more than 0.5 over it fails whatever its sheet co
 costing less is only reported, with the line to record. The end, if the line has one, is then
 not checked. Every run prints each nest's cost.
 
+A job too large for the shared limit (120 s, or `OPENNEST_PROBLEM_NESTS_TIMEOUT`) on a test
+machine can record its own: `auto-nest: 8 sheets, cost 54144, limit 300 s`. The longer of the two
+applies, so the shared setting can still raise every limit but never cuts this one short.
+Recording keeps the entry.
+
 #### Saved layouts
 
 A nest can also hold the layout its baseline describes, so nobody has to nest the old code again

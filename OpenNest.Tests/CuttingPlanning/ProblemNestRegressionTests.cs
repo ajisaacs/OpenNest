@@ -148,8 +148,10 @@ public partial class ProblemNestRegressionTests(ITestOutputHelper output)
             var baseline = SheetBaseline(record.Comments);
             var endBaseline = EndBaseline(record.Comments);
             var costBaseline = CostBaseline(record.Comments);
+            // A large job can record a longer limit than the shared one; it never shortens it.
+            var own = LimitBaseline(record.Comments) is { } longer && longer > limit ? longer : limit;
             var watch = Stopwatch.StartNew();
-            var run = AutoNest(bytes, limit);
+            var run = AutoNest(bytes, own);
             var (sheets, end, problem, cost) = (run.Sheets, run.End, run.Problem, run.Cost);
             output.WriteLine($"{record.Name}: {(problem ?? $"{sheets} sheets, ends {Number(end)}, cost {Number(cost)}")} "
                 + $"(baseline {baseline?.ToString() ?? "none"}{(endBaseline is { } recorded ? $", ends {Number(recorded)}" : "")}"
@@ -195,6 +197,8 @@ public partial class ProblemNestRegressionTests(ITestOutputHelper output)
             var numbers = costBaseline != null ? AutoNestBaselineLine(sheets, end, keptCost ?? cost)
                 : keptEnd is { } stays ? $"{AutoNestLine} {sheets} sheets, ends {Number(stays)}"
                 : AutoNestBaselineLine(sheets, end);
+            if (LimitBaseline(record.Comments) is { } recordedLimit)
+                numbers += $", limit {recordedLimit.TotalSeconds:0} s";
             if (CannotSave(guards, run) is { } why)
             {
                 output.WriteLine($"  not saved: {why}. Its line would be: {numbers}");
@@ -427,6 +431,14 @@ public partial class ProblemNestRegressionTests(ITestOutputHelper output)
 
     // A recorded cost is rounded up to a whole unit; a layout within half of that is the same.
     internal const double CostTolerance = 0.5;
+
+    /// <summary>
+    /// The time limit from an "auto-nest: 8 sheets, cost 54144, limit 300 s" comment line; null
+    /// when the line records none, which leaves the shared limit.
+    /// </summary>
+    internal static TimeSpan? LimitBaseline(string comments) =>
+        CommentLine(comments, AutoNestLine) is { } line && LimitEntry().Match(line) is { Success: true } limit
+            ? TimeSpan.FromSeconds(int.Parse(limit.Groups[1].Value)) : null;
 
     /// <summary>The baseline line for a result, its end rounded up to a tenth and any cost up to a
     /// whole unit, so the result meets it.</summary>
@@ -814,6 +826,9 @@ public partial class ProblemNestRegressionTests(ITestOutputHelper output)
 
     [GeneratedRegex(@"\bcost\s+(\d+(?:\.\d+)?)", RegexOptions.IgnoreCase)]
     private static partial Regex CostEntry();
+
+    [GeneratedRegex(@"\blimit\s+(\d+)\s*s\b", RegexOptions.IgnoreCase)]
+    private static partial Regex LimitEntry();
 }
 
 public class ProblemNestBaselineTests
@@ -883,6 +898,21 @@ public class ProblemNestBaselineTests
         Assert.Null(ProblemNestRegressionTests.CostBaseline("auto-nest: 2 sheets, ends 40"));
         Assert.Equal("auto-nest: 8 sheets, ends 95.5, cost 54144",
             ProblemNestRegressionTests.AutoNestBaselineLine(8, 95.43, 54143.2));
+    }
+
+    [Fact]
+    public void LimitBaseline_ReadsTheLimitWithoutChangingTheOtherEntries()
+    {
+        const string comments = "checks: auto-nest\n"
+            + "auto-nest: 8 sheets, ends 82.2, cost 54144, limit 300 s, layout saved";
+
+        Assert.Equal(TimeSpan.FromSeconds(300), ProblemNestRegressionTests.LimitBaseline(comments));
+        Assert.Equal(8, ProblemNestRegressionTests.SheetBaseline(comments));
+        Assert.Equal(82.2, ProblemNestRegressionTests.EndBaseline(comments));
+        Assert.Equal(54144, ProblemNestRegressionTests.CostBaseline(comments));
+        Assert.True(ProblemNestRegressionTests.LayoutSaved(comments));
+        Assert.Null(ProblemNestRegressionTests.LimitBaseline("auto-nest: 8 sheets, cost 54144"));
+        Assert.Null(ProblemNestRegressionTests.LimitBaseline("It hit the limit 300 s ago.\nauto-nest: 2 sheets"));
     }
 
     [Fact]
