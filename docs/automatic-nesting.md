@@ -10,7 +10,7 @@
 5. Check returned placements with the independent `NestLayoutCheck` used by the benchmark (for bundles, again after expanding them to physical frames and inserts).
 6. Consolidate exact ordered nonempty layouts only when the entire result is valid, then bind each layout to the caller's drawing references; the caller decides whether to commit it.
 
-`NestStockBuilder.FromTemplate` snapshots sheet options and spacing settings for multiple-sheet jobs. `SinglePlate` offers exactly one physical sheet, regardless of the legacy plate repeat quantity. `NestPipelineCommit.ApplyToEmptyPlates` applies accepted desktop proposals to empty/new plates with the checked size, quadrant, spacing and total-copy quantity semantics. Quantity is set before parts are attached, so drawing counts multiply exactly once. It never fills occupied plates.
+`NestStockBuilder.FromTemplate` snapshots sheet options and spacing settings for multiple-sheet jobs. `SinglePlate` offers exactly one physical sheet, regardless of the legacy plate repeat quantity. `NestPipelineCommit.ApplyToEmptyPlates` applies accepted desktop proposals to empty/new plates with the checked size, quadrant, spacing and total-copy quantity semantics. Quantity is set before parts are attached, so drawing counts multiply exactly once. It never fills occupied plates; `ApplyToStockPlates` commits a result solved on the nest's own empty plates onto exactly those plates.
 
 ## Repeated layouts and physical sheets
 
@@ -22,9 +22,19 @@ Layout-entry count is not physical-sheet count: sum layout quantities for sheets
 
 ## Desktop Auto Nest
 
-Every engine selected in **Nest > Auto Nest** uses the pipeline. Part-First and its sorting controls are removed. Use interactive Fill Area/remnant tools for leftover space on occupied sheets; these are not whole-job nesting.
+Every engine selected in **Nest > Auto Nest** uses the pipeline. Part-First and its sorting controls are removed. Leftover space on occupied sheets is filled by the **Plates** choice below or the interactive Fill Area/remnant tools; neither is whole-job nesting.
 
-Auto Nest starts on empty/new sheets and does not change existing populated plates. Stock Options offers sheet sizes and salvage settings; minimum salvage size is part of that section, not a Part-First option. When enabled, its grid keeps a blank last row for adding another size (`W x L`) and cost, including after loading saved options. Unused blank rows are not offered as stock. The maximum remains 100 physical sheets per run.
+With **Plates: New plates** (the default; the dialog always opens on it), Auto Nest starts on empty/new sheets and does not change existing populated plates.
+
+**Plates** (`NestPlateSource`, run by `CurrentPlatesNest`) chooses which plates the run may use:
+
+- **New plates**: the original behavior above, unchanged.
+- **Current plates only**: no plate is created. First `PlateLeftoverFill` fills the free space beside the parts already on each occupied plate with the fill strategy (Options' fill strategy, as Fill Area uses): items by priority, then larger first, into the largest free rectangles, each proposal certified clear of the parts there, other new parts and the clamps, then checked by `NestLayoutCheck` with the existing parts held fixed (only new parts, and their pairs with existing parts, are reported). It skips outlined plates and plates with cut-offs, and a plate repeated `Plate.Quantity` times uses that many copies of each part it receives. Then the remaining demand is one whole-job solve with the chosen engine on the nest's empty plates, one sheet per plate with that plate's size, outline and clamps, no salvage, committed onto exactly those plates. The untouched trailing sheet the nest keeps ready (still at the nest defaults) is not a current plate; one you resized or set up is. The stock options do not apply.
+- **Current, then new**: current plates as above, then the ordinary new-sheet request (stock options, salvage, ledger) for what remains.
+
+Each stage asks only for what earlier stages placed less. New sheets go onto the untouched trailing sheet or newly created plates, never onto an empty plate you set up. As in New mode, an empty plate that receives a layout is cut once: its `Plate.Quantity` is reset to 1. The proposal is reviewed once (parts already on a plate show in one gray, and existing plates are titled "Plate N (existing)"), and kept in one undo record; a plate that changed in the meantime refuses the whole commit. Whole-job placements still never go onto an occupied plate. Leftover fill makes no common lines; the whole-job stages keep the dialog's choice. Nest on the server lays out new plates only, so it is disabled unless Plates is New plates.
+
+Stock Options offers sheet sizes and salvage settings; minimum salvage size is part of that section, not a Part-First option. When enabled, its grid keeps a blank last row for adding another size (`W x L`) and cost, including after loading saved options. Unused blank rows are not offered as stock. The maximum remains 100 physical sheets per run.
 
 Progress is owned and modal so the input drawings cannot be edited while a worker uses them. Stop or closing progress cancels and discards the whole proposal. The dialog waits for the worker to finish. **Use This Layout** (below) is the only way to end the search early with something to keep, and what it keeps is validated like any result. A plug-in that ignores the cancellation token cannot commit its late result.
 

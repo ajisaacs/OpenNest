@@ -61,7 +61,9 @@ snapshots go through the same writer and reader, so a restore rebuilds the outli
   rectangle to Default may well land on the rectangle: Default keeps the cheaper valid layout.
 - Auto Nest's stock-options grid offers rectangles only; an outlined sheet is nested through
   the target plate (no options), or through `NestPlateStock` directly: the console's `--outline`,
-  or API callers that set `NestPlateStock.Outline`. MCP has no outline input.
+  or API callers that set `NestPlateStock.Outline`. MCP has no outline input. With **Plates:
+  Current plates**, an empty outlined plate is offered as itself (only Irregular places on it);
+  an outlined plate that already holds parts is skipped, since leftover fill needs a rectangle.
 - The stored polygon is inside the true material by up to the chord tolerance (0.001) on
   imported arcs and exactly on straight edges. Outlines imported before straight edges were
   kept exactly sit 0.001 inside every edge (a 60 x 27 sheet reads 59.998 x 26.998); import the

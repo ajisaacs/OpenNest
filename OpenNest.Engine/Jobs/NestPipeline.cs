@@ -30,6 +30,14 @@ public sealed record ProposedPlate(int PlateIndex, NestPlateStock Stock, IReadOn
     /// <see cref="Plate.CommonLines"/>. Empty when the layout has none.</summary>
     public IReadOnlyList<CommonLineGroup> CommonLines { get; init; } = Array.Empty<CommonLineGroup>();
 
+    /// <summary>Parts already on the nest's plate before this proposal, shown with it but never
+    /// committed again; empty for a new sheet. <see cref="Parts"/> holds only the new parts.</summary>
+    public IReadOnlyList<Part> Occupants { get; init; } = Array.Empty<Part>();
+
+    /// <summary>The nest's plate number (1-based) when the layout goes onto a plate already in the
+    /// nest; null for a new sheet.</summary>
+    public int? ExistingPlateNumber { get; init; }
+
     private int quantity = 1;
     public int Quantity
     {

@@ -110,7 +110,7 @@ public class NestReviewFormTests
             CancellationToken token = default) => solve(job);
     }
 
-    private static CNC.Program Rectangle()
+    internal static CNC.Program Rectangle()
     {
         var program = new CNC.Program();
         program.MoveTo(0, 0);

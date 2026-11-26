@@ -123,18 +123,19 @@ namespace OpenNest
         }
 
         /// <summary>
-        /// Applies a nest-defaults edit, moving only an untouched trailing empty sheet
-        /// that matched the old defaults to the new defaults.
+        /// True when <paramref name="plate"/> is the nest's trailing empty sheet exactly as the nest
+        /// defaults make it: the untouched workspace sentinel rather than stock someone set up.
+        /// Exact configuration equality, not geometric tolerance: even a small edit makes it
+        /// configured stock.
         /// </summary>
-        public void ChangePlateDefaults(Action changeDefaults)
+        public bool IsUntouchedSentinel(Plate plate)
         {
-            ArgumentNullException.ThrowIfNull(changeDefaults);
+            ArgumentNullException.ThrowIfNull(plate);
+            if (Count == 0 || !ReferenceEquals(nest.Plates[^1], plate))
+                return false;
             var defaults = nest.PlateDefaults;
-            var trailing = Count > 0 ? nest.Plates[^1] : null;
-            // Exact configuration equality, not geometric tolerance: even a small edit
-            // makes this configured stock rather than the untouched workspace sentinel.
-            var followsDefaults = trailing != null
-                && trailing.Parts.Count == 0
+            var trailing = plate;
+            return trailing.Parts.Count == 0
                 && trailing.CutOffs.Count == 0
                 && trailing.Outline == null
                 && trailing.Size.Width == defaults.Size.Width
@@ -150,13 +151,24 @@ namespace OpenNest
                 && (defaults.ClampRail == null
                     ? trailing.ClampZones.Count == 0
                     : defaults.ClampRail.Matches(trailing));
+        }
+
+        /// <summary>
+        /// Applies a nest-defaults edit, moving only an untouched trailing empty sheet
+        /// that matched the old defaults to the new defaults.
+        /// </summary>
+        public void ChangePlateDefaults(Action changeDefaults)
+        {
+            ArgumentNullException.ThrowIfNull(changeDefaults);
+            var trailing = Count > 0 ? nest.Plates[^1] : null;
+            var followsDefaults = trailing != null && IsUntouchedSentinel(trailing);
 
             changeDefaults();
 
             if (!followsDefaults)
                 return;
 
-            defaults = nest.PlateDefaults;
+            var defaults = nest.PlateDefaults;
             trailing.Size = defaults.Size;
             trailing.Quadrant = defaults.Quadrant;
             trailing.EdgeSpacing = defaults.EdgeSpacing;

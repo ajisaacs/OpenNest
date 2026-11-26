@@ -11,7 +11,8 @@ when none are waiting.
 ## Desktop
 
 The Auto Nest dialog's Plates tab shows **Nest on the server** in Database mode only. It is
-enabled for built-in engines only: the server loads no plug-ins from `Engines/`. The dialog
+enabled for built-in engines only: the server loads no plug-ins from `Engines/`; and only
+when **Plates** is New plates, since the server lays out new sheets only. The dialog
 remembers the last choice (`AutoNestOnServer` in the user settings).
 
 With the box ticked, `ServerAutoNest`:

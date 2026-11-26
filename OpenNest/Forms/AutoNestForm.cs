@@ -47,6 +47,13 @@ namespace OpenNest.Forms
             SetPlateOptimizerVisible(false);
             UpdateLedgerButton();
             CommonLineUsage = nest?.CommonLineUsage ?? CommonLineUsage.Off;
+            // Always opens on New plates, so Current is never reused by accident.
+            PlateSource = NestPlateSource.New;
+            ledgerToolTip.SetToolTip(plateSourceComboBox,
+                "New plates: lay out fresh sheets (the stock options below, or sheets like the current plate).\n"
+                + "Current plates only: fill the free space beside parts already placed, then the nest's empty "
+                + "plates, and create no plate.\n"
+                + "Current, then new: current plates first, then new sheets for what remains.");
             ledgerToolTip.SetToolTip(commonLineComboBox,
                 "Place parts one kerf apart so they share a cut. Only drawings with \"Allow common line\" "
                 + "set in Drawing Properties take part. \"When it adds parts\" keeps a common-line layout only "
@@ -71,6 +78,30 @@ namespace OpenNest.Forms
                 CommonLineUsage.Whenever => 2,
                 _ => 0,
             };
+        }
+
+        /// <summary>Which plates the run may use; New unless the user picks another.</summary>
+        public NestPlateSource PlateSource
+        {
+            get => plateSourceComboBox.SelectedIndex switch
+            {
+                1 => NestPlateSource.Current,
+                2 => NestPlateSource.Both,
+                _ => NestPlateSource.New,
+            };
+            set => plateSourceComboBox.SelectedIndex = value switch
+            {
+                NestPlateSource.Current => 1,
+                NestPlateSource.Both => 2,
+                _ => 0,
+            };
+        }
+
+        private void plateSourceComboBox_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            // Current plates only never lays out new stock, so the stock options do not apply.
+            plateOptimizerGroup.Enabled = PlateSource != NestPlateSource.Current;
+            UpdateNestOnServerBox();
         }
 
         public string EngineName
@@ -102,15 +133,19 @@ namespace OpenNest.Forms
         private void UpdateNestOnServerBox()
         {
             var builtIn = NestingEngineRegistry.IsBuiltIn(EngineName);
-            nestOnServerBox.Enabled = builtIn;
-            ledgerToolTip.SetToolTip(nestOnServerBox, builtIn
-                ? "Send this nest to the nest server's worker. This PC stays free while it runs; Keep and Discard work as usual."
-                : "Plug-in engines run only on this PC.");
+            var newPlates = PlateSource == NestPlateSource.New;
+            nestOnServerBox.Enabled = builtIn && newPlates;
+            ledgerToolTip.SetToolTip(nestOnServerBox, !builtIn
+                ? "Plug-in engines run only on this PC."
+                : !newPlates
+                    ? "Server nesting lays out new plates only; current plates are nested on this PC."
+                    : "Send this nest to the nest server's worker. This PC stays free while it runs; Keep and Discard work as usual.");
         }
 
+        /// <summary>True when the run offers the stock options; never with Current plates only.</summary>
         public bool OptimizePlateSize
         {
-            get { return optimizePlateSizeBox.Checked; }
+            get { return optimizePlateSizeBox.Checked && PlateSource != NestPlateSource.Current; }
             set { optimizePlateSizeBox.Checked = value; }
         }
 

@@ -29,6 +29,8 @@ namespace OpenNest.Forms
             this.nestOnServerBox = new System.Windows.Forms.CheckBox();
             this.commonLineLabel = new System.Windows.Forms.Label();
             this.commonLineComboBox = new System.Windows.Forms.ComboBox();
+            this.plateSourceLabel = new System.Windows.Forms.Label();
+            this.plateSourceComboBox = new System.Windows.Forms.ComboBox();
             this.minRemnantLabel = new System.Windows.Forms.Label();
             this.minRemnantBox = new System.Windows.Forms.TextBox();
             this.plateOptimizerGroup = new System.Windows.Forms.GroupBox();
@@ -86,6 +88,8 @@ namespace OpenNest.Forms
             this.platesTab.Controls.Add(this.nestOnServerBox);
             this.platesTab.Controls.Add(this.commonLineLabel);
             this.platesTab.Controls.Add(this.commonLineComboBox);
+            this.platesTab.Controls.Add(this.plateSourceLabel);
+            this.platesTab.Controls.Add(this.plateSourceComboBox);
             this.platesTab.Location = new System.Drawing.Point(4, 25);
             this.platesTab.Name = "platesTab";
             this.platesTab.Padding = new System.Windows.Forms.Padding(6);
@@ -156,6 +160,28 @@ namespace OpenNest.Forms
             this.engineComboBox.Size = new System.Drawing.Size(200, 24);
             this.engineComboBox.TabIndex = 1;
             this.engineComboBox.SelectedIndexChanged += new System.EventHandler(this.engineComboBox_SelectedIndexChanged);
+            //
+            // plateSourceLabel
+            //
+            this.plateSourceLabel.AutoSize = true;
+            this.plateSourceLabel.Location = new System.Drawing.Point(316, 15);
+            this.plateSourceLabel.Name = "plateSourceLabel";
+            this.plateSourceLabel.Size = new System.Drawing.Size(48, 16);
+            this.plateSourceLabel.TabIndex = 7;
+            this.plateSourceLabel.Text = "Plates:";
+            //
+            // plateSourceComboBox
+            //
+            this.plateSourceComboBox.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+            this.plateSourceComboBox.Items.AddRange(new object[] {
+            "New plates",
+            "Current plates only",
+            "Current, then new"});
+            this.plateSourceComboBox.Location = new System.Drawing.Point(370, 12);
+            this.plateSourceComboBox.Name = "plateSourceComboBox";
+            this.plateSourceComboBox.Size = new System.Drawing.Size(168, 24);
+            this.plateSourceComboBox.TabIndex = 8;
+            this.plateSourceComboBox.SelectedIndexChanged += new System.EventHandler(this.plateSourceComboBox_SelectedIndexChanged);
             //
             // nestOnServerBox
             //
@@ -375,6 +401,8 @@ namespace OpenNest.Forms
         private System.Windows.Forms.ToolTip ledgerToolTip;
         private System.Windows.Forms.Label commonLineLabel;
         private System.Windows.Forms.ComboBox commonLineComboBox;
+        private System.Windows.Forms.Label plateSourceLabel;
+        private System.Windows.Forms.ComboBox plateSourceComboBox;
         private System.Windows.Forms.Label salvageRateLabel;
         private System.Windows.Forms.TextBox salvageRateBox;
         private System.Windows.Forms.Label salvageRatePercentLabel;

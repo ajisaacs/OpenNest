@@ -251,9 +251,14 @@ public static class NestLayoutCheck
     /// identity must never be inferred from Name, which is only incidentally seeded from the
     /// originating NestJobPart id) to its original quantity limit and display name.
     /// </summary>
+    /// <param name="fixedParts">Parts already on the plate before this proposal (by reference):
+    /// they count as occupants other parts must clear, but nothing is reported about them alone
+    /// (their bounds, clamps, quantities, pairs with each other or groups only they form). Null,
+    /// the default, checks every part.</param>
     internal static List<string> Validate(
         List<(Plate Plate, List<Part> Parts)> plateRuns,
-        IReadOnlyDictionary<Drawing, (string Name, int Quantity)> requirements
+        IReadOnlyDictionary<Drawing, (string Name, int Quantity)> requirements,
+        IReadOnlySet<Part> fixedParts = null
     )
     {
         var result = new List<string>();
@@ -262,23 +267,32 @@ public static class NestLayoutCheck
         if (allParts.Count == 0)
             return result;
 
-        ValidateQuantities(allParts, requirements, result);
+        bool IsFixed(Part part) => fixedParts != null && fixedParts.Contains(part);
+        ValidateQuantities(fixedParts == null ? allParts : allParts.Where(p => !IsFixed(p)).ToList(),
+            requirements, result);
 
         foreach (var (plate, parts) in plateRuns)
         {
             if (parts.Count == 0)
                 continue;
 
-            ValidateBounds(parts, plate, requirements, result);
-            ValidateAreaBudget(parts, plate, result);
-            ValidateSpacing(parts, plate.PartSpacing, requirements, result, plate.CommonLines);
-            ValidateCommonLines(plate, parts, requirements, result);
+            var proposed = fixedParts == null ? parts : parts.Where(p => !IsFixed(p)).ToList();
+            if (proposed.Count == 0)
+                continue;
+            ValidateBounds(proposed, plate, requirements, result);
+            if (fixedParts == null || FixedArea(parts, fixedParts) <= AreaBudget(plate) + Tolerance.Epsilon)
+                ValidateAreaBudget(parts, plate, result);
+            ValidateSpacing(parts, plate.PartSpacing, requirements, result, plate.CommonLines, fixedParts);
+            ValidateCommonLines(plate, parts, requirements, result, fixedParts);
             if (plate.ClampZones.Count > 0)
-                ValidateClamps(parts, plate, requirements, result);
+                ValidateClamps(proposed, plate, requirements, result);
         }
 
         return result;
     }
+
+    private static double FixedArea(List<Part> parts, IReadOnlySet<Part> fixedParts) =>
+        parts.Where(fixedParts.Contains).Sum(p => p.BaseDrawing.Area);
 
     /// <summary>
     /// C1/C5: no part material may enter a clamp zone inflated by the plate's clamp
@@ -597,10 +611,7 @@ public static class NestLayoutCheck
         List<string> result
     )
     {
-        var workArea = plate.WorkArea();
-        var budget = plate.Outline == null
-            ? workArea.Width * workArea.Length
-            : DrawingJobMapper.FromPlate("plate", plate, null).UsableOutline().Sum(Clipper.Area);
+        var budget = AreaBudget(plate);
         var placedArea = parts.Sum(p => p.BaseDrawing.Area);
 
         if (placedArea > budget + Tolerance.Epsilon)
@@ -610,6 +621,14 @@ public static class NestLayoutCheck
                     + "parts must overlap even though the polygon overlap check did not flag a pair"
             );
         }
+    }
+
+    private static double AreaBudget(Plate plate)
+    {
+        var workArea = plate.WorkArea();
+        return plate.Outline == null
+            ? workArea.Width * workArea.Length
+            : DrawingJobMapper.FromPlate("plate", plate, null).UsableOutline().Sum(Clipper.Area);
     }
 
     /// <summary>
@@ -628,7 +647,8 @@ public static class NestLayoutCheck
         double spacing,
         IReadOnlyDictionary<Drawing, (string Name, int Quantity)> requirements,
         List<string> result,
-        IEnumerable<CommonLineGroup> commonLines = null
+        IEnumerable<CommonLineGroup> commonLines = null,
+        IReadOnlySet<Part> fixedParts = null
     )
     {
         // Members of one explicit common-line group are held to the group's kerf instead.
@@ -677,6 +697,10 @@ public static class NestLayoutCheck
                 if (!BoxesTouch(reach, other))
                     continue;
 
+                // Two occupants were placed before this proposal; only pairs with a new part count.
+                if (fixedParts != null && fixedParts.Contains(parts[i]) && fixedParts.Contains(parts[j]))
+                    continue;
+
                 // Inflating one side by the full spacing covers both cases: part j
                 // inside part i's (shrunk) cutout, or part i's inflated outline
                 // inside part j's raw cutout.
@@ -719,10 +743,13 @@ public static class NestLayoutCheck
     /// so its spacing exemption would hide a real violation.
     /// </summary>
     private static void ValidateCommonLines(Plate plate, List<Part> parts,
-        IReadOnlyDictionary<Drawing, (string Name, int Quantity)> requirements, List<string> result)
+        IReadOnlyDictionary<Drawing, (string Name, int Quantity)> requirements, List<string> result,
+        IReadOnlySet<Part> fixedParts = null)
     {
         foreach (var group in plate.CommonLines)
         {
+            if (fixedParts != null && group.Members.All(fixedParts.Contains))
+                continue;
             if (group.Members.Any(member => !parts.Contains(member)))
             {
                 result.Add("A common-line group names a part that is not on its plate");

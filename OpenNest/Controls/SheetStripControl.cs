@@ -74,6 +74,12 @@ namespace OpenNest.Controls
 
         public int PartCount => tiles.Sum(t => t.Quantity * t.PartCount);
 
+        /// <summary>Parts already on the sheets before this proposal, every physical copy counted.</summary>
+        public int ExistingPartCount => tiles.Sum(t => t.Quantity * t.OccupantCount);
+
+        /// <summary>The one color parts already on a plate are drawn in, so the new parts stand out.</summary>
+        internal static readonly Color OccupantColor = Color.FromArgb(160, 160, 160);
+
         public void SetSheets(IReadOnlyList<ProposedPlate> sheets)
         {
             ClearTiles();
@@ -179,6 +185,8 @@ namespace OpenNest.Controls
             var baseline = (room - content) / 2 + (content - CaptionHeight);
             using var partPen = new Pen(Color.FromArgb(60, 60, 60), 0);
             using var clampBrush = new SolidBrush(Color.FromArgb(90, 230, 170, 40));
+            using var occupantBrush = new SolidBrush(Color.FromArgb(170, OccupantColor));
+            using var occupantPen = new Pen(Color.FromArgb(120, 120, 120), 0);
             // The plate view's obstacle colors.
             using var obstacleBrush = new HatchBrush(HatchStyle.WideUpwardDiagonal,
                 Color.FromArgb(170, 120, 60, 60), Color.FromArgb(60, 200, 80, 80));
@@ -225,6 +233,11 @@ namespace OpenNest.Controls
                 g.Transform = toDevice;
                 foreach (var zone in tile.Clamps)
                     g.FillRectangle(clampBrush, zone);
+                foreach (var path in tile.Occupants)
+                {
+                    g.FillPath(occupantBrush, path);
+                    g.DrawPath(occupantPen, path);
+                }
                 foreach (var (path, brush) in tile.Parts)
                 {
                     g.FillPath(brush, path);
@@ -292,6 +305,12 @@ namespace OpenNest.Controls
                 foreach (var zone in stock.ClampZones)
                     Clamps.Add(new RectangleF((float)zone.Bounds.X, (float)zone.Bounds.Y,
                         (float)zone.Bounds.Length, (float)zone.Bounds.Width));
+                foreach (var part in plate.Occupants)
+                {
+                    PartArea += part.BaseDrawing.IsCutOff ? 0 : part.BaseDrawing.Area;
+                    Occupants.Add(part.Program.GetFillPath(part.Location));
+                }
+                OccupantCount = plate.Occupants.Count(p => !p.BaseDrawing.IsCutOff);
                 foreach (var part in plate.Parts)
                 {
                     PartArea += part.BaseDrawing.Area;
@@ -315,9 +334,13 @@ namespace OpenNest.Controls
                     };
                 }
 
-                Title = Quantity == 1 ? $"Sheet {firstNumber}" : $"Sheets {firstNumber}–{firstNumber + Quantity - 1} (×{Quantity})";
+                Title = plate.ExistingPlateNumber is int existing
+                    ? (Quantity == 1 ? $"Plate {existing} (existing)" : $"Plate {existing} (existing, ×{Quantity})")
+                    : Quantity == 1 ? $"Sheet {firstNumber}" : $"Sheets {firstNumber}–{firstNumber + Quantity - 1} (×{Quantity})";
                 var utilization = SheetArea > 0 ? PartArea / SheetArea : 0;
-                Detail = $"{stock.Size} · {PartCount} parts · {utilization:P0}";
+                Detail = OccupantCount > 0
+                    ? $"{stock.Size} · {PartCount} new parts · {utilization:P0}"
+                    : $"{stock.Size} · {PartCount} parts · {utilization:P0}";
             }
 
             public Geometry.Box Sheet { get; }
@@ -332,6 +355,9 @@ namespace OpenNest.Controls
             public GraphicsPath Obstacles { get; }
             public int Quantity { get; }
             public int PartCount { get; }
+
+            /// <summary>Parts already on the plate, drawn in <see cref="OccupantColor"/>.</summary>
+            public int OccupantCount { get; }
             public double PartArea { get; }
             public string Title { get; }
             public string Detail { get; }
@@ -343,6 +369,7 @@ namespace OpenNest.Controls
             public PointF[] RemnantSpan { get; }
             public List<RectangleF> Clamps { get; } = new();
             public List<(GraphicsPath Path, Brush Brush)> Parts { get; } = new();
+            public List<GraphicsPath> Occupants { get; } = new();
 
             private static PointF[] ToPoints(IReadOnlyList<Geometry.Vector> points, double x, double y) =>
                 points.Select(p => new PointF((float)(p.X + x), (float)(p.Y + y))).ToArray();
@@ -357,6 +384,9 @@ namespace OpenNest.Controls
                     brush.Dispose();
                 }
                 Parts.Clear();
+                foreach (var path in Occupants)
+                    path.Dispose();
+                Occupants.Clear();
             }
         }
     }

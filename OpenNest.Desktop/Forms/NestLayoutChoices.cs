@@ -31,8 +31,9 @@ namespace OpenNest.Forms
         public static SheetRemnant? Of(ProposedPlate plate)
         {
             var stock = plate?.Stock;
-            if (stock == null || stock.Outline != null || plate.Parts.Count == 0)
+            if (stock == null || stock.Outline != null || plate.Parts.Count + plate.Occupants.Count == 0)
                 return null;
+            var parts = plate.Parts.Concat(plate.Occupants).ToList();
             var length = stock.Size.Length;
             var width = stock.Size.Width;
             // Sheet extents around the origin, as the plate view places them for this quadrant.
@@ -40,10 +41,10 @@ namespace OpenNest.Forms
             var fromTop = stock.Quadrant is 3 or 4;
             var x = fromRight ? -length : 0;
             var y = fromTop ? -width : 0;
-            var left = plate.Parts.Min(p => p.BoundingBox.Left);
-            var right = plate.Parts.Max(p => p.BoundingBox.Right);
-            var bottom = plate.Parts.Min(p => p.BoundingBox.Bottom);
-            var top = plate.Parts.Max(p => p.BoundingBox.Top);
+            var left = parts.Min(p => p.BoundingBox.Left);
+            var right = parts.Max(p => p.BoundingBox.Right);
+            var bottom = parts.Min(p => p.BoundingBox.Bottom);
+            var top = parts.Max(p => p.BoundingBox.Top);
             var alongLength = System.Math.Max(0, fromRight ? left - x : x + length - right);
             var alongWidth = System.Math.Max(0, fromTop ? bottom - y : y + width - top);
             return alongLength * width >= alongWidth * length

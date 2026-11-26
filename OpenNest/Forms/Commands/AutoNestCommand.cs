@@ -9,6 +9,7 @@ using OpenNest.Data.MaterialLedger;
 using OpenNest.Diagnostics;
 using OpenNest.Engine;
 using OpenNest.Engine.Jobs;
+using OpenNest.Engine.Jobs.Placement;
 
 namespace OpenNest.Forms.Commands
 {
@@ -35,6 +36,7 @@ namespace OpenNest.Forms.Commands
         private IReadOnlyList<LedgerStockRow> ledgerRows = Array.Empty<LedgerStockRow>();
         private bool nestOnServer;
         private CommonLineUsage commonLineUsage;
+        private NestPlateSource plateSource;
 
         private AutoNestCommand(IWin32Window owner, EditNestForm target, List<NestItem> items,
             List<PlateOption> plateOptions, string engineName, double salvageRate, double minRemnantSize)
@@ -99,6 +101,7 @@ namespace OpenNest.Forms.Commands
                 ledgerRows = form.OptimizePlateSize ? form.LedgerRows : Array.Empty<LedgerStockRow>(),
                 nestOnServer = form.NestOnServer,
                 commonLineUsage = form.CommonLineUsage,
+                plateSource = form.PlateSource,
             };
         }
 
@@ -108,6 +111,11 @@ namespace OpenNest.Forms.Commands
         /// </summary>
         public async Task RunAsync(CancellationTokenSource cts)
         {
+            if (plateSource != NestPlateSource.New)
+            {
+                await RunOnCurrentPlatesAsync(cts);
+                return;
+            }
             try
             {
                 var request = new NestPipelineRequest(EngineName, items,
@@ -323,6 +331,158 @@ namespace OpenNest.Forms.Commands
             if (!solve.IsCompleted)
                 progressForm.ShowDialog(owner);
             return await solve;
+        }
+
+        /// <summary>
+        /// Auto Nest on the nest's current plates (and new sheets for Both): the free space beside
+        /// placed parts, the empty plates, then new sheets, shown together in one review and kept in
+        /// one undo record. Always on this PC: the server lays out new plates only.
+        /// </summary>
+        private async Task RunOnCurrentPlatesAsync(CancellationTokenSource cts)
+        {
+            try
+            {
+                var kerf = CommonLineKerf(target);
+                var proposal = await CurrentPlatesNest.RunAsync(target.Nest, target.PlateManager, plateSource,
+                    items, EngineName, EngineSelection.FillStrategy,
+                    sheets => new NestJobOptions(maxPlates: sheets, salvageRate: 0,
+                        minimumSalvageDimension: minRemnantSize)
+                    {
+                        CommonLineUsage = commonLineUsage,
+                        CommonLineKerf = kerf,
+                    },
+                    remaining => new NestPipelineRequest(EngineName, remaining.ToList(),
+                        NestStockBuilder.FromTemplate(target.PlateView.Plate, plateOptions),
+                        new NestJobOptions(maxPlates: 100,
+                            salvageRate: plateOptions?.Count > 0 ? salvageRate : 0,
+                            minimumSalvageDimension: minRemnantSize)
+                        {
+                            CommonLineUsage = commonLineUsage,
+                            CommonLineKerf = kerf,
+                        }),
+                    plan => FillLeftoverAsync(plan, cts),
+                    async request => (await SolveAndPickAsync(owner, target, request, cts)).Result,
+                    cts.Token);
+                cts.Token.ThrowIfCancellationRequested();
+
+                if (!proposal.PlacesAnything)
+                {
+                    var why = plateSource == NestPlateSource.Current
+                        && CurrentPlatesNest.EmptyPlates(target.Nest, target.PlateManager).Count == 0
+                        && !target.Nest.Plates.Any(PlateLeftoverFill.CanFill)
+                            ? "The nest has no current plate Auto Nest can use: no empty plate you have set up, "
+                                + "and no rectangular plate with parts and without cut-offs."
+                            : plateSource == NestPlateSource.Current
+                                ? "Auto Nest placed nothing on the current plates."
+                                : "Auto Nest placed nothing on the current plates or new sheets.";
+                    if (proposal.Unplaced.Count > 0)
+                        why += "\n\n" + $"Not placed ({proposal.Unplaced.Sum(u => u.Count)}):\n"
+                            + string.Join("\n", proposal.Unplaced.Select(u => u.Describe()));
+                    MessageBox.Show(owner, why, Caption, MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    return;
+                }
+
+                await ReviewAndCommitAsync(proposal, cts.Token);
+            }
+            catch (OperationCanceledException) when (cts.IsCancellationRequested)
+            {
+                // Stop discards the entire proposal.
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(owner, $"Nesting error: {ex.Message}", Caption,
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        /// <summary>Runs the leftover fill off the UI thread behind a cancellable progress window.</summary>
+        private async Task<LeftoverFillResult> FillLeftoverAsync(
+            Func<IProgress<NestProgress>, LeftoverFillResult> plan, CancellationTokenSource cts)
+        {
+            using var progressForm = new NestProgressForm(cts, showPlateRow: true)
+            {
+                AllowAccept = false,
+                HoldOpenUntilCompleted = true,
+            };
+            var receiving = true;
+            var progress = new Progress<NestProgress>(p =>
+            {
+                if (receiving && !target.IsDisposed)
+                    progressForm.UpdateProgress(p);
+            });
+            async Task<LeftoverFillResult> RunFillAsync()
+            {
+                try
+                {
+                    return await Task.Run(() => plan(progress));
+                }
+                finally
+                {
+                    receiving = false;
+                    progressForm.ShowCompleted();
+                    progressForm.Close();
+                }
+            }
+
+            var fill = RunFillAsync();
+            if (!fill.IsCompleted)
+                progressForm.ShowDialog(owner);
+            return await fill;
+        }
+
+        /// <summary>
+        /// The current-plates counterpart of the shared review: the validation review when a stage
+        /// broke layout rules, the Keep/Discard review of every sheet (parts already placed shown in
+        /// one color), then one commit in one undo record.
+        /// </summary>
+        private async Task ReviewAndCommitAsync(CurrentPlatesProposal proposal, CancellationToken token)
+        {
+            var allowInvalid = false;
+            if (!proposal.IsValid)
+            {
+                using var validation = new NestValidationForm(proposal.Violations, proposal.CanKeep);
+                if (validation.ShowDialog(owner) != DialogResult.OK)
+                    return;
+                allowInvalid = true;
+            }
+            using (var review = new NestReviewForm($"Review Auto Nest — {EngineName}", proposal.Sheets,
+                proposal.IsValid ? 0 : proposal.Violations.Count, proposal.Unplaced,
+                target.PlateView.ColorScheme, null))
+            {
+                if (review.ShowDialog(owner) != DialogResult.OK)
+                    return;
+            }
+            if (target.IsDisposed)
+                return;
+
+            IReadOnlyList<Plate> applied;
+            using (var change = target.BeginChange(Caption))
+            {
+                change.MarkChanged();
+                applied = CurrentPlatesNest.Commit(proposal, target.Nest, target.PlateManager, allowInvalid, token,
+                    out var newPlates);
+                if (proposal.New != null)
+                    AssignLedgerStock(proposal.New, newPlates);
+                target.Nest.CommonLineUsage = commonLineUsage;
+                if (proposal.New != null && plateOptions?.Count > 0)
+                {
+                    if (savedOptions?.Count > 0)
+                        target.Nest.PlateOptions = savedOptions;
+                    target.Nest.SalvageRate = salvageRate;
+                    target.Nest.MinimumRemnantDimension = minRemnantSize;
+                }
+                if (applied.Count > 0)
+                    target.PlateManager.LoadAt(target.Nest.Plates.IndexOf(applied[0]));
+                change.Complete();
+            }
+            target.PlateView.Invalidate();
+            target.UpdatePlateList();
+            if (allowInvalid)
+            {
+                target.OverlapDisplay = OverlapDisplayMode.Both;
+                await target.CheckOverlapsAsync();
+            }
+            ShowResultNotices(owner, target, applied);
         }
 
         // Only a committed proposal gets codes: every return above leaves them as they were.

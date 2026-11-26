@@ -512,6 +512,20 @@ public static partial class PlateFillService
         return new RemnantFinder(area, obstacles).FindRemnants();
     }
 
+    /// <summary>
+    /// The parts of <paramref name="proposed"/> that lie in <paramref name="area"/>, keep the plate's
+    /// part spacing from its parts, <paramref name="accepted"/> and each other, stay out of its
+    /// clamp keep-outs and fit <paramref name="demand"/>: the same certification the clamp path
+    /// gives every fill. Neither list is changed.
+    /// </summary>
+    internal static List<Part> CertifyClear(Plate plate, Box area, List<Part> proposed,
+        List<Part> accepted, List<NestItem> demand)
+    {
+        var clear = new List<Part>();
+        AddClear(clear, proposed, plate, area, demand, accepted);
+        return clear;
+    }
+
     private static void AddClear(List<Part> accepted, List<Part> proposed, Plate plate,
         Box area, List<NestItem> demand = null, List<Part> previouslyPlaced = null,
         int groupSize = 1)

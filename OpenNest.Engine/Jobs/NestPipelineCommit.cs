@@ -25,7 +25,7 @@ public static class NestPipelineCommit
         manager.BeginBatch();
         try
         {
-            return Attach(result, manager.GetOrCreateEmpty);
+            return Attach(result, _ => manager.GetOrCreateEmpty());
         }
         finally
         {
@@ -48,8 +48,51 @@ public static class NestPipelineCommit
     {
         ArgumentNullException.ThrowIfNull(nextPlate);
         EnsureCommittable(result, allowInvalid, token);
-        return Attach(result, nextPlate);
+        return Attach(result, _ => nextPlate());
     }
+
+    /// <summary>
+    /// Commits a result solved on stock made from the nest's own empty plates: each proposed
+    /// plate goes onto the plate <paramref name="plateByStockId"/> names for its stock id. Every
+    /// check runs before anything changes; a stock id with no plate, a plate that has gained parts
+    /// or cut-offs, or two layouts on one plate refuses the whole commit.
+    /// </summary>
+    public static IReadOnlyList<Plate> ApplyToStockPlates(
+        NestPipelineResult result,
+        IReadOnlyDictionary<string, Plate> plateByStockId,
+        bool allowInvalid = false,
+        CancellationToken token = default
+    )
+    {
+        ArgumentNullException.ThrowIfNull(plateByStockId);
+        EnsureStockPlates(result, plateByStockId, allowInvalid, token);
+        return Attach(result, proposed => plateByStockId[proposed.Stock.Id]);
+    }
+
+    /// <summary>The checks <see cref="ApplyToStockPlates"/> runs before it changes anything.</summary>
+    public static void EnsureStockPlates(
+        NestPipelineResult result,
+        IReadOnlyDictionary<string, Plate> plateByStockId,
+        bool allowInvalid = false,
+        CancellationToken token = default
+    )
+    {
+        ArgumentNullException.ThrowIfNull(plateByStockId);
+        EnsureCommittable(result, allowInvalid, token);
+        var used = new HashSet<Plate>(ReferenceEqualityComparer.Instance);
+        foreach (var proposed in result.Plates.Where(p => p.Parts.Count > 0))
+        {
+            if (!plateByStockId.TryGetValue(proposed.Stock.Id, out var plate)
+                || plate.Parts.Count > 0 || plate.CutOffs.Count > 0 || proposed.Quantity != 1
+                || !used.Add(plate))
+                throw new InvalidOperationException("A plate changed after the nesting proposal was made; run Auto Nest again.");
+        }
+    }
+
+    /// <summary>The checks every commit runs before it changes anything; public so a caller
+    /// committing several results can check them all first.</summary>
+    public static void EnsureCanApply(NestPipelineResult result, bool allowInvalid = false,
+        CancellationToken token = default) => EnsureCommittable(result, allowInvalid, token);
 
     /// <summary>
     /// Pairs the plates <see cref="ApplyToEmptyPlates"/> or <see cref="ApplyToPlates"/> returned
@@ -82,14 +125,14 @@ public static class NestPipelineCommit
         token.ThrowIfCancellationRequested();
     }
 
-    private static IReadOnlyList<Plate> Attach(NestPipelineResult result, Func<Plate> nextPlate)
+    private static IReadOnlyList<Plate> Attach(NestPipelineResult result, Func<ProposedPlate, Plate> plateFor)
     {
         var applied = new List<Plate>();
         foreach (var proposed in result.Plates)
         {
             if (proposed.Parts.Count == 0)
                 continue;
-            var plate = nextPlate();
+            var plate = plateFor(proposed);
             plate.Size = proposed.Stock.Size;
             plate.Outline = proposed.Stock.Outline;
             plate.PartSpacing = proposed.Stock.PartSpacing;
