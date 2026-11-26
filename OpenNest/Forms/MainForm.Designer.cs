@@ -1266,8 +1266,8 @@ namespace OpenNest.Forms
             materialStatusLabel.Padding = new System.Windows.Forms.Padding(5, 0, 5, 0);
             materialStatusLabel.Size = new System.Drawing.Size(85, 19);
             materialStatusLabel.Text = "Material: (none)";
-            materialStatusLabel.ToolTipText = "Click to edit nest info";
-            materialStatusLabel.Click += MaterialStatusLabel_Click;
+            materialStatusLabel.ToolTipText = "Click to edit nest info; right-click for more";
+            materialStatusLabel.MouseUp += MaterialStatusLabel_MouseUp;
             //
             // plateUtilStatusLabel
             //

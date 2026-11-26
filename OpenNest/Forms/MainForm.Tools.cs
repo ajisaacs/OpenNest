@@ -271,7 +271,11 @@ namespace OpenNest.Forms
                 MachineSettings.LoadSavedNestDefaults(out _)), activeForm.Nest.Machine);
         }
 
-        private void MachineConfig_Click(object sender, EventArgs e)
+        private void MachineConfig_Click(object sender, EventArgs e) => ShowMachineConfig(null);
+
+        // Opens Machine Configuration, at the nest's machine settings for its material and
+        // thickness when a nest is given.
+        private void ShowMachineConfig(Nest nest)
         {
             var provider = MachineSettings.CreateMachineProvider(refresh: true);
             SharedSettings.WarnIfOffline(this);
@@ -280,6 +284,8 @@ namespace OpenNest.Forms
                 var source = SharedSettings.MachineSource(provider);
                 if (source.Length > 0)
                     form.Text += $" ({source})";
+                if (nest != null)
+                    form.SelectNestMaterial(nest);
                 form.ShowDialog(this);
             }
         }

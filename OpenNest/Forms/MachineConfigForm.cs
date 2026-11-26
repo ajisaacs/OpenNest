@@ -95,6 +95,57 @@ namespace OpenNest.Forms
                 _tree.SelectedNode = _tree.Nodes[0];
         }
 
+        /// <summary>
+        /// Selects the most specific node the nest's machine has on file for its material: the
+        /// thickness the cutting defaults use, else the grade, else the material, else the
+        /// machine. Returns the selected node, or null (selection unchanged) when the nest's
+        /// machine is not in the tree.
+        /// </summary>
+        public TreeNode SelectNestMaterial(Nest nest)
+        {
+            ArgumentNullException.ThrowIfNull(nest);
+            var machineNode = _tree.Nodes.Cast<TreeNode>()
+                .FirstOrDefault(n => n.Tag is MachineConfig m && m.Id == nest.Machine?.Id);
+            if (machineNode is null)
+                return null;
+
+            var machine = (MachineConfig)machineNode.Tag;
+            var node = FindNestMaterialNode(machineNode, machine, nest) ?? machineNode;
+            _tree.SelectedNode = node;
+            node.EnsureVisible();
+            return node;
+        }
+
+        private static TreeNode FindNestMaterialNode(
+            TreeNode machineNode,
+            MachineConfig machine,
+            Nest nest
+        )
+        {
+            var name = nest.Material?.Name;
+            if (string.IsNullOrWhiteSpace(name))
+                return null;
+
+            var key = SharedListNames.Key(name);
+            var groupNode = machineNode.Nodes.Cast<TreeNode>()
+                .FirstOrDefault(n => n.Tag is string group && SharedListNames.Key(group) == key);
+            if (groupNode is null)
+                return null;
+
+            var grade = nest.Material.Grade;
+            var material = string.IsNullOrWhiteSpace(grade)
+                ? machine.GetMaterial(name)
+                : machine.GetMaterial(name, grade);
+            var gradeNode = groupNode.Nodes.Cast<TreeNode>()
+                .FirstOrDefault(n => ReferenceEquals(n.Tag, material));
+            if (gradeNode is null)
+                return groupNode;
+
+            var thickness = MachineCuttingDefaults.Find(machine, nest);
+            return gradeNode.Nodes.Cast<TreeNode>()
+                .FirstOrDefault(n => ReferenceEquals(n.Tag, thickness)) ?? gradeNode;
+        }
+
         private static TreeNode BuildMachineNode(MachineConfig machine)
         {
             var machineNode = new TreeNode(machine.Name) { Tag = machine };

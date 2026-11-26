@@ -99,8 +99,28 @@ namespace OpenNest.Forms
         private void LocationStatusLabel_Click(object sender, EventArgs e) =>
             statusBar.ToggleLocationMode();
 
-        private void MaterialStatusLabel_Click(object sender, EventArgs e) =>
-            EditNest_Click(sender, e);
+        // A click edits the nest info; a right-click also offers the machine's settings for the
+        // nest's material and thickness.
+        private void MaterialStatusLabel_MouseUp(object sender, MouseEventArgs e)
+        {
+            if (activeForm == null)
+                return;
+            if (e.Button == MouseButtons.Left)
+            {
+                EditNest_Click(sender, e);
+                return;
+            }
+            if (e.Button != MouseButtons.Right)
+                return;
+
+            var nest = activeForm.Nest;
+            var menu = new ContextMenuStrip();
+            menu.Items.Add("Edit Nest...", null, EditNest_Click);
+            var showConfig = menu.Items.Add("Show in Machine Configuration...", null,
+                (_, _) => ShowMachineConfig(nest));
+            showConfig.Enabled = nest.Machine != null;
+            ShowAboveStatusLabel(menu, materialStatusLabel);
+        }
 
         // Holds are read only on open, save and here; the status bar never polls.
         private void LedgerStatusLabel_Click(object sender, EventArgs e)
@@ -117,9 +137,16 @@ namespace OpenNest.Forms
 
             var menu = new ContextMenuStrip();
             FillMachineItems(menu.Items);
+            ShowAboveStatusLabel(menu, machineStatusLabel);
+        }
+
+        // Opens a one-off menu above a status label; it is disposed once closed.
+        private void ShowAboveStatusLabel(ContextMenuStrip menu, ToolStripItem label)
+        {
             menu.Closed += (_, _) => BeginInvoke(menu.Dispose);
-            var bounds = machineStatusLabel.Bounds;
-            menu.Show(statusStrip1, new System.Drawing.Point(bounds.Left, bounds.Top), ToolStripDropDownDirection.AboveRight);
+            var bounds = label.Bounds;
+            menu.Show(statusStrip1, new System.Drawing.Point(bounds.Left, bounds.Top),
+                ToolStripDropDownDirection.AboveRight);
         }
 
         #endregion Statusbar Events
