@@ -465,6 +465,13 @@ namespace OpenNest.IO
             [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
             public bool AllowCommonLine { get; init; }
 
+            /// <summary>
+            /// <c>Drawing.FormedOverride</c>: whether the part is formed after cutting, set by
+            /// hand. Omitted when the drawing's bend lines decide.
+            /// </summary>
+            [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+            public bool? Formed { get; init; }
+
             public ConstraintsDto Constraints { get; init; } = new();
             public MaterialDto Material { get; init; } = new();
             public SourceDto Source { get; init; } = new();

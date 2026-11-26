@@ -244,6 +244,7 @@ namespace OpenNest.IO
                         NestPriority = d.Priority == 0 ? null : d.Priority,
                         CutFirst = d.CutFirst,
                         AllowCommonLine = d.AllowCommonLine,
+                        Formed = d.FormedOverride,
                         Constraints = new ConstraintsDto
                         {
                             StepAngle = d.Constraints.StepAngle,

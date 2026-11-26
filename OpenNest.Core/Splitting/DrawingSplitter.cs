@@ -134,6 +134,8 @@ public static class DrawingSplitter
         piece.Priority = source.Priority;
         piece.CutFirst = source.CutFirst;
         piece.AllowCommonLine = source.AllowCommonLine;
+        // A piece of a rolled or formed part is still formed; bend lines follow below.
+        piece.FormedOverride = source.FormedOverride;
         piece.Material = source.Material;
         piece.Constraints = source.Constraints;
         piece.Customer = source.Customer;

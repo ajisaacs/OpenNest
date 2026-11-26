@@ -120,6 +120,27 @@ namespace OpenNest
         public List<Bend> Bends { get; set; } = new List<Bend>();
 
         /// <summary>
+        /// Someone's answer to "is this part formed (bent or rolled) after cutting?", or null to
+        /// let <see cref="Bends"/> decide (rolled parts carry a centerline bend with the roll
+        /// radius). For exceptions: a drawing with bend lines that ships flat sets it false, one
+        /// whose bend lines were lost sets it true.
+        /// </summary>
+        public bool? FormedOverride { get; set; }
+
+        /// <summary>
+        /// True when this part goes to forming after cutting: <see cref="FormedOverride"/> when
+        /// set, otherwise whether the drawing has bend lines. Reports use it to sort parts.
+        /// </summary>
+        public bool IsFormed => FormedOverride ?? Bends is { Count: > 0 };
+
+        /// <summary>
+        /// Records an answer to "formed after cutting?": an answer the bend lines already give
+        /// clears <see cref="FormedOverride"/>, so later bend line edits keep deciding.
+        /// </summary>
+        public void SetFormed(bool formed) =>
+            FormedOverride = formed == (Bends is { Count: > 0 }) ? null : formed;
+
+        /// <summary>
         /// The library revision this drawing was copied from, or null when it did not come
         /// from a drawing library. Editing the drawing in a nest keeps the link as provenance.
         /// </summary>

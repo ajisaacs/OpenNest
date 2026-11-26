@@ -303,6 +303,7 @@ namespace OpenNest.IO
                 drawing.Priority = d.NestPriority ?? LegacyPriority.Convert(d.Priority);
                 drawing.CutFirst = d.CutFirst;
                 drawing.AllowCommonLine = d.AllowCommonLine;
+                drawing.FormedOverride = d.Formed;
                 drawing.Constraints.StepAngle = d.Constraints.StepAngle;
                 drawing.Constraints.StartAngle = d.Constraints.StartAngle;
                 drawing.Constraints.EndAngle = d.Constraints.EndAngle;

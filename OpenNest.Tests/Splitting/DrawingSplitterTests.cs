@@ -85,6 +85,7 @@ public class DrawingSplitterTests
         drawing.Color = System.Drawing.Color.Red;
         drawing.Priority = 5;
         drawing.CutFirst = true;
+        drawing.FormedOverride = true;
 
         var results = DrawingSplitter.Split(
             drawing,
@@ -99,6 +100,7 @@ public class DrawingSplitterTests
                 Assert.Equal(System.Drawing.Color.Red, d.Color);
                 Assert.Equal(5, d.Priority);
                 Assert.True(d.CutFirst);
+                Assert.True(d.FormedOverride);
             }
         );
     }
