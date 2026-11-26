@@ -11,11 +11,11 @@ in `OpenNest.Engine/NestingEngines/<Name>/`, its tests in `OpenNest.Engine.Tests
 
 | Engine | Best for | Method |
 |---|---|---|
-| Default | Any job; used when no engine is named | Runs Irregular, Rectangles and Circles, checks each layout with the layout check and keeps the best: valid first, then fewest unplaced parts, then lowest salvage-credited cost, then the largest compactness offcut; remaining ties keep the engine listed first here |
+| Default | Any job; used when no engine is named | Runs Irregular, Rectangles, Circles and Raster, checks each layout with the layout check and keeps the best: valid first, then fewest unplaced parts, then lowest salvage-credited cost, then the largest compactness offcut; remaining ties keep the engine listed first here |
 | Rectangles | Plain and near-rectangular plates | Each part packed as the box of its material at its minimum-area rotation, using a maximal-rectangles free list; the sheet that finishes the job is also squeezed into a shorter or narrower bin; stock chosen sheet by sheet by salvage-credited look-ahead cost, and the whole job also run large parts first with the small parts filling their sheets' gaps |
 | Circles | Round parts: blanks, washers, flanges, gears by their tip circle | Each part packed as its minimum enclosing circle at centers tangent to two of walls, placed discs and clamp keep-outs, with hexagonal and square lattice seeds; bids only when every part is round; stock chosen as Rectangles does, plus whole-job runs preferring each stock and a tail re-plan |
 | Irregular | Irregular profiles | No-fit-polygon frontier packing with gap filling and best-fit pairs, six whole-job strategy variants (each also keeping a stock that finished the job when the per-sheet estimate passed it over for a plan that ended up dearer) and a tail re-plan, then large-first variants that pack each sheet's large parts before any small one, then grouped variants that pack like parts together, then a banded variant that packs each sheet in full-height strips, each group as its Lattice band or each strip from the largest parts down, with the last sheet of every plan it makes its best packed again as such bands, then a sheet-reduction pass that packs edge parts first and turns a key part by its contacts, then a squeeze that packs the last sheet again, largest part first, in ever shorter strips; under a time limit it first reports a quick plan without Lattice blocks, and after its search keeps trying seeded variants until the limit |
-| Raster | A fast first plan of irregular parts | Each part rotation rasterized as a bit mask of its material grown by half the part spacing; coarse raster no-fit maps propose positions over the sheet and a grid four times finer settles each one; the job decoded greedily in 48 variants (orders, rotation sets, leftmost or frontier positions) and once offering every variant's sheet each round, stock chosen as Rectangles does, best by Default's ranking kept; not one of Default's candidates |
+| Raster | A fast first plan of irregular parts | Each part rotation rasterized as a bit mask of its material grown by half the part spacing; coarse raster no-fit maps propose positions over the sheet and a grid four times finer settles each one; the job decoded greedily in 48 variants (orders, rotation sets, leftmost or frontier positions) and once offering every variant's sheet each round, stock chosen as Rectangles does, best by Default's ranking kept; Default's last candidate |
 | FlatBar | Flat bar: parts about as wide as the bar | Each stock read as a bar and cut in one row: the CutList cut-list packer and a best-fill search on part lengths less their self-nesting gain, then a slide-left pass that nests shaped ends and refills freed length; stock chosen bar by bar by whole-plan cost |
 | Lattice, Strip, Vertical Remnant, Horizontal Remnant | Many copies of a few parts | The fixed placement strategies behind interactive fill; Lattice is the multi-phase lattice fill (linear, pairs, rectangle best-fit, remainder; the pairs phase fills the strip its grid leaves with rows of pairs when they hold more than single parts, and also tiles herringbone pairs: the part turned so a hull edge lies along a sheet axis, nested into its own row, with every other row reversed), and the remnant strategies run it ranked to keep the largest drop. In whole jobs, all four place a plate with any fixed or bounded part rotation by the rotation-aware ordered placer instead |
 
@@ -53,10 +53,11 @@ same way, in place of the two orders above.
 
 Neither Irregular nor Rectangles wins every job, even within its own lane, so Default runs both
 rather than choosing by part shape; Rectangles adds little time and is also the fallback when an
-Irregular layout fails the check. Default runs Rectangles first, then Circles, then Irregular, so
-a search stopped early already holds a valid plan and Irregular can keep searching last; it
-chooses only after all have run, in table order (Irregular, Rectangles, Circles), so the run
-order never changes the choice. A candidate that throws is skipped. Default routes the whole job:
+Irregular layout fails the check. Default runs Rectangles first, then Raster, then Circles, then
+Irregular, so a search stopped early already holds a valid plan, an irregular one within seconds
+from Raster, and Irregular can keep searching last; it chooses only after all have run, in the
+order Irregular, Rectangles, Circles, Raster, so the run order never changes the choice and Raster
+wins only with a strictly better score. A candidate that throws is skipped. Default routes the whole job:
 engines cannot share a sheet, so a job mixing plain and irregular parts goes to both engines whole.
 Circles is a third candidate that bids only on round jobs (see below), so a job mixing round and
 other parts goes to Irregular and Rectangles.
@@ -591,7 +592,8 @@ On seven real jobs (one to 292 parts, `--parallel 1`, 6" minimum salvage) every 
 was valid. It matched Irregular's sheet count on five, in 0.6 to 2.3 s where Irregular took 11 to
 78 s, at under 1 to 4% more salvage-credited cost; it took a third sheet where Irregular used two on a
 job of ten large plates, and 24 s on a job offering seven stock sizes. It suits a quick look at a
-job, not a final layout, and is not one of Default's candidates.
+job, not a final layout. Default runs it second, after Rectangles, so its plan is shown early,
+and ranks it last, so it is chosen only when its layout scores strictly better.
 
 Packing tighter than the spacing (masks grown by half the spacing, then half and one cell under)
 and opening the gaps with Fix Spacing was tried on the same jobs: it saved under 0.1% of total

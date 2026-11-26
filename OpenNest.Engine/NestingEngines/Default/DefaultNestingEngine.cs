@@ -7,6 +7,7 @@ using System.Threading;
 using OpenNest.Engine.Jobs;
 using OpenNest.Engine.NestingEngines.Circles;
 using OpenNest.Engine.NestingEngines.Irregular;
+using OpenNest.Engine.NestingEngines.Raster;
 using OpenNest.Engine.NestingEngines.Rectangles;
 
 namespace OpenNest.Engine.NestingEngines.Default;
@@ -17,10 +18,11 @@ namespace OpenNest.Engine.NestingEngines.Default;
 /// layout before an invalid one, then the fewest unplaced parts, then the lowest
 /// <see cref="NestJobCost"/>; remaining ties keep candidate order.
 ///
-/// Candidates are Irregular, then Rectangles, then Circles. Neither of the first two wins every
-/// job: Rectangles packs each part as its box, which is often best for plain plates and is a
-/// cheap, valid fallback for the rest. Circles bids only when every part is round, and otherwise
-/// returns everything unplaced at once.
+/// Candidates are Irregular, then Rectangles, then Circles, then Raster. Neither of the first two
+/// wins every job: Rectangles packs each part as its box, which is often best for plain plates and
+/// is a cheap, valid fallback for the rest. Circles bids only when every part is round, and
+/// otherwise returns everything unplaced at once. Raster is a fast irregular nest whose plan comes
+/// long before Irregular's; it is last in tie-break order, so it wins only by a better score.
 /// A candidate that throws or returns no result is skipped; when every candidate throws, the
 /// exception of the first in tie-break order is rethrown. Cancellation stops the search.
 /// Candidates' plate commits are not forwarded; the chosen result's commits are reported once it
@@ -31,9 +33,10 @@ namespace OpenNest.Engine.NestingEngines.Default;
 /// worse plan after a better one. A candidate result that beats them is reported too, and the
 /// chosen result is always the last plan reported.
 ///
-/// Rectangles, the quick and always-valid fallback, runs first, then Circles, then Irregular, so
-/// a caller that stops the search early, such as <see cref="DeadlineNestingEngine"/>, already
-/// holds a valid plan, and Irregular can search until cancelled
+/// Rectangles, the quick and always-valid fallback, runs first, then Raster, then Circles, then
+/// Irregular, so a caller that stops the search early, such as <see cref="DeadlineNestingEngine"/>,
+/// already holds a valid plan (an irregular one within seconds), and Irregular can search until
+/// cancelled
 /// (<see cref="NestJobOptions.SearchUntilCancelled"/>) last. The choice is made after all have
 /// run, in candidate (tie-break) order, so the run order never changes it.
 ///
@@ -51,8 +54,9 @@ public sealed class DefaultNestingEngine : INestingEngine
                 () => new IrregularNestingEngine(),
                 () => new RectanglesNestingEngine(),
                 () => new CirclesNestingEngine(),
+                () => new RasterNestingEngine(),
             },
-            new[] { 1, 2, 0 })
+            new[] { 1, 3, 2, 0 })
     {
     }
 

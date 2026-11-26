@@ -301,7 +301,7 @@ public class IrregularSearchUntilCancelledTests
     public void DefaultUnderATimeLimitReturnsAValidPlanNoWorseThanUnlimited()
     {
         // Irregular runs last under Default and searches until the limit; its plans compete
-        // with the Rectangles and Circles results already reported. A limit shorter than the
+        // with the Rectangles, Raster and Circles results already reported. A limit shorter than the
         // normal search correctly returns an earlier, worse plan, so the limit is scaled from
         // the measured unlimited solve: seconds on a loaded CI runner, not a fixed constant.
         var job = MixedJob(false);

@@ -39,11 +39,11 @@ public class DefaultNestingEngineTests
     [Fact]
     public void BuiltInDefaultRunsIrregularLast()
     {
-        // Rectangles is the cheap, always-valid fallback: under a limit it must have reported
-        // its plan before the slower Irregular search starts, and Irregular, which may search
-        // until cancelled, must not keep Circles from running. Candidates stay in tie-break
-        // order Irregular, Rectangles, Circles.
-        Assert.Equal(new[] { 1, 2, 0 }, new DefaultNestingEngine().RunOrder);
+        // Rectangles is the cheap, always-valid fallback and Raster the fast irregular plan:
+        // under a limit both must have reported before the slower Irregular search starts, and
+        // Irregular, which may search until cancelled, must not keep the others from running.
+        // Candidates stay in tie-break order Irregular, Rectangles, Circles, Raster.
+        Assert.Equal(new[] { 1, 3, 2, 0 }, new DefaultNestingEngine().RunOrder);
     }
 
     [Fact]

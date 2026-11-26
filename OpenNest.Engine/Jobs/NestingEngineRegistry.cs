@@ -46,7 +46,7 @@ public static class NestingEngineRegistry
         // Listed first: the engine front ends use when the caller names none.
         Register(
             "Default",
-            "Any job: tries Rectangles, Circles and Irregular and keeps the best",
+            "Any job: tries Rectangles, Raster, Circles and Irregular and keeps the best",
             () => new DefaultNestingEngine()
         );
 

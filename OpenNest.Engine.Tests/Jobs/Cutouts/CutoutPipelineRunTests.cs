@@ -45,8 +45,10 @@ public class CutoutPipelineRunTests
     public void OrdinaryRunPlacesAnInsertInsideItsFrameThatTheOrdinarySolveCannotFit(string engine)
     {
         var request = Request(engine);
-        var baseline = NestPipeline.RunWithoutCutouts(request);
-        Assert.Equal(NestJobStatus.Incomplete, baseline.Status);
+        // Irregular's ordinary solve never nests a part in a hole; Default's can, through Raster,
+        // which keeps cutouts open, so only the bundled result is checked for it.
+        if (engine == "Irregular")
+            Assert.Equal(NestJobStatus.Incomplete, NestPipeline.RunWithoutCutouts(request).Status);
 
         var result = NestPipeline.Run(request);
         Assert.True(result.IsValid, string.Join("; ", result.Violations));
