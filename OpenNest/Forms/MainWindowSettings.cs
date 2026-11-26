@@ -1,4 +1,5 @@
 using System;
+using System.Drawing;
 using System.Windows.Forms;
 using OpenNest.Data;
 using OpenNest.Desktop;
@@ -10,32 +11,52 @@ namespace OpenNest.Forms
     /// <summary>The main window's persisted placement and its one-time settings upgrades.</summary>
     internal static class MainWindowSettings
     {
-        /// <summary>Restores the saved placement when it still fits the primary screen.</summary>
+        /// <summary>
+        /// Restores the saved placement when it still fits the primary screen. Without a usable
+        /// saved size the window keeps its designer start, maximized.
+        /// </summary>
         public static void Load(Form form)
         {
             var screen = Screen.PrimaryScreen.Bounds;
+            if (!IsRestorableSize(Settings.Default.MainWindowSize, form.MinimumSize, screen.Size))
+                return;
 
             if (screen.Contains(Settings.Default.MainWindowLocation))
                 form.Location = Settings.Default.MainWindowLocation;
-
-            if (
-                Settings.Default.MainWindowSize.Width <= screen.Width
-                && Settings.Default.MainWindowSize.Height <= screen.Height
-            )
-            {
-                form.Size = Settings.Default.MainWindowSize;
-            }
-
-            form.WindowState = Settings.Default.MainWindowState;
+            form.Size = Settings.Default.MainWindowSize;
+            form.WindowState = Settings.Default.MainWindowState == FormWindowState.Maximized
+                ? FormWindowState.Maximized : FormWindowState.Normal;
         }
 
         public static void Save(Form form)
         {
-            Settings.Default.MainWindowLocation = form.Location;
-            Settings.Default.MainWindowSize = form.Size;
-            Settings.Default.MainWindowState = form.WindowState;
+            var (bounds, state) = SavedPlacement(form.WindowState, form.Bounds, form.RestoreBounds);
+            Settings.Default.MainWindowLocation = bounds.Location;
+            Settings.Default.MainWindowSize = bounds.Size;
+            Settings.Default.MainWindowState = state;
             Settings.Default.Save();
         }
+
+        /// <summary>
+        /// Whether a saved main-window size is worth restoring: it fits the screen and is larger
+        /// than the window's minimum. The 0, 0 default, applied, shrinks the window to its minimum,
+        /// and a later close used to save that minimum, so the window opened at it from then on.
+        /// </summary>
+        internal static bool IsRestorableSize(Size saved, Size minimum, Size screen) =>
+            saved.Width > 0 && saved.Height > 0
+            && (saved.Width > minimum.Width || saved.Height > minimum.Height)
+            && saved.Width <= screen.Width && saved.Height <= screen.Height;
+
+        /// <summary>
+        /// What to remember on close: the restored bounds of a maximized or minimized window, and
+        /// never the minimized state.
+        /// </summary>
+        internal static (Rectangle Bounds, FormWindowState State) SavedPlacement(
+            FormWindowState state, Rectangle bounds, Rectangle restoreBounds) =>
+            state == FormWindowState.Normal
+                ? (bounds, FormWindowState.Normal)
+                : (restoreBounds, state == FormWindowState.Maximized
+                    ? FormWindowState.Maximized : FormWindowState.Normal);
 
         /// <summary>
         /// Places the Drawing Sets window where it last closed when that still shows on a
