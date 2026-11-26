@@ -56,7 +56,6 @@
             shapeLibraryButton = new System.Windows.Forms.ToolStripButton();
             drawingLibraryButton = new System.Windows.Forms.ToolStripButton();
             editDrawingsButton = new System.Windows.Forms.ToolStripButton();
-            toolStripButton3 = new System.Windows.Forms.ToolStripButton();
             hideNestedButton = new System.Windows.Forms.ToolStripButton();
             sortDrawingsButton = new System.Windows.Forms.ToolStripDropDownButton();
             ((System.ComponentModel.ISupportInitialize)splitContainer).BeginInit();
@@ -209,7 +208,7 @@
             // 
             toolStrip2.GripStyle = System.Windows.Forms.ToolStripGripStyle.Hidden;
             toolStrip2.ImageScalingSize = new System.Drawing.Size(20, 20);
-            toolStrip2.Items.AddRange(new System.Windows.Forms.ToolStripItem[] { toolStripButton2, shapeLibraryButton, drawingLibraryButton, editDrawingsButton, toolStripButton3, hideNestedButton, sortDrawingsButton });
+            toolStrip2.Items.AddRange(new System.Windows.Forms.ToolStripItem[] { toolStripButton2, shapeLibraryButton, drawingLibraryButton, editDrawingsButton, hideNestedButton, sortDrawingsButton });
             toolStrip2.Location = new System.Drawing.Point(4, 3);
             toolStrip2.Name = "toolStrip2";
             toolStrip2.Size = new System.Drawing.Size(265, 27);
@@ -258,17 +257,6 @@
             editDrawingsButton.Size = new System.Drawing.Size(34, 24);
             editDrawingsButton.Text = "Edit Drawings in Converter";
             editDrawingsButton.Click += EditDrawingsInConverter_Click;
-            //
-            // toolStripButton3
-            //
-            toolStripButton3.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Image;
-            toolStripButton3.Image = (System.Drawing.Image)resources.GetObject("toolStripButton3.Image");
-            toolStripButton3.Name = "toolStripButton3";
-            toolStripButton3.Padding = new System.Windows.Forms.Padding(5, 0, 5, 0);
-            toolStripButton3.RightToLeft = System.Windows.Forms.RightToLeft.No;
-            toolStripButton3.Size = new System.Drawing.Size(34, 24);
-            toolStripButton3.Text = "Cleanup unused Drawings";
-            toolStripButton3.Click += CleanUnusedDrawings_Click;
             //
             // hideNestedButton
             // 
@@ -336,7 +324,6 @@
         private System.Windows.Forms.ToolStripButton shapeLibraryButton;
         private System.Windows.Forms.ToolStripButton drawingLibraryButton;
         private System.Windows.Forms.ToolStripButton editDrawingsButton;
-        private System.Windows.Forms.ToolStripButton toolStripButton3;
         private System.Windows.Forms.ToolStripButton hideNestedButton;
         private System.Windows.Forms.ToolStripDropDownButton sortDrawingsButton;
         private System.Windows.Forms.ToolStripButton toolStripLabel2;

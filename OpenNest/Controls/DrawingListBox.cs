@@ -55,24 +55,29 @@ namespace OpenNest.Controls
                     PartPrintoutRequested?.Invoke(this, drawing);
             };
             var printoutSeparator = new ToolStripSeparator();
+            var removeUnusedSeparator = new ToolStripSeparator();
+            var removeUnusedItem = new ToolStripMenuItem("Remove Unused Drawings...") { Name = "mnuRemoveUnusedDrawings" };
+            removeUnusedItem.Click += (s, e) => RemoveUnusedRequested?.Invoke(this, EventArgs.Empty);
             menu.ShowItemToolTips = true;
             menu.Opening += (s, e) =>
             {
-                if (SelectedItem == null)
-                {
-                    e.Cancel = true;
-                    return;
-                }
+                // Commands on the selected drawing need one; whole-nest commands do not.
+                var hasDrawing = SelectedItem != null;
 
                 // Only hosts that handle the request offer it.
-                saveToLibraryItem.Visible = saveToLibrarySeparator.Visible = SaveToLibraryRequested != null;
+                saveToLibraryItem.Available = hasDrawing && SaveToLibraryRequested != null;
                 saveToLibraryItem.Enabled = SaveToLibraryUnavailableReason == null;
                 saveToLibraryItem.ToolTipText = SaveToLibraryUnavailableReason ?? "";
-                addToSetItem.Visible = AddToSetRequested != null;
+                addToSetItem.Available = AddToSetRequested != null;
                 addToSetItem.Enabled = SaveToLibraryUnavailableReason == null;
                 addToSetItem.ToolTipText = SaveToLibraryUnavailableReason ?? "";
-                openInConverterItem.Visible = openInConverterSeparator.Visible = OpenInConverterRequested != null;
-                printoutItem.Visible = printoutSeparator.Visible = PartPrintoutRequested != null;
+                openInConverterItem.Available = hasDrawing && OpenInConverterRequested != null;
+                printoutItem.Available = hasDrawing && PartPrintoutRequested != null;
+                deleteItem.Available = hasDrawing;
+                removeUnusedItem.Available = RemoveUnusedRequested != null;
+
+                TidySeparators(menu);
+                e.Cancel = !menu.Items.Cast<ToolStripItem>().Any(item => item.Available);
             };
             menu.Items.Add(saveToLibraryItem);
             menu.Items.Add(addToSetItem);
@@ -82,7 +87,35 @@ namespace OpenNest.Controls
             menu.Items.Add(printoutItem);
             menu.Items.Add(printoutSeparator);
             menu.Items.Add(deleteItem);
+            menu.Items.Add(removeUnusedSeparator);
+            menu.Items.Add(removeUnusedItem);
             ContextMenuStrip = menu;
+        }
+
+        /// <summary>Shows only the separators that sit between two shown commands.</summary>
+        private static void TidySeparators(ToolStrip menu)
+        {
+            ToolStripSeparator pending = null;
+            var anyShown = false;
+
+            foreach (ToolStripItem item in menu.Items)
+            {
+                if (item is ToolStripSeparator separator)
+                {
+                    separator.Available = false;
+                    if (anyShown)
+                        pending = separator;
+                    continue;
+                }
+
+                if (!item.Available)
+                    continue;
+
+                if (pending != null)
+                    pending.Available = true;
+                pending = null;
+                anyShown = true;
+            }
         }
 
         public event EventHandler<Drawing> DeleteRequested;
@@ -101,6 +134,12 @@ namespace OpenNest.Controls
         /// tooltip; null enables them.
         /// </summary>
         public string SaveToLibraryUnavailableReason { get; set; }
+
+        /// <summary>
+        /// Raised when Remove Unused Drawings is chosen; it acts on the whole nest, not the
+        /// selected drawing.
+        /// </summary>
+        public event EventHandler RemoveUnusedRequested;
 
         /// <summary>Raised when Open in CAD Converter is chosen for the selected drawing.</summary>
         public event EventHandler<Drawing> OpenInConverterRequested;

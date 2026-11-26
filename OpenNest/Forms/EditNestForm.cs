@@ -499,6 +499,7 @@ namespace OpenNest.Forms
             drawingListBox1.DeleteRequested += drawingListBox1_DeleteRequested;
             drawingListBox1.SaveToLibraryRequested += drawingListBox1_SaveToLibraryRequested;
             drawingListBox1.AddToSetRequested += drawingListBox1_AddToSetRequested;
+            drawingListBox1.RemoveUnusedRequested += drawingListBox1_RemoveUnusedRequested;
             drawingListBox1.OpenInConverterRequested += drawingListBox1_OpenInConverterRequested;
             // Every nest window (opened, new or from BOM import) lives in the main window.
             drawingListBox1.PartPrintoutRequested += (_, drawing) =>
@@ -1799,7 +1800,7 @@ namespace OpenNest.Forms
             change.Complete();
         }
 
-        private void CleanUnusedDrawings_Click(object sender, EventArgs e)
+        private void drawingListBox1_RemoveUnusedRequested(object sender, EventArgs e)
         {
             var result = MessageBox.Show(
                 "Remove unused drawings?",
