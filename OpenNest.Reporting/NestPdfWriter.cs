@@ -383,10 +383,13 @@ public static class NestPdfWriter
 
         // Only a removed clamp needs words: it is an action before cutting. Hatched clamps and the
         // rulers (their unit sits in the corner) explain themselves, and the room goes to parts rows.
-        // Tabbed parts are marked too: the tabs must be broken to free them. Both lines share one.
+        // Tabbed parts are marked too: the tabs must be broken to free them. Formed parts are
+        // marked so the operator sorts them onto the forming skid. The lines share one paragraph.
         var tabbed = plate.Parts.Where(part => part.Geometry.StrokeOnly).Select(part => part.ReportId)
             .ToHashSet(StringComparer.Ordinal);
         var notes = new List<string>();
+        if (plate.Parts.Any(part => part.Formed))
+            notes.Add($"{NestReportDiagram.FormedMark} Formed: goes to forming.");
         if (tabbed.Count > 0)
             notes.Add($"{NestReportDiagram.TabbedMark} Tabbed: held in the sheet by tabs.");
         if (plate.Clamps.Any(clamp => clamp.Removed))
@@ -408,13 +411,15 @@ public static class NestPdfWriter
     /// The plate's drawings as two side-by-side tables sharing one MigraDoc table, so twice as
     /// many fit on the diagram's page. Entries run left to right, then down, which keeps ID order
     /// intact when the table continues on later pages; an unbordered column separates the halves.
+    /// A job with formed parts adds a Formed column to every plate's table.
     /// </summary>
     private static void AddPlatePartsTable(Section section, NestReportSnapshot snapshot, ReportPlate plate,
         IReadOnlyDictionary<string, XColor> colors, HashSet<string> tabbed)
     {
         const int Halves = 2;
         const double Gap = 16;
-        double[] half = [40, 0, 86, 92];
+        var formedColumn = snapshot.HasFormedParts;
+        double[] half = formedColumn ? [40, 0, 48, 86, 92] : [40, 0, 86, 92];
         half[1] = (LandscapeWidth - Gap) / Halves - half.Sum();
         var widths = new List<double>(half);
         widths.Add(Gap);
@@ -427,7 +432,9 @@ public static class NestPdfWriter
         var drawings = snapshot.Drawings.Where(drawing => perSheet.ContainsKey(drawing.Id)).ToList();
 
         var parts = AddTable(section, widths.ToArray());
-        string?[] heading = ["ID", "Drawing", "Parts per plate", $"Total ({plate.Copies} plates)"];
+        string?[] heading = formedColumn
+            ? ["ID", "Drawing", "Formed", "Parts per plate", $"Total ({plate.Copies} plates)"]
+            : ["ID", "Drawing", "Parts per plate", $"Total ({plate.Copies} plates)"];
         var header = AddRow(parts, "Table heading", true, [.. heading, null, .. heading]);
         header.HeadingFormat = true;
         header.Format.Font.Bold = true;
@@ -446,10 +453,14 @@ public static class NestPdfWriter
             {
                 var drawing = entries[side];
                 var count = perSheet[drawing.Id];
-                cells[side * stride] = tabbed.Contains(drawing.Id) ? drawing.Id + NestReportDiagram.TabbedMark : drawing.Id;
-                cells[side * stride + 1] = names[drawing.Id];
-                cells[side * stride + 2] = count.ToString(Invariant);
-                cells[side * stride + 3] = checked(count * plate.Copies).ToString(Invariant);
+                var column = side * stride;
+                cells[column++] = NestReportDiagram.MarkedId(drawing.Id, drawing.Formed,
+                    tabbed.Contains(drawing.Id));
+                cells[column++] = names[drawing.Id];
+                if (formedColumn)
+                    cells[column++] = drawing.Formed ? "Yes" : "";
+                cells[column++] = count.ToString(Invariant);
+                cells[column] = checked(count * plate.Copies).ToString(Invariant);
             }
             var row = AddRow(parts, $"Plate {plate.Number}, drawing {entries[0].Id}", false, cells);
             for (var side = 0; side < entries.Count; side++)

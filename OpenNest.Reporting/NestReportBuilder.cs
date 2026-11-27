@@ -84,7 +84,10 @@ public static class NestReportBuilder
             }
 
             var item = registry.Register(part.BaseDrawing);
-            parts.Add(new ReportPlacement(item.Id, geometry));
+            parts.Add(new ReportPlacement(item.Id, geometry)
+            {
+                Formed = part.BaseDrawing.IsFormed,
+            });
             perSheet.TryGetValue(item, out var count);
             perSheet[item] = checked(count + 1);
             var partArea = part.BaseDrawing.Area;
@@ -178,6 +181,7 @@ public static class NestReportBuilder
             System.Math.Max(checked(item.Nested - required), 0), item.Plates.ToImmutableArray(), geometry)
         {
             Weight = PartWeight(drawing, nest, catalogDensity),
+            Formed = drawing.IsFormed,
         };
     }
 

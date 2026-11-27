@@ -29,9 +29,16 @@ public sealed record ReportDrawing(string Id, string Name, long Required, long N
     /// has no thickness or the material has no density.
     /// </summary>
     public double? Weight { get; init; }
+
+    /// <summary>True when the part is formed (bent or rolled) after cutting.</summary>
+    public bool Formed { get; init; }
 }
 
-public sealed record ReportPlacement(string ReportId, ReportGeometry Geometry);
+public sealed record ReportPlacement(string ReportId, ReportGeometry Geometry)
+{
+    /// <summary>True when the part is formed (bent or rolled) after cutting.</summary>
+    public bool Formed { get; init; }
+}
 
 /// <summary>
 /// A machine clamp footprint in the parts' placement frame. <paramref name="Removed"/> marks a
@@ -76,6 +83,9 @@ public sealed record NestReportSnapshot(string Name, string Customer, string Not
     public bool HasCutTimes { get; init; }
 
     /// <summary>Every plate's estimate times its copies; null when the report has no estimates.</summary>
+    /// <summary>True when any drawing in the job is formed after cutting.</summary>
+    public bool HasFormedParts => Drawings.Any(drawing => drawing.Formed);
+
     public TimeSpan? TotalCutTime => !HasCutTimes
         ? null
         : Plates.Aggregate(TimeSpan.Zero, (total, plate) => total + (plate.CutTime ?? TimeSpan.Zero) * plate.Copies);

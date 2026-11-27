@@ -100,9 +100,19 @@ internal static class NestReportDiagram
     /// <summary>Appended to a tabbed part's ID: its outline is open at the tabs holding it in the sheet.</summary>
     internal const string TabbedMark = "*";
 
-    /// <summary>A part's diagram label: its report ID, marked when the part is tabbed.</summary>
-    internal static string LabelText(ReportPlate plate, int index) =>
-        plate.Parts[index].ReportId + (plate.Parts[index].Geometry.StrokeOnly ? TabbedMark : "");
+    /// <summary>Appended to a formed part's ID: it goes to the brake or rolls after cutting.</summary>
+    internal const string FormedMark = "F";
+
+    /// <summary>A part's diagram label: its report ID, marked when it is formed or tabbed.</summary>
+    internal static string LabelText(ReportPlate plate, int index)
+    {
+        var part = plate.Parts[index];
+        return MarkedId(part.ReportId, part.Formed, part.Geometry.StrokeOnly);
+    }
+
+    /// <summary>An ID with its formed mark, then its tabbed mark: "7F*".</summary>
+    internal static string MarkedId(string id, bool formed, bool tabbed) =>
+        id + (formed ? FormedMark : "") + (tabbed ? TabbedMark : "");
 
     internal static DiagramView Plan(ReportPlate plate, double width, double height)
     {
@@ -254,7 +264,8 @@ internal static class NestReportDiagram
                 || groups.Any(group => group.Boundary.IntersectsWith(boundary) || group.Label.Box.IntersectsWith(boundary)))
                 continue;
 
-            var text = members.Any(member => plate.Parts[member].Geometry.StrokeOnly) ? id + TabbedMark : id;
+            var text = MarkedId(id, plate.Parts[seed].Formed,
+                members.Any(member => plate.Parts[member].Geometry.StrokeOnly));
             var size = ReportText.Size(text, font);
             var labelWidth = size.Width + 2 * LabelPadding;
             var labelHeight = size.Height + 2 * LabelPadding;
