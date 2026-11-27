@@ -517,6 +517,11 @@ namespace OpenNest.Controls
             if (!Focused)
                 Focus();
 
+            // Moves made while a context menu was open never reached the view, so the cursor
+            // may be stale: a press must act where it lands, and a drag must start from it.
+            if (e.Button != MouseButtons.Middle)
+                LastPoint = CurrentPoint = PointControlToWorld(e.Location);
+
             if (e.Button == MouseButtons.Middle)
                 middleMouseDownPoint = e.Location;
 
