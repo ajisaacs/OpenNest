@@ -63,6 +63,8 @@ namespace OpenNest.Forms
             label4 = new Label();
             priorityBox = new OpenNest.Controls.NumericUpDown();
             priorityHint = new Label();
+            formedBox = new CheckBox();
+            formedHint = new Label();
             cutFirstBox = new CheckBox();
             cutFirstHint = new Label();
             allowCommonLineBox = new CheckBox();
@@ -299,9 +301,13 @@ namespace OpenNest.Forms
             drawingFields.Controls.Add(nameBox, 1, 0);
             drawingFields.Controls.Add(label3, 0, 1);
             drawingFields.Controls.Add(customerBox, 1, 1);
+            drawingFields.Controls.Add(formedBox, 1, 2);
+            drawingFields.Controls.Add(formedHint, 1, 3);
             drawingFields.Dock = DockStyle.Fill;
             drawingFields.Name = "drawingFields";
-            drawingFields.RowCount = 2;
+            drawingFields.RowCount = 4;
+            drawingFields.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            drawingFields.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             drawingFields.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             drawingFields.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             drawingFields.TabIndex = 0;
@@ -333,6 +339,23 @@ namespace OpenNest.Forms
             customerBox.Margin = new Padding(3, 4, 3, 4);
             customerBox.Name = "customerBox";
             customerBox.TabIndex = 1;
+            //
+            // formedBox
+            //
+            formedBox.AutoSize = true;
+            formedBox.Margin = new Padding(3, 6, 3, 0);
+            formedBox.Name = "formedBox";
+            formedBox.TabIndex = 2;
+            formedBox.Text = "F&ormed after cutting";
+            formedBox.UseVisualStyleBackColor = true;
+            //
+            // formedHint
+            //
+            formedHint.AutoSize = true;
+            formedHint.ForeColor = SystemColors.GrayText;
+            formedHint.Margin = new Padding(20, 0, 3, 4);
+            formedHint.Name = "formedHint";
+            formedHint.Text = "Bent or rolled; marked F on the nest report";
             //
             // nestingGroup
             //
@@ -512,7 +535,7 @@ namespace OpenNest.Forms
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
             CancelButton = cancelButton;
-            ClientSize = new Size(640, 470);
+            ClientSize = new Size(640, 520);
             Controls.Add(layout);
             Controls.Add(bottomPanel1);
             Font = new Font("Segoe UI", 9F, FontStyle.Regular, GraphicsUnit.Point);
@@ -581,6 +604,8 @@ namespace OpenNest.Forms
         private Label label4;
         private Controls.NumericUpDown priorityBox;
         private Label priorityHint;
+        private CheckBox formedBox;
+        private Label formedHint;
         private CheckBox cutFirstBox;
         private Label cutFirstHint;
         private CheckBox allowCommonLineBox;
