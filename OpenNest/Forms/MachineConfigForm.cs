@@ -949,12 +949,22 @@ namespace OpenNest.Forms
                 thickness.Cutting = MachineCuttingDefaults.ToCuttingConfig(panel.BuildParameters(), thickness.Cutting);
                 MarkDirty();
             };
+            // Unchecking clears the settings; checking again restores the fields this build does
+            // not know (from a newer or older OpenNest), so a toggle alone never erases them.
+            var cleared = thickness.Cutting;
             useBox.CheckedChanged += (s, e) =>
             {
                 panel.Enabled = useBox.Checked;
-                thickness.Cutting = useBox.Checked
-                    ? MachineCuttingDefaults.ToCuttingConfig(panel.BuildParameters(), thickness.Cutting)
-                    : null;
+                if (useBox.Checked)
+                {
+                    thickness.Cutting = MachineCuttingDefaults.ToCuttingConfig(
+                        panel.BuildParameters(), thickness.Cutting ?? cleared);
+                }
+                else
+                {
+                    cleared = thickness.Cutting;
+                    thickness.Cutting = null;
+                }
                 MarkDirty();
             };
 

@@ -65,6 +65,56 @@ public class MachineTabsPierceFormsTests
     }
 
     [Fact]
+    public void TabsPierceTab_KeepsFieldsItDoesNotKnowThroughAToggle()
+    {
+        RunSta(() =>
+        {
+            var directory = Path.Combine(Path.GetTempPath(), "OpenNestTests", Guid.NewGuid().ToString());
+            Directory.CreateDirectory(directory);
+            try
+            {
+                var provider = new LocalJsonProvider(directory);
+                var unknown = new Dictionary<string, System.Text.Json.JsonElement>
+                {
+                    ["tabHeldMaxLength"] = System.Text.Json.JsonDocument.Parse("12").RootElement.Clone(),
+                };
+                provider.SaveMachine(new MachineConfig
+                {
+                    Name = "Laser",
+                    Materials =
+                    {
+                        new MaterialConfig
+                        {
+                            Name = "Mild Steel",
+                            Thicknesses = { new ThicknessConfig { Value = 0.25, Cutting = new ThicknessCuttingConfig { Tabs = true, Unknown = unknown } } },
+                        },
+                    },
+                });
+
+                using var form = new MachineConfigForm(provider);
+                var node = Descendants(Find<TreeView>(form, "_tree").Nodes).Single(n => n.Tag is ThicknessConfig);
+                typeof(MachineConfigForm)
+                    .GetMethod("Tree_AfterSelect", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
+                    .Invoke(form, new object[] { null, new TreeViewEventArgs(node) });
+                var shown = (ThicknessConfig)node.Tag;
+                var page = All<TabControl>(form).Single().TabPages.Cast<TabPage>().Single(p => p.Text == "Tabs & Pierce");
+                var use = All<CheckBox>(page).Single(c => c.Text == "Use for this thickness");
+
+                use.Checked = false;
+                Assert.Null(shown.Cutting);
+                use.Checked = true;
+
+                Assert.True(shown.Cutting!.Tabs);
+                Assert.Equal(12, shown.Cutting.Unknown!["tabHeldMaxLength"].GetDouble());
+            }
+            finally
+            {
+                Directory.Delete(directory, recursive: true);
+            }
+        });
+    }
+
+    [Fact]
     public void CopyCutting_GivesEachThicknessItsOwnCopy()
     {
         var source = new ThicknessCuttingConfig { Tabs = true, TabSize = 0.04, TabSizeMaxWidth = 3 };
