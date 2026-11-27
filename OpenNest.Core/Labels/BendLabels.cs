@@ -157,11 +157,9 @@ namespace OpenNest.Labels
             {
                 if (spot.Bend < 0 || spot.Bend >= bends.Count || !IsBend(bends[spot.Bend]))
                     continue;
-                var line = bends[spot.Bend].LineAngle;
-                var letter = PartLabels.GroupLetter(line + partRotation, grainAngle);
-                // Along the line, turned at most a quarter so it never reads upside down.
-                strokes.AddRange(PartLabels.CircledLetter(letter, spot.Center, spot.Diameter,
-                    LabelBox.ReadableRotation(line)));
+                var bend = bends[spot.Bend];
+                var letter = PartLabels.GroupLetter(bend.LineAngle + partRotation, grainAngle);
+                strokes.AddRange(PartLabels.CircledLetter(letter, spot.Center, spot.Diameter, Facing(bend, spot.Center)));
             }
             return strokes;
         }
@@ -212,7 +210,17 @@ namespace OpenNest.Labels
             if (drawing == null || !double.IsFinite(partRotation) || !double.IsFinite(grainAngle))
                 return new List<Stroke>();
 
-            var strokes = Layout(spots, drawing.Bends, partRotation, grainAngle);
+            // The spots lose the source offset; the bends must too, so each letter faces its line.
+            var offset = drawing.Source?.Offset ?? Vector.Zero;
+            var bends = drawing.Bends?.Select(bend => bend == null ? null : new Bend
+            {
+                StartPoint = bend.StartPoint - offset,
+                EndPoint = bend.EndPoint - offset,
+                Direction = bend.Direction,
+                Angle = bend.Angle,
+                Radius = bend.Radius,
+            }).ToList();
+            var strokes = Layout(spots, bends, partRotation, grainAngle);
             return partRotation == 0
                 ? strokes
                 : strokes.ConvertAll(stroke => stroke.Map(point => point.Rotate(partRotation)));
@@ -228,6 +236,20 @@ namespace OpenNest.Labels
             PartLabels.Append(program, Strokes(drawing, spots, partRotation, grainAngle));
 
         private static bool IsBend(Bend bend) => bend != null && bend.Length > Tolerance.Epsilon;
+
+        // The letter's rotation: along the bend line, with its top toward the line, so it reads
+        // upright from the outer edge of the flange it sits on, whichever side of the line that is.
+        private static double Facing(Bend bend, Vector center)
+        {
+            var dx = bend.EndPoint.X - bend.StartPoint.X;
+            var dy = bend.EndPoint.Y - bend.StartPoint.Y;
+            // Which side of the line, from its start to its end, the letter is on.
+            var cross = dx * (center.Y - bend.StartPoint.Y) - dy * (center.X - bend.StartPoint.X);
+            if (System.Math.Abs(cross) <= Tolerance.Epsilon * bend.Length)
+                return LabelBox.ReadableRotation(bend.LineAngle);
+            // On the right the text runs from the line's start to its end; on the left, back.
+            return cross > 0 ? bend.LineAngle + System.Math.PI : bend.LineAngle;
+        }
 
         // Undirected: a line and its reverse are parallel.
         private static bool Parallel(Bend a, Bend b)

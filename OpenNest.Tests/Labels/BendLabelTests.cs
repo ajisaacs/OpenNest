@@ -225,13 +225,15 @@ public class BendLabelTests
         var turned = BendLabels.Layout(spots, bends, Quarter, 0);
 
         List<Vector> Points(IEnumerable<Stroke> strokes) => strokes.SelectMany(s => s.Points()).ToList();
-        // Each letter reads along its own bend line: level beside the first, turned a quarter
-        // beside the second.
-        var second = LabelBox.ReadableRotation(bends[1].LineAngle);
-        var expected = PartLabels.CircledLetter('B', spots[0].Center, spots[0].Diameter)
+        // Each letter reads along its own bend line with its top toward the line: both sit on
+        // the left of their lines, above the first and left of the second.
+        Assert.True(spots[0].Center.Y > 2 && spots[1].Center.X < 2);
+        var first = System.Math.PI;
+        var second = 3 * Quarter;
+        var expected = PartLabels.CircledLetter('B', spots[0].Center, spots[0].Diameter, first)
             .Concat(PartLabels.CircledLetter('A', spots[1].Center, spots[1].Diameter, second));
         Assert.Equal(Points(expected), Points(upright));
-        var swapped = PartLabels.CircledLetter('A', spots[0].Center, spots[0].Diameter)
+        var swapped = PartLabels.CircledLetter('A', spots[0].Center, spots[0].Diameter, first)
             .Concat(PartLabels.CircledLetter('B', spots[1].Center, spots[1].Diameter, second));
         Assert.Equal(Points(swapped), Points(turned));
 
@@ -241,6 +243,29 @@ public class BendLabelTests
         Assert.NotEmpty(slantedSpots);
         foreach (var stroke in BendLabels.Layout(slantedSpots, slanted, 0, 0))
             Assert.Contains(slantedSpots, spot => stroke.Points().All(p => p.DistanceTo(spot.Center) <= spot.Diameter / 2 + 1e-9));
+    }
+
+    [Theory]
+    [InlineData(1.5, 1)]  // Room on the left of an upward line: the letter sits there.
+    [InlineData(0.4, -1)] // No room on the left: it sits on the right.
+    public void Letter_ReadsUprightFromTheOuterEdgeOfItsFlange(double line, int side)
+    {
+        // A vertical bend near the left edge, with a source offset so the drawing's bends and its
+        // program frame differ.
+        var offset = new Vector(-40, -30);
+        var drawing = new Drawing("flange", LeadPathValidationTests.Rectangle(0, 0, 10, 20));
+        drawing.Source.Offset = offset;
+        drawing.Bends.Add(Bend(line + offset.X, offset.Y, line + offset.X, 20 + offset.Y));
+
+        var spot = Assert.Single(BendLabels.Spots(drawing));
+        var towardLine = System.Math.Sign(line - spot.Center.X);
+        Assert.Equal(side, towardLine);
+
+        // The letter's up, (-sin r, cos r), points from the flange's edge toward the line.
+        var rotation = towardLine > 0 ? 3 * Quarter : Quarter;
+        var expected = PartLabels.CircledLetter('A', spot.Center, spot.Diameter, rotation);
+        var strokes = BendLabels.Strokes(drawing, [spot], 0, 0);
+        Assert.Equal(expected.SelectMany(s => s.Points()), strokes.SelectMany(s => s.Points()));
     }
 
     [Fact]

@@ -142,8 +142,8 @@ A `labelMode` number that names no choice (the reader accepts numbers) loads as 
     bends are in one group however the part is turned, so two bends an inch apart show one
     letter, not two. Bends are taken in the drawing's order, so the earlier one carries it. A
     bend at any other angle keeps its own letter, however close.
-  - Each letter reads along its own bend line, turned at most a quarter so it is never upside
-    down. Where they go depends only on the drawing (its cut geometry, bends and box), so every
+  - Each letter reads along its own bend line with its top toward the line, so it reads upright
+    from the outer edge of the flange it sits on, whichever side of the line that is. Where they go depends only on the drawing (its cut geometry, bends and box), so every
     part of a drawing gets them in the same place; which letter each one is depends on the part's
     rotation against the grain.
   - A letter may sit on a breakoff's scrap (only the break cut itself is kept clear): it is read
