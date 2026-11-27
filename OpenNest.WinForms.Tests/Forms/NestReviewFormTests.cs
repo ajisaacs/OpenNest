@@ -74,7 +74,7 @@ public class NestReviewFormTests
     }, TimeSpan.FromMinutes(1), "The STA test did not complete.");
 
     [Fact]
-    public void SheetsKeepFullHeightWhenTheCaptionsAloneOverflowTheWidth() => StaTestThread.Run(() =>
+    public void TwoSheetsFillTheWidthWhenTheyCannotAllFit() => StaTestThread.Run(() =>
     {
         var stock = new NestPlateStock("sheet", new Size(48, 96), quantity: null, partSpacing: 0.25);
         using var strip = new OpenNest.Controls.SheetStripControl { Size = new System.Drawing.Size(600, 300), ShowRemnant = true };
@@ -85,9 +85,13 @@ public class NestReviewFormTests
         strip.SetSheets(Enumerable.Range(0, 12)
             .Select(i => new ProposedPlate(i, stock, Array.Empty<Part>()))
             .ToArray());
+        var scale = strip.PixelsPerUnit;
 
+        // One sheet fits at full height; of twelve, the first two share the width.
         Assert.True(one > 0);
-        Assert.Equal(one, strip.PixelsPerUnit, 3);
+        Assert.True(scale < one);
+        var twoSheets = 2 * 96 * scale + 16;
+        Assert.InRange(twoSheets, strip.ClientSize.Width - 16 - 8, strip.ClientSize.Width - 16);
         Assert.True(strip.AutoScrollMinSize.Width > strip.ClientSize.Width);
     }, TimeSpan.FromMinutes(1), "The STA test did not complete.");
 

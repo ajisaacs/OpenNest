@@ -120,10 +120,9 @@ namespace OpenNest.Controls
             : $"{tile.Title}\n{tile.Detail}";
 
         /// <summary>
-        /// Pixels per world unit, shared by every sheet. All sheets fit the width when they can;
-        /// otherwise they shrink to a third of full height and the strip scrolls. When the
-        /// captions alone are wider than the strip, shrinking cannot avoid the scroll, so the
-        /// sheets keep full height and the strip scrolls.
+        /// Pixels per world unit, shared by every sheet and at most full height. All sheets fit
+        /// the width when that keeps them at least a third of full height; otherwise the strip
+        /// scrolls with the first two sheets filling the view, so two whole plates always show.
         /// </summary>
         internal float PixelsPerUnit
         {
@@ -136,21 +135,32 @@ namespace OpenNest.Controls
                 if (tallest <= 0 || height <= 0)
                     return 0;
                 var full = (float)(height / tallest);
-                var width = ClientSize.Width - Edge * 2 - Gap * (tiles.Count - 1);
-                if (tiles.Sum(t => TileWidth(t, 0)) > width)
-                    return full;
-                // Largest scale whose tiles, captions included, fit the width (tile widths grow with scale).
-                float low = 0, high = full;
-                for (var i = 0; i < 24; i++)
-                {
-                    var mid = (low + high) / 2;
-                    if (tiles.Sum(t => TileWidth(t, mid)) <= width)
-                        low = mid;
-                    else
-                        high = mid;
-                }
-                return System.Math.Max(low, full / 3);
+                var all = FitScale(tiles, full);
+                if (all >= full / 3)
+                    return all;
+                var two = FitScale(tiles.Take(2).ToList(), full);
+                return two > 0 ? two : full / 3;
             }
+        }
+
+        /// <summary>The largest scale up to <paramref name="full"/> at which <paramref name="shown"/>,
+        /// captions included, fit the width; 0 when their captions alone are too wide.</summary>
+        private float FitScale(IReadOnlyCollection<Tile> shown, float full)
+        {
+            var width = ClientSize.Width - Edge * 2 - Gap * (shown.Count - 1);
+            if (shown.Sum(t => TileWidth(t, 0)) > width)
+                return 0;
+            // Tile widths grow with scale, so bisect.
+            float low = 0, high = full;
+            for (var i = 0; i < 24; i++)
+            {
+                var mid = (low + high) / 2;
+                if (shown.Sum(t => TileWidth(t, mid)) <= width)
+                    low = mid;
+                else
+                    high = mid;
+            }
+            return low;
         }
 
         private void UpdateScrollSize()
