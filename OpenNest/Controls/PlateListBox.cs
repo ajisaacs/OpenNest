@@ -24,6 +24,7 @@ namespace OpenNest.Controls
 
         private readonly Size imageSize;
         private readonly Font nameFont;
+        private readonly Font quantityFont;
         private readonly ToolTip toolTip = new ToolTip();
         private readonly Dictionary<Plate, Preview> previews = new Dictionary<Plate, Preview>();
         private int toolTipIndex = -1;
@@ -38,6 +39,7 @@ namespace OpenNest.Controls
 
             imageSize = new Size(110, ItemHeight - 10);
             nameFont = new Font(Font.FontFamily, 10, FontStyle.Bold);
+            quantityFont = new Font(Font.FontFamily, 16, FontStyle.Bold);
         }
 
         /// <summary>The scheme the pictures take the sheet colors from.</summary>
@@ -114,11 +116,10 @@ namespace OpenNest.Controls
             g.DrawString(isSentinel ? "New plate" : $"Plate {e.Index + 1}", nameFont, Brushes.Black, pt);
 
             var partCount = plate.Parts.Count(part => !part.BaseDrawing.IsCutOff);
-            var quantity = plate.Quantity > 1 ? $"×{plate.Quantity}  " : "";
             var lines = new List<string>
             {
                 plate.Size.ToString(4),
-                isSentinel ? "Empty" : $"{quantity}{partCount} {(partCount == 1 ? "part" : "parts")}",
+                isSentinel ? "Empty" : $"{partCount} {(partCount == 1 ? "part" : "parts")}",
             };
             if (partCount > 0)
                 lines.Add($"{plate.Utilization():P0} utilized");
@@ -127,6 +128,18 @@ namespace OpenNest.Controls
             {
                 pt.Y += line == lines[0] ? 22 : 18;
                 g.DrawString(line, Font, Brushes.Gray, pt);
+            }
+
+            // How many sheets are cut from this layout, large at the right edge of the row.
+            if (plate.Quantity > 1)
+            {
+                var quantityBounds = new RectangleF(e.Bounds.X, e.Bounds.Y, e.Bounds.Width - 12, e.Bounds.Height);
+                using var format = new StringFormat
+                {
+                    Alignment = StringAlignment.Far,
+                    LineAlignment = StringAlignment.Center,
+                };
+                g.DrawString($"×{plate.Quantity}", quantityFont, Brushes.Gray, quantityBounds, format);
             }
 
             using var separatorPen = new Pen(Color.LightGray);
@@ -365,6 +378,7 @@ namespace OpenNest.Controls
                 previews.Clear();
                 toolTip.Dispose();
                 nameFont.Dispose();
+                quantityFont.Dispose();
             }
 
             base.Dispose(disposing);
