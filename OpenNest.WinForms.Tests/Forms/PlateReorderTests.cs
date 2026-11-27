@@ -1,5 +1,6 @@
 using System.Drawing;
 using System.Windows.Forms;
+using OpenNest.Controls;
 using OpenNest.Forms;
 
 namespace OpenNest.WinForms.Tests.Forms;
@@ -18,15 +19,15 @@ public class PlateReorderTests
     [Fact]
     public void DropSlotFollowsTheRowHalvesAndStopsBeforeTheSentinel() => UndoTestEnv.Run(env =>
     {
-        var list = (ListView)Assert.Single(env.Editor.Controls.Find("platesListView", true));
+        var list = (PlateListBox)Assert.Single(env.Editor.Controls.Find("platesListView", true));
         var movable = env.Editor.PlateManager.MovableCount;
         Assert.Equal(env.Nest.Plates.Count - 1, movable);
 
-        var first = list.Items[0].Bounds;
+        var first = list.GetItemRectangle(0);
         Assert.Equal(0, env.Editor.GetPlateDropSlot(new Point(5, first.Top + 1)));
         Assert.Equal(1, env.Editor.GetPlateDropSlot(new Point(5, first.Bottom - 1)));
 
-        var sentinel = list.Items[movable].Bounds;
+        var sentinel = list.GetItemRectangle(movable);
         Assert.Equal(movable, env.Editor.GetPlateDropSlot(new Point(5, sentinel.Top + 1)));
         Assert.Equal(movable, env.Editor.GetPlateDropSlot(new Point(5, list.ClientSize.Height - 1)));
     });
@@ -41,9 +42,9 @@ public class PlateReorderTests
 
         Assert.Same(plate, env.Nest.Plates[1]);
         Assert.Same(plate, env.Editor.PlateManager.CurrentPlate);
-        var list = (ListView)Assert.Single(env.Editor.Controls.Find("platesListView", true));
-        Assert.True(list.Items[1].Selected);
-        Assert.Equal("2", list.Items[1].Text);
+        var list = (PlateListBox)Assert.Single(env.Editor.Controls.Find("platesListView", true));
+        Assert.Equal(1, list.SelectedIndex);
+        Assert.Same(plate, list.Items[1]);
     });
 
     [Fact]
@@ -63,8 +64,8 @@ public class PlateReorderTests
         Assert.Same(copy, env.Editor.PlateManager.CurrentPlate);
         if (source.CuttingParameters != null)
             Assert.NotSame(source.CuttingParameters, copy.CuttingParameters);
-        var list = (ListView)Assert.Single(env.Editor.Controls.Find("platesListView", true));
-        Assert.True(list.Items[1].Selected);
+        var list = (PlateListBox)Assert.Single(env.Editor.Controls.Find("platesListView", true));
+        Assert.Equal(1, list.SelectedIndex);
         Assert.NotNull(list.ContextMenuStrip);
     });
 
@@ -74,7 +75,7 @@ public class PlateReorderTests
         env.Editor.PlateManager.LoadAt(0);
         var plate = env.Nest.Plates[0];
         var count = env.Nest.Plates.Count;
-        var list = (ListView)Assert.Single(env.Editor.Controls.Find("platesListView", true));
+        var list = (PlateListBox)Assert.Single(env.Editor.Controls.Find("platesListView", true));
         var item = Assert.IsType<ToolStripMenuItem>(list.ContextMenuStrip!.Items["deletePlateMenuItem"]);
         Assert.Equal("Delete Plate", item.Text);
 

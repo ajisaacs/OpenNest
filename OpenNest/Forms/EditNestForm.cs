@@ -108,13 +108,13 @@ namespace OpenNest.Forms
             toolStrip1.Renderer = renderer;
             toolStrip2.Renderer = renderer;
 
-            platesListView.ShowItemToolTips = true;
+            platesListView.ToolTipProvider = plate => LedgerStockAssignment.Describe(plate, LedgerLocations);
             platesListView.SelectedIndexChanged += (sender, e) =>
             {
-                if (updatingPlateList || platesListView.SelectedIndices.Count == 0)
+                if (updatingPlateList || platesListView.SelectedIndex < 0)
                     return;
 
-                PlateManager.LoadAt(platesListView.SelectedIndices[0]);
+                PlateManager.LoadAt(platesListView.SelectedIndex);
             };
             InitializePlateReordering();
         }
@@ -553,24 +553,12 @@ namespace OpenNest.Forms
             updatingPlateList = true;
             var focused = ContainsFocus ? GetFocusedControl() : null;
 
-            platesListView.BeginUpdate();
-            platesListView.Items.Clear();
-
-            var items = new ListViewItem[Nest.Plates.Count];
-
-            for (int i = 0; i < items.Length; ++i)
-            {
-                var plate = Nest.Plates[i];
-                var item = GetListViewItem(plate, i + 1);
-                items[i] = item;
-            }
-
-            platesListView.Items.AddRange(items);
+            platesListView.ColorScheme = PlateView.ColorScheme;
+            platesListView.SetPlates(Nest.Plates.ToList());
 
             if (PlateManager.CurrentIndex < platesListView.Items.Count)
-                platesListView.Items[PlateManager.CurrentIndex].Selected = true;
+                platesListView.SelectedIndex = PlateManager.CurrentIndex;
 
-            platesListView.EndUpdate();
             updatingPlateList = false;
 
             if (focused != null && focused != platesListView)
@@ -1311,16 +1299,14 @@ namespace OpenNest.Forms
             if (index < 0 || index >= platesListView.Items.Count)
                 return;
 
-            var item = platesListView.Items[index];
-            if (item.Selected)
+            if (platesListView.SelectedIndex == index)
                 return;
 
-            // Guarded so the list's own SelectedIndexChanged doesn't reload the plate.
+            // Guarded so the list's own SelectedIndexChanged doesn't reload the plate. Selecting
+            // a row scrolls it into view.
             var wasUpdating = updatingPlateList;
             updatingPlateList = true;
-            item.Selected = true;
-            item.Focused = true;
-            item.EnsureVisible();
+            platesListView.SelectedIndex = index;
             updatingPlateList = wasUpdating;
         }
 
@@ -1456,7 +1442,7 @@ namespace OpenNest.Forms
 
         private void EditSelectedPlate_Click(object sender, EventArgs e)
         {
-            if (platesListView.SelectedIndices.Count != 0)
+            if (platesListView.SelectedIndex >= 0)
                 EditPlate();
         }
 
@@ -1858,23 +1844,6 @@ namespace OpenNest.Forms
         }
 
         #endregion
-
-        private ListViewItem GetListViewItem(Plate plate, int id)
-        {
-            var item = new ListViewItem();
-            item.ToolTipText = LedgerStockAssignment.Describe(plate, LedgerLocations) ?? "";
-            item.Text = id.ToString();
-            item.SubItems.Add(plate.Size.ToString(4));
-            item.SubItems.Add(plate.Quantity.ToString());
-
-            var partCount = plate.Parts.Count(p => !p.BaseDrawing.IsCutOff);
-            item.SubItems.Add(partCount.ToString());
-
-            var util = plate.Utilization();
-            item.SubItems.Add(partCount > 0 ? $"{util:P0}" : "");
-
-            return item;
-        }
 
         private void PlateView_PartRemoved(object sender, ItemRemovedEventArgs<Part> e)
         {

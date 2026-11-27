@@ -41,12 +41,7 @@
             splitContainer = new System.Windows.Forms.SplitContainer();
             tabControl1 = new System.Windows.Forms.TabControl();
             tabPage1 = new System.Windows.Forms.TabPage();
-            platesListView = new System.Windows.Forms.ListView();
-            plateNumColumn = new System.Windows.Forms.ColumnHeader();
-            sizeColumn = new System.Windows.Forms.ColumnHeader();
-            qtyColumn = new System.Windows.Forms.ColumnHeader();
-            partsColumn = new System.Windows.Forms.ColumnHeader();
-            utilColumn = new System.Windows.Forms.ColumnHeader();
+            platesListView = new OpenNest.Controls.PlateListBox();
             toolStrip1 = new System.Windows.Forms.ToolStrip();
             toolStripLabel2 = new System.Windows.Forms.ToolStripButton();
             tabPage2 = new System.Windows.Forms.TabPage();
@@ -114,44 +109,15 @@
             // platesListView
             // 
             platesListView.BorderStyle = System.Windows.Forms.BorderStyle.None;
-            platesListView.Columns.AddRange(new System.Windows.Forms.ColumnHeader[] { plateNumColumn, sizeColumn, qtyColumn, partsColumn, utilColumn });
             platesListView.Dock = System.Windows.Forms.DockStyle.Fill;
-            platesListView.Font = new System.Drawing.Font("Microsoft Sans Serif", 9.75F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, 0);
-            platesListView.FullRowSelect = true;
-            platesListView.HeaderStyle = System.Windows.Forms.ColumnHeaderStyle.Nonclickable;
+            platesListView.DrawMode = System.Windows.Forms.DrawMode.OwnerDrawFixed;
+            platesListView.ItemHeight = 85;
             platesListView.Location = new System.Drawing.Point(4, 30);
             platesListView.Margin = new System.Windows.Forms.Padding(4, 3, 4, 3);
-            platesListView.MultiSelect = false;
             platesListView.Name = "platesListView";
             platesListView.Size = new System.Drawing.Size(265, 394);
             platesListView.TabIndex = 1;
-            platesListView.UseCompatibleStateImageBehavior = false;
-            platesListView.View = System.Windows.Forms.View.Details;
             platesListView.DoubleClick += EditSelectedPlate_Click;
-            // 
-            // plateNumColumn
-            // 
-            plateNumColumn.Text = "";
-            plateNumColumn.Width = 30;
-            // 
-            // sizeColumn
-            // 
-            sizeColumn.Text = "Size";
-            sizeColumn.Width = 80;
-            // 
-            // qtyColumn
-            // 
-            qtyColumn.Text = "Qty";
-            // 
-            // partsColumn
-            // 
-            partsColumn.Text = "Parts";
-            partsColumn.Width = 45;
-            // 
-            // utilColumn
-            // 
-            utilColumn.Text = "Util";
-            utilColumn.Width = 45;
             // 
             // toolStrip1
             // 
@@ -310,15 +276,10 @@
         private System.Windows.Forms.SplitContainer splitContainer;
         private System.Windows.Forms.TabControl tabControl1;
         private System.Windows.Forms.TabPage tabPage1;
-        private System.Windows.Forms.ListView platesListView;
-        private System.Windows.Forms.ColumnHeader sizeColumn;
-        private System.Windows.Forms.ColumnHeader qtyColumn;
+        private OpenNest.Controls.PlateListBox platesListView;
         private System.Windows.Forms.ToolStrip toolStrip1;
         private System.Windows.Forms.TabPage tabPage2;
         private Controls.DrawingListBox drawingListBox1;
-        private System.Windows.Forms.ColumnHeader plateNumColumn;
-        private System.Windows.Forms.ColumnHeader partsColumn;
-        private System.Windows.Forms.ColumnHeader utilColumn;
         private System.Windows.Forms.ToolStrip toolStrip2;
         private System.Windows.Forms.ToolStripButton toolStripButton2;
         private System.Windows.Forms.ToolStripButton shapeLibraryButton;

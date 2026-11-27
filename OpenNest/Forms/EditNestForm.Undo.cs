@@ -76,7 +76,13 @@ namespace OpenNest.Forms
         private NestUndoRecorder CreateRecorder()
         {
             var recorder = new NestUndoRecorder(Document) { SwapIn = SwapInRestoredNest };
-            recorder.Changed += (_, _) => UpdateTitle();
+            recorder.Changed += (_, _) =>
+            {
+                UpdateTitle();
+                // A part moved or rotated in place adds and removes nothing, so only a recorded
+                // edit tells the plate list its picture may be out of date.
+                platesListView?.Invalidate();
+            };
             recorder.Restored += (_, _) => NestRestored?.Invoke(this, EventArgs.Empty);
             return recorder;
         }

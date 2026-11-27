@@ -29,7 +29,7 @@ namespace OpenNest.Forms
         private void InitializePlateReordering()
         {
             platesListView.AllowDrop = true;
-            platesListView.ItemDrag += PlatesListView_ItemDrag;
+            platesListView.RowDragStarted += PlatesListView_RowDragStarted;
             platesListView.DragEnter += PlatesListView_DragOver;
             platesListView.DragOver += PlatesListView_DragOver;
             platesListView.DragDrop += PlatesListView_DragDrop;
@@ -175,24 +175,22 @@ namespace OpenNest.Forms
             e.SuppressKeyPress = true;
         }
 
-        private void PlatesListView_ItemDrag(object sender, ItemDragEventArgs e)
+        private void PlatesListView_RowDragStarted(object sender, int index)
         {
-            if (IsInspecting || e.Button != MouseButtons.Left || e.Item is not ListViewItem item)
-                return;
-            if (item.Index >= PlateManager.MovableCount)
+            if (IsInspecting || index < 0 || index >= PlateManager.MovableCount)
                 return;
 
             var effects = DragDropEffects.None;
             if (PlateManager.MovableCount >= 2)
                 effects |= DragDropEffects.Move;
-            if (PlateManager.CanDuplicatePlate(item.Index, item.Index + 1))
+            if (PlateManager.CanDuplicatePlate(index, index + 1))
                 effects |= DragDropEffects.Copy;
             if (effects == DragDropEffects.None)
                 return;
 
             try
             {
-                platesListView.DoDragDrop(new PlateDragData(this, item.Index), effects);
+                platesListView.DoDragDrop(new PlateDragData(this, index), effects);
             }
             finally
             {
@@ -261,15 +259,17 @@ namespace OpenNest.Forms
         internal int GetPlateDropSlot(Point client)
         {
             var movable = PlateManager.MovableCount;
-            var item = platesListView.GetItemAt(platesListView.ClientSize.Width / 2, client.Y);
-            if (item == null)
+            var index = platesListView.RowAt(new Point(platesListView.ClientSize.Width / 2, client.Y));
+            if (index < 0)
             {
-                var top = platesListView.TopItem;
-                return top != null && client.Y < top.Bounds.Top ? top.Index : movable;
+                var top = platesListView.TopIndex;
+                return top < platesListView.Items.Count && client.Y < platesListView.GetItemRectangle(top).Top
+                    ? top
+                    : movable;
             }
 
-            var bounds = item.Bounds;
-            var slot = client.Y < bounds.Top + bounds.Height / 2 ? item.Index : item.Index + 1;
+            var bounds = platesListView.GetItemRectangle(index);
+            var slot = client.Y < bounds.Top + bounds.Height / 2 ? index : index + 1;
             return System.Math.Min(slot, movable);
         }
 
@@ -282,11 +282,13 @@ namespace OpenNest.Forms
                 return;
 
             plateDropSlot = slot;
-            var items = platesListView.Items;
-            if (items.Count == 0)
+            var count = platesListView.Items.Count;
+            if (count == 0)
                 return;
 
-            var y = slot < items.Count ? items[slot].Bounds.Top : items[slot - 1].Bounds.Bottom;
+            var y = slot < count
+                ? platesListView.GetItemRectangle(slot).Top
+                : platesListView.GetItemRectangle(slot - 1).Bottom;
             plateDropIndicator.SetBounds(0, System.Math.Max(0, y - 1), platesListView.ClientSize.Width, 2);
             plateDropIndicator.Visible = true;
             plateDropIndicator.BringToFront();
@@ -302,26 +304,22 @@ namespace OpenNest.Forms
         // Scrolls one row when the pointer nears the top or bottom edge during a drag.
         private void AutoScrollPlateList(Point client)
         {
-            var items = platesListView.Items;
-            var top = platesListView.TopItem;
-            if (items.Count == 0 || top == null)
+            var count = platesListView.Items.Count;
+            var top = platesListView.TopIndex;
+            if (count == 0 || top >= count)
                 return;
 
-            var margin = top.Bounds.Height;
-            if (client.Y < margin && top.Index > 0)
+            var margin = platesListView.ItemHeight;
+            var visibleRows = System.Math.Max(1, platesListView.ClientSize.Height / margin);
+            if (client.Y < margin && top > 0)
             {
                 HidePlateDropIndicator();
-                items[top.Index - 1].EnsureVisible();
+                platesListView.TopIndex = top - 1;
             }
-            else if (client.Y > platesListView.ClientSize.Height - margin)
+            else if (client.Y > platesListView.ClientSize.Height - margin && top + visibleRows < count)
             {
-                var below = platesListView.GetItemAt(1, platesListView.ClientSize.Height - 1);
-                var next = below == null ? -1 : below.Index + 1;
-                if (next > 0 && next < items.Count)
-                {
-                    HidePlateDropIndicator();
-                    items[next].EnsureVisible();
-                }
+                HidePlateDropIndicator();
+                platesListView.TopIndex = top + 1;
             }
         }
     }

@@ -1,4 +1,5 @@
 using System.Windows.Forms;
+using OpenNest.Controls;
 using OpenNest.Forms;
 using OpenNest.Shapes;
 
@@ -22,10 +23,9 @@ public class EditNestPlateStockTooltipTests
         form.LedgerLocations["DROP-1182"] = "B3";
         form.UpdatePlateList();
 
-        var plates = Assert.IsType<ListView>(Assert.Single(form.Controls.Find("platesListView", true)));
-        Assert.True(plates.ShowItemToolTips);
-        Assert.Equal("Stock: DROP-1182 (B3)", plates.Items[0].ToolTipText);
-        Assert.Equal("", plates.Items[^1].ToolTipText);
+        var plates = Assert.IsType<PlateListBox>(Assert.Single(form.Controls.Find("platesListView", true)));
+        Assert.Equal("Stock: DROP-1182 (B3)", plates.GetToolTipText(0));
+        Assert.Equal("", plates.GetToolTipText(plates.Items.Count - 1));
     });
 
     private static void RunSta(System.Action testBody) =>

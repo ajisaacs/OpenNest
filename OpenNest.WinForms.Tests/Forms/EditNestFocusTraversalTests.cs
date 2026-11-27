@@ -1,5 +1,6 @@
 using System.Reflection;
 using System.Windows.Forms;
+using OpenNest.Controls;
 using OpenNest.Forms;
 
 namespace OpenNest.WinForms.Tests.Forms;
@@ -136,10 +137,10 @@ public class EditNestFocusTraversalTests
         return Assert.IsAssignableFrom<Control>(method.Invoke(form, null));
     }
 
-    private static ListView PlateList(EditNestForm form) =>
-        Assert.IsType<ListView>(Assert.Single(form.Controls.Find("platesListView", true)));
+    private static PlateListBox PlateList(EditNestForm form) =>
+        Assert.IsType<PlateListBox>(Assert.Single(form.Controls.Find("platesListView", true)));
 
-    private static void SelectPlatesTab(EditNestForm form, ListView plates)
+    private static void SelectPlatesTab(EditNestForm form, PlateListBox plates)
     {
         var tabControl = Assert.IsType<TabControl>(Assert.Single(form.Controls.Find("tabControl1", true)));
         tabControl.SelectedTab = Assert.IsType<TabPage>(plates.Parent);
