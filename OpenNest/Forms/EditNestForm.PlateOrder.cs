@@ -6,7 +6,7 @@ namespace OpenNest.Forms
 {
     // Reordering plates in the Plates list: drag a row to a new position, or Alt+Up/Alt+Down.
     // Ctrl+drag drops a copy of the plate instead, as does Duplicate Plate on the row's menu;
-    // Delete Plate on the same menu removes it.
+    // Delete Plate on the same menu removes it; Sort Plates by Size on the toolbar reorders them all.
     // The trailing empty new-plate sentinel stays last and cannot be dragged.
     public partial class EditNestForm
     {
@@ -59,6 +59,54 @@ namespace OpenNest.Forms
                 deleteItem.Enabled = !IsInspecting && PlateManager.CanRemoveCurrent;
             };
             platesListView.ContextMenuStrip = menu;
+
+            InitializeSortPlatesButton();
+        }
+
+        // Sort Plates by Size reorders the nest once, as an undoable edit; the list has no
+        // standing sort, since the plate order is the nest's own (cutting and report order).
+        private void InitializeSortPlatesButton()
+        {
+            var largestItem = new ToolStripMenuItem("Largest First", null, (sender, e) => SortPlatesBySize(true));
+            var smallestItem = new ToolStripMenuItem("Smallest First", null, (sender, e) => SortPlatesBySize(false));
+            var button = new ToolStripDropDownButton
+            {
+                Name = "sortPlatesButton",
+                DisplayStyle = ToolStripItemDisplayStyle.Image,
+                Image = sortDrawingsImage ??= CreateSortDrawingsImage(),
+                Padding = new Padding(5, 0, 5, 0),
+                Text = "Sort Plates by Size",
+                ToolTipText = "Sort plates by size",
+            };
+            button.DropDownItems.Add(largestItem);
+            button.DropDownItems.Add(smallestItem);
+            button.DropDownOpening += (sender, e) =>
+            {
+                largestItem.Enabled = !IsInspecting && PlateManager.CanSortPlatesBySize(true);
+                smallestItem.Enabled = !IsInspecting && PlateManager.CanSortPlatesBySize(false);
+            };
+            toolStrip1.Items.Add(button);
+        }
+
+        /// <summary>
+        /// Orders the plates by sheet size, largest or smallest first, as one undoable step,
+        /// keeping the current plate current. The trailing empty new-plate sentinel stays last.
+        /// </summary>
+        /// <returns>Whether the order changed.</returns>
+        public bool SortPlatesBySize(bool largestFirst)
+        {
+            if (IsInspecting || !PlateManager.CanSortPlatesBySize(largestFirst))
+                return false;
+
+            using (var change = BeginChange("Sort Plates"))
+            {
+                change.MarkChanged();
+                PlateManager.SortPlatesBySize(largestFirst);
+                change.Complete();
+            }
+
+            FirePlateChanged();
+            return true;
         }
 
         /// <summary>

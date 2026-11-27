@@ -85,6 +85,19 @@ public class UndoRecordingTests
         env.AssertOneUndoableEdit("Move Plate", () => Assert.True(env.Editor.MovePlate(3, 0))));
 
     [Fact]
+    public void SortPlatesBySizeRecordsOneEntry() => UndoTestEnv.Run(env =>
+    {
+        using (var change = env.Editor.BeginChange("Resize"))
+        {
+            change.MarkChanged();
+            env.Nest.Plates[0].Size = new OpenNest.Geometry.Size(50, 50);
+            env.Nest.Plates[3].Size = new OpenNest.Geometry.Size(120, 60);
+            change.Complete();
+        }
+        env.AssertOneUndoableEdit("Sort Plates", () => Assert.True(env.Editor.SortPlatesBySize(true)));
+    });
+
+    [Fact]
     public void DuplicatePlateRecordsOneEntry() => UndoTestEnv.Run(env =>
         env.AssertOneUndoableEdit("Duplicate Plate", () => Assert.True(env.Editor.DuplicatePlate(0, 1))));
 

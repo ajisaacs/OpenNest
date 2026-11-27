@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using OpenNest.Collections;
 
 namespace OpenNest
@@ -219,6 +220,63 @@ namespace OpenNest
                 reorderCurrent = null;
             }
             return true;
+        }
+
+        /// <summary>Whether <see cref="SortPlatesBySize"/> would change the plate order.</summary>
+        public bool CanSortPlatesBySize(bool largestFirst)
+        {
+            var movable = MovableCount;
+            var sorted = SortedBySize(largestFirst);
+            for (var i = 0; i < movable; i++)
+            {
+                if (!ReferenceEquals(sorted[i], nest.Plates[i]))
+                    return true;
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Orders the plates by sheet area, largest or smallest first; equal areas order by the
+        /// longer side, and plates of the same size keep their order among themselves. Like
+        /// <see cref="MovePlate"/>, only the order changes, the current plate stays current and
+        /// the trailing empty sentinel stays last.
+        /// </summary>
+        /// <returns>Whether the order changed.</returns>
+        public bool SortPlatesBySize(bool largestFirst)
+        {
+            if (!CanSortPlatesBySize(largestFirst))
+                return false;
+
+            var order = new List<Plate>(SortedBySize(largestFirst));
+            for (var i = MovableCount; i < Count; i++)
+                order.Add(nest.Plates[i]);
+
+            reorderCurrent = CurrentPlate;
+            try
+            {
+                nest.Plates.Reorder(order);
+            }
+            finally
+            {
+                reorderCurrent = null;
+            }
+            return true;
+        }
+
+        // The movable plates in size order; LINQ's ordering is stable, so ties keep their order.
+        private List<Plate> SortedBySize(bool largestFirst)
+        {
+            var movable = new List<Plate>(MovableCount);
+            for (var i = 0; i < MovableCount; i++)
+                movable.Add(nest.Plates[i]);
+
+            static double Area(Plate p) => p.Size.Width * p.Size.Length;
+            static double LongSide(Plate p) => System.Math.Max(p.Size.Width, p.Size.Length);
+
+            var sorted = largestFirst
+                ? movable.OrderByDescending(Area).ThenByDescending(LongSide)
+                : movable.OrderBy(Area).ThenBy(LongSide);
+            return sorted.ToList();
         }
 
         /// <summary>

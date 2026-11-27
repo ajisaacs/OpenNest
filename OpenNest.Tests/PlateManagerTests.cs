@@ -707,6 +707,33 @@ public class PlateManagerTests
     }
 
     [Fact]
+    public void SortPlatesBySize_OrdersByAreaThenLongSideAndKeepsTiesAndTheSentinel()
+    {
+        var (nest, mgr, filled) = NestWithFilledPlates(5);
+        using var _ = mgr;
+        filled[0].Size = new Size(48, 96);
+        filled[1].Size = new Size(60, 120);
+        filled[2].Size = new Size(96, 48);
+        filled[3].Size = new Size(32, 144);
+        filled[4].Size = new Size(10, 10);
+        var sentinel = nest.Plates[^1];
+        mgr.LoadAt(2);
+
+        Assert.True(mgr.SortPlatesBySize(largestFirst: true));
+
+        // 48x96, 96x48 and 32x144 share an area: the longest side first, then the original order.
+        Assert.Equal(new[] { filled[1], filled[3], filled[0], filled[2], filled[4], sentinel }, nest.Plates);
+        Assert.Same(filled[2], mgr.CurrentPlate);
+        Assert.Equal(3, mgr.CurrentIndex);
+
+        Assert.True(mgr.SortPlatesBySize(largestFirst: false));
+
+        Assert.Equal(new[] { filled[4], filled[0], filled[2], filled[3], filled[1], sentinel }, nest.Plates);
+        Assert.False(mgr.CanSortPlatesBySize(largestFirst: false));
+        Assert.False(mgr.SortPlatesBySize(largestFirst: false));
+    }
+
+    [Fact]
     public void DuplicatePlate_InsertsACopyAtTheSlotAndMakesItCurrent()
     {
         var (nest, mgr, filled) = NestWithFilledPlates(2);
