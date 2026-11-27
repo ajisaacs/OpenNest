@@ -90,6 +90,15 @@ PartPrintoutWriter.Write(snapshot, destinationPath);
   straight line, and its ID is marked `*` on the diagram and in the plate's parts
   table, with a "* Tabbed" legend line under the diagram. Cutoffs are separate
   strokes with no product ID or quantity.
+- A formed part (bent or rolled after cutting, `Drawing.IsFormed`) has its ID
+  marked `F` on the diagram and in the plate's parts table (`7F`, or `7F*` when
+  it is also tabbed), with an "F Formed: goes to forming." legend line under the
+  diagram, so the operator sorts formed and flat parts onto separate skids. A
+  drawing with bend lines (brake bends, or a rolled part's centerline bend with
+  its roll radius) is formed unless **Formed after cutting** is unchecked in
+  Drawing Properties; checking it marks a part whose bend lines were lost. When
+  any drawing in the job is formed, every plate's parts table adds a **Formed**
+  column (Yes / blank).
 - Snapshots retain values, not live drawings, parts, CNC programs or mutable
   geometry. Invalid/missing/nonfinite geometry fails with drawing/plate context.
 - A drawing's weight is its net area (holes excluded) times the nest thickness
@@ -205,8 +214,8 @@ Machine clamps appear on the plate diagram as white, diagonally hatched
 rectangles drawn under the parts, and IDs keep clear of them like any other
 obstacle. A clamp taken off the sheet is a dashed rectangle crossed out, drawn
 over the parts (they may sit where it was) so the operator sees it must come off
-before cutting. Only a removed clamp (and a tabbed part) gets a legend line under
-the diagram, the two sharing one line; hatched
+before cutting. Only a removed clamp (and a formed or tabbed part) gets a legend
+line under the diagram, all sharing one line; hatched
 clamps and the rulers explain themselves, which leaves room for ten parts-table
 rows on a plate page even with an estimated cut time.
 
