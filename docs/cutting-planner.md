@@ -960,6 +960,18 @@ regenerated program are marked; a rapid into or inside a locked program or a cut
 rapid inside a hole sub-program after its arrival, keeps its crossing as a finding. The checker sets a raised rapid's crossings apart
 instead of reporting them, in replay and in pre-post verification alike.
 
+The walk never goes back to a part it has cut, so a free-order route then tries local changes to
+its order where it raises the head (`RaisedRapidRepair`). For a part whose planner-chosen rapids
+cross parts already cut, it tries that part just before the earliest part crossed, then each
+crossed part, latest first, just before and just after it, keeping every prerequisite. Only the
+parts whose place changed, the part before them (planned facing a different next part) and the
+part after them are planned again by the walk's own step, each facing the next part along the
+changed order; the rest keep their programs. Each change is marked and replayed in full, and the
+first that breaks no more checks (tiers as above) and raises the head fewer times is kept; the
+search then starts again from the new route. It stops when no change helps, after 200 replays or
+when its expansion budget (the plate's) runs out, so it can only make a route safer. A kept order
+is never changed.
+
 The batch walks both the free order and the current order, replays each against its captured
 input with fresh checks, and keeps the one with the lower severity, then fewer head raises, then
 the shorter rapid travel; a route that passes every check without a raise is taken at once.

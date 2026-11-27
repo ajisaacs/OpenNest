@@ -517,8 +517,27 @@ public static class CuttingPlanService
         // twice the strict search's budget. Replay still checks it against the captured input.
         var budget = (int)System.Math.Min(int.MaxValue, 2L * snapshot.ExpansionBudget);
         var order = JointCuttingPlanSearch.SafestRoute(snapshot.WithSearchLimits(budget, snapshot.MaxEntries), token);
-        if (order == null)
+        if (order == null || ReplaySafestRoute(snapshot, order, token) is not { } result)
             return null;
+        // The walk never goes back to a part it cut: try cutting parts the other way round
+        // where its rapids raise the head over them.
+        try
+        {
+            result = RaisedRapidRepair.Repair(snapshot, order, result,
+                changed => ReplaySafestRoute(snapshot, changed, token), token);
+        }
+        catch (Exception ex) when (ex is ArgumentException or NotSupportedException)
+        {
+            // A route that cannot be read for its crossings keeps its raises.
+        }
+        result.Snapshot = snapshot;
+        return result;
+    }
+
+    // The route with its crossing rapids marked to raise the head, replayed; null when refused.
+    private static CuttingPlanResult ReplaySafestRoute(CuttingPlanSnapshot snapshot,
+        IReadOnlyList<FixedProgramPlacement> order, CancellationToken token)
+    {
         try
         {
             order = RaisedRapids.Mark(snapshot, order, token);
@@ -528,11 +547,8 @@ public static class CuttingPlanService
             // A route that cannot be read for marking keeps its crossings as findings.
         }
         var result = ReplayPrograms(snapshot, order, 0, token, safestRoute: true);
-        if (result.Status is not (CuttingPlanStatus.Ready or CuttingPlanStatus.BestEffort)
-            || result.SafestRoute is { Severe: > 0 })
-            return null;
-        result.Snapshot = snapshot;
-        return result;
+        return result.Status is not (CuttingPlanStatus.Ready or CuttingPlanStatus.BestEffort)
+            || result.SafestRoute is { Severe: > 0 } ? null : result;
     }
 
     // Re-read EXACT selected programs with a fresh checker and native lead validation.

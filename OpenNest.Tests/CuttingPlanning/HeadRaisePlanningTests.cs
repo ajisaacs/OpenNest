@@ -110,6 +110,60 @@ public class HeadRaisePlanningTests
     }
 
     [Fact]
+    public void Repair_CutsThePartBeyondTheWallBeforeIt()
+    {
+        // A safest route that cuts the wall, the left square, then the right one raises the head
+        // over the wall; cutting the right square before the wall keeps it down.
+        var (_, plate) = WallPlate();
+        var snapshot = CuttingPlanService.Capture(CuttingPlanRequest.ForPlate(plate,
+            confirmedParameters: ExplicitContourTests.Parameters(), preservePartOrder: false), default);
+        var order = new JointCuttingPlanSearch.Resequencer(snapshot, default).Cut([], [0, 1, 2], 0, 2);
+        var raised = CuttingPlanService.ReplayPrograms(snapshot, RaisedRapids.Mark(snapshot, order, default), 0,
+            default, safestRoute: true);
+        Assert.Equal(1, raised.HeadRaises);
+        var (index, crossed) = Assert.Single(RaisedRapids.Crossed(snapshot, order, default));
+        Assert.Equal(2, index);
+        Assert.Equal(new[] { 0 }, crossed); // The wall.
+
+        var repaired = RaisedRapidRepair.Repair(snapshot, order, raised, changed => CuttingPlanService.ReplayPrograms(
+            snapshot, RaisedRapids.Mark(snapshot, changed, default), 0, default, safestRoute: true), default);
+
+        Assert.Equal(CuttingPlanStatus.Ready, repaired.Status);
+        Assert.Equal(0, repaired.HeadRaises);
+        Assert.Equal(new[] { 2, 0, 1 }, repaired.ProposedOrder.Select(p => p.SourceOrdinal));
+    }
+
+    [Fact]
+    public void Repair_NeverChangesAKeptOrder()
+    {
+        var (_, plate) = WallPlate();
+        var snapshot = CuttingPlanService.Capture(CuttingPlanRequest.ForPlate(plate,
+            confirmedParameters: ExplicitContourTests.Parameters(), preservePartOrder: true), default);
+        var result = CuttingPlanService.PlanSafestRoute(snapshot, default);
+
+        Assert.Equal(1, result.HeadRaises);
+        Assert.Equal(new[] { 0, 1, 2 }, result.ProposedOrder.Select(p => p.SourceOrdinal));
+    }
+
+    [Fact]
+    public void RepairCandidates_MoveThePartOrWhatItCrossed()
+    {
+        // Part 7 at index 3 crossed part 5 (index 1) and part 9 (index 0).
+        int[] sequence = [9, 5, 6, 7, 8];
+
+        var candidates = RaisedRapidRepair.Candidates(sequence, 3, [5, 9]).ToArray();
+
+        Assert.Equal(new[]
+        {
+            new[] { 7, 9, 5, 6, 8 }, // Before the earliest crossed part.
+            new[] { 9, 6, 5, 7, 8 }, // Part 5 just before it,
+            new[] { 9, 6, 7, 5, 8 }, // and just after it.
+            new[] { 5, 6, 9, 7, 8 },
+            new[] { 5, 6, 7, 9, 8 },
+        }, candidates);
+    }
+
+    [Fact]
     public void StrictPlan_NeverMarksARapid()
     {
         var (_, plate) = WallPlate();

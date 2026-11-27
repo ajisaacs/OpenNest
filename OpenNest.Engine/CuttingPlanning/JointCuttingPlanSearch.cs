@@ -277,6 +277,38 @@ internal static class JointCuttingPlanSearch
         }
     }
 
+    /// <summary>
+    /// Plans windows of a safest route again along a changed part order (see
+    /// <see cref="Walk.Resequence"/>), every call drawing on one search budget.
+    /// </summary>
+    internal sealed class Resequencer(CuttingPlanSnapshot snapshot, CancellationToken token)
+    {
+        private readonly Walk walk = new(snapshot, token, []);
+
+        /// <summary>True once the budget ran out; every later call returns null.</summary>
+        internal bool Exhausted { get; private set; }
+
+        internal IReadOnlyList<FixedProgramPlacement> Cut(IReadOnlyList<FixedProgramPlacement> order,
+            int[] sequence, int from, int to)
+        {
+            if (Exhausted)
+                return null;
+            try
+            {
+                return walk.Resequence(order, sequence, from, to);
+            }
+            catch (BudgetExceededException)
+            {
+                Exhausted = true;
+                return null;
+            }
+            catch (Exception ex) when (ex is ArgumentException or NotSupportedException)
+            {
+                return null;
+            }
+        }
+    }
+
     // Captured containment (never learned rules) and each host's placed cut contours.
     private static CuttingNestedOrder.Context NestedOrder(CuttingPlanSnapshot snapshot, Vector[] centers,
         HashSet<int>[] prerequisites, CancellationToken token)
@@ -1736,9 +1768,42 @@ internal static class JointCuttingPlanSearch
         /// <summary>The holes, next along the tour, a safest-route step weighs for its next cut.</summary>
         private const int SafestHoleWindow = 4;
 
-        // One part's route from the node, its perimeter last. Null when it cannot be emitted.
-        private SafestStep SafestPart(Node node, FixedProgramPlacement source)
+        /// <summary>
+        /// <paramref name="order"/> with the parts at <paramref name="from"/> through <paramref name="to"/>
+        /// of <paramref name="sequence"/> planned again, each by the safest-route step facing the
+        /// next part along it, from where the proposals before <paramref name="from"/> leave the
+        /// tool. The proposals after <paramref name="to"/> are kept as they are. The sequence must
+        /// match the order outside that window. Null when a part cannot be emitted.
+        /// </summary>
+        internal IReadOnlyList<FixedProgramPlacement> Resequence(IReadOnlyList<FixedProgramPlacement> order,
+            int[] sequence, int from, int to)
         {
+            var checker = snapshot.NewReleasedState();
+            var position = snapshot.StartPoint;
+            foreach (var proposal in order.Take(from))
+            {
+                token.ThrowIfCancellationRequested();
+                var execution = ExecutionMotionReader.Read(proposal.CopyProgram(), proposal.Location, position, token);
+                checker.Check(execution, position, proposal.SourceOrdinal + 1, proposal.IsCutOff,
+                    proposal.FixedMotions(execution), token, snapshot.WarnsTabLeadOuts(proposal));
+                position = execution.DeparturePoint;
+            }
+            var node = new Node([.. order.Take(from)], position, checker, null, null);
+            for (var index = from; index <= to; index++)
+            {
+                if (SafestPart(node, snapshot.Placements[sequence[index]], sequence) is not { } step)
+                    return null;
+                node = step.Node;
+            }
+            var kept = order.ToDictionary(p => p.SourceOrdinal);
+            return [.. node.Order, .. sequence.Skip(to + 1).Select(ordinal => kept[ordinal])];
+        }
+
+        // One part's route from the node, its perimeter last, facing the next part along the
+        // sequence (a kept order's when none is given). Null when it cannot be emitted.
+        private SafestStep SafestPart(Node node, FixedProgramPlacement source, int[] sequence = null)
+        {
+            sequence ??= KeptSequence;
             var arrival = node.Position;
             if (source.Prepared is not { } prepared)
             {
@@ -1759,7 +1824,7 @@ internal static class JointCuttingPlanSearch
             // Recovery's contour solver first: its first route whose only violations, if any, are
             // where the arrival rapid crosses cut contours. It passes every check when it can.
             if (HasRecoverableHoles(source) && prepared.Count > 1 && prepared.PerimeterOrdinal <= MaximumRecoveryHoles
-                && RecoverPart(node, KeptSequence, source, new Attempt(null), arrivalMayCross: true).FirstOrDefault() is { } recovered)
+                && RecoverPart(node, sequence, source, new Attempt(null), arrivalMayCross: true).FirstOrDefault() is { } recovered)
             {
                 var proposal = recovered.Node.Order[^1];
                 return new(recovered.Node, Score(proposal, proposal.Execution, arrival, node.Checker.Copy(),
@@ -1771,7 +1836,7 @@ internal static class JointCuttingPlanSearch
             var holes = Enumerable.Range(0, prepared.PerimeterOrdinal).ToArray();
             var centers = CuttingHoleOrder.Centers(prepared, approach, token);
             var remaining = CuttingHoleOrder.Plan(holes, centers, approach, null, token).ToList();
-            var onward = LookAheadCenter(node, KeptSequence, source) - source.Location;
+            var onward = LookAheadCenter(node, sequence, source) - source.Location;
             var choices = new List<ContourChoice>();
             Program program = null;
             OwnedExecution execution = null;
