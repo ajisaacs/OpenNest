@@ -56,22 +56,17 @@ public class BendLinePlacementTests
     }
 
     [Fact]
-    public void BendGrainColor_KeepsTheBendColorAcrossTheGrain_AndTheOthersAreFarFromItInHue()
+    public void BendGrainColor_IsATrafficLight_GreenAcrossYellowAtAnAngleRedWithTheGrain()
     {
-        Assert.Equal(System.Drawing.Color.Yellow, PlateRenderer.BendGrainColor(BendGrainKind.AcrossGrain));
-        Assert.Equal(System.Drawing.Color.Cyan, PlateRenderer.BendGrainColor(BendGrainKind.WithGrain));
-        Assert.Equal(System.Drawing.Color.Magenta, PlateRenderer.BendGrainColor(BendGrainKind.Other));
-
-        // No two kinds are closer than a third of the color wheel, so none reads as a shade of another.
-        var hues = Enum.GetValues<BendGrainKind>().Select(kind => PlateRenderer.BendGrainColor(kind).GetHue()).ToList();
-        for (var a = 0; a < hues.Count; a++)
-        {
-            for (var b = a + 1; b < hues.Count; b++)
-            {
-                var apart = System.Math.Abs(hues[a] - hues[b]);
-                Assert.True(System.Math.Min(apart, 360 - apart) >= 119, $"{hues[a]} and {hues[b]} are too close.");
-            }
-        }
+        Assert.Equal(
+            System.Drawing.Color.Lime,
+            PlateRenderer.BendGrainColor(BendGrainKind.AcrossGrain));
+        Assert.Equal(
+            System.Drawing.Color.Yellow,
+            PlateRenderer.BendGrainColor(BendGrainKind.Other));
+        Assert.Equal(
+            System.Drawing.Color.Red,
+            PlateRenderer.BendGrainColor(BendGrainKind.WithGrain));
 
         // Each kind also has its own dash pattern.
         Assert.Equal(3, Enum.GetValues<BendGrainKind>().Select(PlateRenderer.BendGrainDash).Distinct().Count());

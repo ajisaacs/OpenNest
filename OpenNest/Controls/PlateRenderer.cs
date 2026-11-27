@@ -528,13 +528,13 @@ namespace OpenNest.Controls
             }
         }
 
-        // Bend lines are colored by how they run against the sheet's grain. Across the grain is
-        // the preferred direction, so it keeps the plain bend color; the others stand out. The
-        // three are far apart in hue (yellow, cyan, magenta) and each has its own dash pattern,
-        // so they can be told apart on any part color and without relying on hue alone.
-        private static readonly Color AcrossGrainBendColor = Color.Yellow;
-        private static readonly Color WithGrainBendColor = Color.Cyan;
-        private static readonly Color OtherGrainBendColor = Color.Magenta;
+        // Bend lines are colored by how they run against the sheet's grain, as a traffic light:
+        // across the grain (preferred) is green, at an angle yellow, with the grain (worst, it
+        // can crack) red. Each also has its own dash pattern, so they can be told apart on any
+        // part color and without relying on hue alone.
+        private static readonly Color AcrossGrainBendColor = Color.Lime;
+        private static readonly Color WithGrainBendColor = Color.Red;
+        private static readonly Color OtherGrainBendColor = Color.Yellow;
 
         // Drawn under each bend line so a bright line still shows on a light part color.
         private static readonly Color BendLineOutlineColor = Color.FromArgb(150, 0, 0, 0);
